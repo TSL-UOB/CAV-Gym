@@ -214,15 +214,6 @@ class Lane:
     max_y: float
 
 
-class JointReward(list):
-    def __iadd__(self, other):
-        for i, value in enumerate(other):
-            self[i] += value
-
-    def __float__(self):
-        return [float(value) for value in self]
-
-
 class RoadEnv(MarkovGameEnv):
     metadata = {
         'render.modes': ['human', 'rgb_array']
@@ -322,7 +313,7 @@ class RoadEnv(MarkovGameEnv):
 
         joint_reward = [-1 if any(vehicle.intersects(other_vehicle) for other_vehicle in self.vehicles if vehicle is not other_vehicle) else 0 for vehicle in self.vehicles]
 
-        return self.observation_space.sample(), JointReward(joint_reward), any(reward < 0 for reward in joint_reward), None
+        return self.observation_space.sample(), joint_reward, any(reward < 0 for reward in joint_reward), None
 
     def reset(self):
         for vehicle in self.vehicles:
