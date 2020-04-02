@@ -1,9 +1,8 @@
-import dataclasses
 import math
 from copy import copy
+from dataclasses import dataclass
 from enum import Enum
 
-import numpy as np
 from gym import Env, spaces
 from gym.envs.classic_control.rendering import Line, LineStyle
 from gym.utils import seeding
@@ -26,11 +25,11 @@ class MarkovGameEnv(Env):
         Accepts a joint action and returns a tuple (joint_observation, joint_reward, done, info).
 
         Args:
-            joint_action (dict(object)): an action provided by each agent
+            joint_action (list(object)): an action provided by each agent
 
         Returns:
-            joint_observation (dict(object)): each agent's observation of the current environment
-            joint_reward (dict(float)) : each agent's amount of reward returned after previous joint action
+            joint_observation (list(object)): each agent's observation of the current environment
+            joint_reward (list(float)) : each agent's amount of reward returned after previous joint action
             done (bool): whether the episode has ended, in which case further step() calls will return undefined results
             info (dict): contains auxiliary diagnostic information (helpful for debugging, and sometimes learning)
         """
@@ -84,7 +83,7 @@ class MarkovGameEnv(Env):
         raise NotImplementedError
 
 
-@dataclasses.dataclass
+@dataclass
 class Point:
     x: float
     y: float
@@ -93,7 +92,7 @@ class Point:
         return Point(self.x, self.y)
 
 
-@dataclasses.dataclass
+@dataclass
 class VehicleState:
     position: Point
     diagonal_velocity: float
@@ -105,7 +104,7 @@ class VehicleState:
         return VehicleState(copy(self.position), self.diagonal_velocity, self.throttle, self.orientation, self.turn)
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class VehicleConfig:
     length: float = 50.0
     width: float = 20.0
@@ -201,14 +200,14 @@ class Observation(Enum):
         return self.name
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class RoadEnvConfig:
     viewer_width: int = 1600
     viewer_height: int = 100
     time_resolution: float = 1.0 / 60.0
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class Lane:
     min_y: float
     max_y: float

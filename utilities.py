@@ -7,6 +7,9 @@ from gym.utils import atomic_write
 from gym.utils.json_utils import json_encode_np
 
 class JointStatsRecorder(object):
+    """
+    This is a modified version Gym's StatsRecorder class to support joint rewards.
+    """
     def __init__(self, directory, file_prefix, agents, autoreset=False, env_id=None):
         self.autoreset = autoreset
         self.env_id = env_id
