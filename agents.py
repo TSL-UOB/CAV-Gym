@@ -1,6 +1,6 @@
 from gym.utils import seeding
 
-from environment import ThrottleAction, TurnAction
+from environment import ThrottleAction, TurnAction, TrafficLightAction
 
 
 class Agent:
@@ -14,11 +14,39 @@ class Agent:
         raise NotImplementedError()
 
 
-class RandomAgent(Agent):
+class RandomTrafficLightAgent(Agent):
     def __init__(self, epsilon=0.1, seed=None):
         self.np_random = None
         self.seed(seed)
         self.epsilon = epsilon
+
+        self.action = TrafficLightAction.NOOP
+
+    def seed(self, seed=None):
+        self.np_random, seed = seeding.np_random(seed)
+        return [seed]
+
+    def reset(self):
+        self.action = TrafficLightAction.NOOP
+
+    def choose_action(self, observation, action_space):
+        if self.np_random.uniform(0.0, 1.0) < self.epsilon:
+            action_id = action_space.sample()
+            self.action = TrafficLightAction(action_id)
+        else:
+            self.action = TrafficLightAction.NOOP
+        return self.action.value
+
+    def process_feedback(self, previous_observation, action, observation, reward):
+        pass
+
+
+class RandomVehicleAgent(Agent):
+    def __init__(self, epsilon=0.1, seed=None):
+        self.np_random = None
+        self.seed(seed)
+        self.epsilon = epsilon
+
         self.throttle_action = ThrottleAction.NEUTRAL
         self.turn_action = TurnAction.NEUTRAL
 
@@ -41,7 +69,7 @@ class RandomAgent(Agent):
         pass
 
 
-class HumanAgent(Agent):
+class HumanVehicleAgent(Agent):
     key_throttle_actions = {
         32: {
             False: ThrottleAction.NEUTRAL,
