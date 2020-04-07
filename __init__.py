@@ -99,7 +99,7 @@ actors = [
 human_agent = HumanDynamicActorAgent()
 agents = [human_agent, RandomDynamicActorAgent(), RandomTrafficLightAgent(), RandomTrafficLightAgent(), RandomDynamicActorAgent()]
 
-save_video = True
+save_video = False
 env = RoadEnv(actors=actors, constants=env_constants)
 if save_video:
     env = wrappers.Monitor(env, f"{Path.home()}/CAV-Gym/Videos/", video_callable=lambda episode_id: True, force=True)  # save all episodes instead of default behaviour (episodes 1, 8, 27, 64, ...)
