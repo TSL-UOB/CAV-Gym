@@ -11,11 +11,16 @@ class LightState(Enum):
     FULL = 2
 
 
-class VehicleView:
+class ActorView:
+    def update(self, actor):
+        raise NotImplementedError
+
+
+class VehicleView(ActorView):
     def __init__(self, vehicle):
         rear, right, front, left = vehicle.bounds
-        light_offset = vehicle.config.width * 0.25
-        roof_offset = vehicle.config.length * 0.25
+        light_offset = vehicle.constants.width * 0.25
+        roof_offset = vehicle.constants.length * 0.25
 
         self.scale = {
             LightState.OFF: (0, 0),
@@ -31,8 +36,8 @@ class VehicleView:
         self.roof.set_color(0.5, 0.5, 0.5)
         self.roof.add_attr(self.transform)
 
-        front_right_indicator = rendering.make_circle(vehicle.config.width * 0.2)
-        rear_right_indicator = rendering.make_circle(vehicle.config.width * 0.2)
+        front_right_indicator = rendering.make_circle(vehicle.constants.width * 0.2)
+        rear_right_indicator = rendering.make_circle(vehicle.constants.width * 0.2)
         self.right_indicators = rendering.Compound([front_right_indicator, rear_right_indicator])
         self.right_indicators.set_color(1, 0.75, 0)
         self.front_right_indicator_transform = rendering.Transform(translation=(front - light_offset, right), scale=self.scale[LightState.OFF])
@@ -41,8 +46,8 @@ class VehicleView:
         rear_right_indicator.add_attr(self.rear_right_indicator_transform)
         self.right_indicators.add_attr(self.transform)
 
-        front_left_indicator = rendering.make_circle(vehicle.config.width * 0.2)
-        rear_left_indicator = rendering.make_circle(vehicle.config.width * 0.2)
+        front_left_indicator = rendering.make_circle(vehicle.constants.width * 0.2)
+        rear_left_indicator = rendering.make_circle(vehicle.constants.width * 0.2)
         self.left_indicators = rendering.Compound([front_left_indicator, rear_left_indicator])
         self.left_indicators.set_color(1, 0.75, 0)
         self.front_left_indicator_transform = rendering.Transform(translation=(front - light_offset, left), scale=self.scale[LightState.OFF])
@@ -51,8 +56,8 @@ class VehicleView:
         rear_left_indicator.add_attr(self.rear_left_indicator_transform)
         self.left_indicators.add_attr(self.transform)
 
-        brake_light_left = rendering.make_circle(vehicle.config.width * 0.2)
-        brake_light_right = rendering.make_circle(vehicle.config.width * 0.2)
+        brake_light_left = rendering.make_circle(vehicle.constants.width * 0.2)
+        brake_light_right = rendering.make_circle(vehicle.constants.width * 0.2)
         self.brake_lights = rendering.Compound([brake_light_left, brake_light_right])
         self.brake_lights.set_color(1, 0, 0)
         self.brake_light_left_transform = rendering.Transform(translation=(rear, left - light_offset), scale=self.scale[LightState.OFF])
@@ -61,8 +66,8 @@ class VehicleView:
         brake_light_right.add_attr(self.brake_light_right_transform)
         self.brake_lights.add_attr(self.transform)
 
-        headlight_left = rendering.make_circle(vehicle.config.width * 0.2)
-        headlight_right = rendering.make_circle(vehicle.config.width * 0.2)
+        headlight_left = rendering.make_circle(vehicle.constants.width * 0.2)
+        headlight_right = rendering.make_circle(vehicle.constants.width * 0.2)
         self.headlights = rendering.Compound([headlight_left, headlight_right])
         self.headlights.set_color(1, 1, 0)
         self.headlight_left_transform = rendering.Transform(translation=(front, left - light_offset), scale=self.scale[LightState.OFF])
@@ -91,14 +96,14 @@ class VehicleView:
         self.transform.set_translation(vehicle.state.position.x, vehicle.state.position.y)
         self.transform.set_rotation(vehicle.state.orientation)
 
-        if vehicle.state.turn > 0:
-            if vehicle.state.turn == vehicle.config.radians_left:
+        if vehicle.state.angular_velocity > 0:
+            if vehicle.state.angular_velocity == vehicle.constants.normal_left_turn:
                 self.set_left_indicators(LightState.DIM)
             else:
                 self.set_left_indicators(LightState.FULL)
             self.set_right_indicators(LightState.OFF)
-        elif vehicle.state.turn < 0:
-            if vehicle.state.turn == vehicle.config.radians_right:
+        elif vehicle.state.angular_velocity < 0:
+            if vehicle.state.angular_velocity == vehicle.constants.normal_right_turn:
                 self.set_right_indicators(LightState.DIM)
             else:
                 self.set_right_indicators(LightState.FULL)
@@ -107,14 +112,14 @@ class VehicleView:
             self.set_left_indicators(LightState.OFF)
             self.set_right_indicators(LightState.OFF)
 
-        if vehicle.state.throttle < 0:
-            if vehicle.state.throttle == vehicle.config.speed_decelerate:
+        if vehicle.state.acceleration < 0:
+            if vehicle.state.acceleration == vehicle.constants.normal_deceleration:
                 self.set_brake_lights(LightState.DIM)
             else:
                 self.set_brake_lights(LightState.FULL)
             self.set_headlights(LightState.OFF)
-        elif vehicle.state.throttle > 0:
-            if vehicle.state.throttle == vehicle.config.speed_accelerate:
+        elif vehicle.state.acceleration > 0:
+            if vehicle.state.acceleration == vehicle.constants.normal_acceleration:
                 self.set_headlights(LightState.DIM)
             else:
                 self.set_headlights(LightState.FULL)
@@ -124,29 +129,46 @@ class VehicleView:
             self.set_headlights(LightState.OFF)
 
 
-class TrafficLightView:
+class PedestrianView(ActorView):
+    def __init__(self, pedestrian):
+        rear, right, front, left = pedestrian.bounds
+
+        self.body = rendering.make_polygon([(front, right), (front, left), (rear, left), (rear, right)])
+        self.transform = rendering.Transform(translation=(pedestrian.state.position.x, pedestrian.state.position.y), rotation=pedestrian.state.orientation)
+        self.body.add_attr(self.transform)
+
+        self.head = rendering.make_circle(pedestrian.constants.length * 0.3)
+        self.head.set_color(0.5, 0.5, 0.5)
+        self.head.add_attr(self.transform)
+
+    def update(self, pedestrian):
+        self.transform.set_translation(pedestrian.state.position.x, pedestrian.state.position.y)
+        self.transform.set_rotation(pedestrian.state.orientation)
+
+
+class TrafficLightView(ActorView):
     def __init__(self, traffic_light):
         rear, right, front, left = traffic_light.bounds
 
         self.body = rendering.make_polygon([(front, right), (front, left), (rear, left), (rear, right)])
-        self.transform = rendering.Transform(translation=(traffic_light.config.position.x, traffic_light.config.position.y), rotation=traffic_light.config.orientation)
+        self.transform = rendering.Transform(translation=(traffic_light.constants.position.x, traffic_light.constants.position.y), rotation=traffic_light.constants.orientation)
         self.body.add_attr(self.transform)
 
-        self.red_light = rendering.make_circle(traffic_light.config.width * 0.25)
+        self.red_light = rendering.make_circle(traffic_light.constants.width * 0.25)
         self.red_light.set_color(1, 0, 0)
-        self.red_light_transform = rendering.Transform(translation=(0, traffic_light.config.height * 0.25))
+        self.red_light_transform = rendering.Transform(translation=(0, traffic_light.constants.height * 0.25))
         self.red_light.add_attr(self.red_light_transform)
         self.red_light.add_attr(self.transform)
 
-        self.amber_light = rendering.make_circle(traffic_light.config.width * 0.25)
+        self.amber_light = rendering.make_circle(traffic_light.constants.width * 0.25)
         self.amber_light.set_color(1, 0.75, 0)
         self.amber_light_transform = rendering.Transform(translation=(0, 0))
         self.amber_light.add_attr(self.amber_light_transform)
         self.amber_light.add_attr(self.transform)
 
-        self.green_light = rendering.make_circle(traffic_light.config.width * 0.25)
+        self.green_light = rendering.make_circle(traffic_light.constants.width * 0.25)
         self.green_light.set_color(0, 1, 0)
-        self.green_light_transform = rendering.Transform(translation=(0, -traffic_light.config.height * 0.25))
+        self.green_light_transform = rendering.Transform(translation=(0, -traffic_light.constants.height * 0.25))
         self.green_light.add_attr(self.green_light_transform)
         self.green_light.add_attr(self.transform)
 
@@ -186,12 +208,13 @@ class RoadEnvViewer(rendering.Viewer):
     def __init__(self, width, height, actors):
         super().__init__(width, height)
 
-        self.road_view = RoadView(self.width, [self.height * 0.1, self.height * 0.5, self.height * 0.9])
+        self.road_view = RoadView(self.width, [self.height * 0.25, self.height * 0.5, self.height * 0.75])
         self.add_geom(self.road_view.markings)
 
         self.actor_views = list()
         self.vehicle_views = list()
         self.traffic_light_views = list()
+        self.pedestrian_views = list()
         for actor in actors:
             if isinstance(actor, environment.Vehicle):
                 vehicle_view = VehicleView(actor)
@@ -201,6 +224,10 @@ class RoadEnvViewer(rendering.Viewer):
                 traffic_light_view = TrafficLightView(actor)
                 self.actor_views.append(traffic_light_view)
                 self.traffic_light_views.append(traffic_light_view)
+            elif isinstance(actor, environment.Pedestrian):
+                pedestrian_view = PedestrianView(actor)
+                self.actor_views.append(pedestrian_view)
+                self.pedestrian_views.append(pedestrian_view)
 
         for traffic_light_view in self.traffic_light_views:
             self.add_geom(traffic_light_view.body)
@@ -222,6 +249,10 @@ class RoadEnvViewer(rendering.Viewer):
         for vehicle_view in self.vehicle_views:
             self.add_geom(vehicle_view.body)
             self.add_geom(vehicle_view.roof)
+
+        for pedestrian_view in self.pedestrian_views:
+            self.add_geom(pedestrian_view.body)
+            self.add_geom(pedestrian_view.head)
 
     def update(self, actors):
         for actor_view, actor in zip(self.actor_views, actors):
