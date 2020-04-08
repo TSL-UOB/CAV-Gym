@@ -2,7 +2,7 @@ from enum import Enum
 
 from gym.envs.classic_control import rendering
 
-import environment
+from cavgym import environment
 
 
 class LightState(Enum):

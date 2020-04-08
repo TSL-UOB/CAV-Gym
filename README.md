@@ -3,3 +3,7 @@ A custom OpenAI Gym environment that supports Markov games (joint actions, joint
 
 ![](demo.gif)
 
+## Usage
+```
+python3 main.py
+```

@@ -8,8 +8,8 @@ from gym import spaces
 from gym.utils import seeding
 from shapely import geometry, affinity
 
-from actions import TrafficLightAction, AccelerationAction, TurnAction
-from rendering import RoadEnvViewer
+from cavgym.actions import TrafficLightAction, AccelerationAction, TurnAction
+from cavgym.rendering import RoadEnvViewer
 
 DEG2RAD = 0.017453292519943295
 

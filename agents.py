@@ -1,6 +1,6 @@
 from gym.utils import seeding
 
-from environment import TurnAction, TrafficLightAction, AccelerationAction
+from cavgym.environment import TurnAction, TrafficLightAction, AccelerationAction
 
 
 class Agent:
