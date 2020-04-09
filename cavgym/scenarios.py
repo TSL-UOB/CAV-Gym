@@ -1,10 +1,24 @@
 from cavgym.environment import DEG2RAD, DynamicActorConstants, RoadEnvConstants, RoadEnv, Vehicle, DynamicActorState, \
-    Point, TrafficLightState, TrafficLight, StaticActorConstants, Pedestrian
+    Point, TrafficLightState, TrafficLight, StaticActorConstants, Pedestrian, RoadLayout, Road, RoadConstants
+
+road_layout = RoadLayout(
+    main_road=Road(
+        constants=RoadConstants(
+            length=1600.0,
+            num_outbound_lanes=3,
+            num_inbound_lanes=2,
+            lane_width=40.0,
+            position=Point(0.0, 0.0),
+            orientation=0.0
+        )
+    )
+)
 
 env_constants = RoadEnvConstants(
-    viewer_width=1600,
-    viewer_height=160,
-    time_resolution=1.0 / 60.0
+    viewer_width=int(road_layout.main_road.constants.length),
+    viewer_height=int(road_layout.main_road.constants.lane_width * (road_layout.main_road.constants.num_outbound_lanes + road_layout.main_road.constants.num_inbound_lanes + 2)),
+    time_resolution=1.0 / 60.0,
+    road_layout=road_layout
 )
 
 vehicle_constants = DynamicActorConstants(
@@ -46,7 +60,7 @@ class PelicanCrossing(RoadEnv):
             actors=[
                 Vehicle(
                     init_state=DynamicActorState(
-                        position=Point(0.0, 100.0),
+                        position=Point(0.0, 0.0),
                         velocity=100.0,
                         orientation=0.0,
                         acceleration=0.0,
@@ -56,7 +70,7 @@ class PelicanCrossing(RoadEnv):
                 ),
                 Vehicle(
                     init_state=DynamicActorState(
-                        position=Point(1600.0, 60.0),
+                        position=Point(env_constants.viewer_width, -road_layout.main_road.constants.lane_width),
                         velocity=100.0,
                         orientation=DEG2RAD * 180.0,
                         acceleration=0.0,
@@ -69,7 +83,7 @@ class PelicanCrossing(RoadEnv):
                     constants=StaticActorConstants(
                         height=20.0,
                         width=10.0,
-                        position=Point(780.0, 130.0),
+                        position=Point((env_constants.viewer_width / 2.0) - (road_layout.main_road.constants.lane_width / 2.0), (env_constants.viewer_height / 2.0) - (road_layout.main_road.constants.lane_width * 0.75)),
                         orientation=0.0
                     )
                 ),
@@ -78,13 +92,13 @@ class PelicanCrossing(RoadEnv):
                     constants=StaticActorConstants(
                         height=20.0,
                         width=10.0,
-                        position=Point(820.0, 30.0),
+                        position=Point((env_constants.viewer_width / 2.0) + (road_layout.main_road.constants.lane_width / 2.0), -(env_constants.viewer_height / 2.0) + (road_layout.main_road.constants.lane_width * 0.75)),
                         orientation=0.0
                     )
                 ),
                 Pedestrian(
                     init_state=DynamicActorState(
-                        position=Point(800.0, 30.0),
+                        position=Point(env_constants.viewer_width / 2.0, -(env_constants.viewer_height / 2.0) + (road_layout.main_road.constants.lane_width * 0.75)),
                         velocity=0.0,
                         orientation=DEG2RAD * 90.0,
                         acceleration=0.0,

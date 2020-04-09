@@ -2,7 +2,7 @@ from enum import Enum
 
 from gym.envs.classic_control import rendering
 
-from cavgym import environment
+from cavgym import environment, mods
 
 
 class LightState(Enum):
@@ -196,20 +196,45 @@ class TrafficLightView(ActorView):
             self.set_green_light()
 
 
-class RoadView:
-    def __init__(self, width, y_values):
-        lines = [rendering.make_polyline([(0, y_value), (width, y_value)]) for y_value in y_values]
-        for line in lines[1:-1]:
-            line.add_attr(rendering.LineStyle(0x0FF0))
-        self.markings = rendering.Compound(lines)
+class RoadLayoutView:
+    def __init__(self, road_layout):
+        rear, right, front, left = road_layout.main_road.bounds
+        self.edge_markings = rendering.make_polygon([(front, right), (front, left), (rear, left), (rear, right)], filled=False)
+        self.transform = rendering.Transform(translation=(road_layout.main_road.constants.position.x, road_layout.main_road.constants.position.y), rotation=road_layout.main_road.constants.orientation)
+        self.edge_markings.add_attr(self.transform)
+
+        def make_centre_line():
+            inbound_rear, _, inbound_front, inbound_left = road_layout.main_road.inbound_bounds
+            centre_line = rendering.make_polyline([(inbound_rear, inbound_left), (inbound_front, inbound_left)])
+            centre_line.add_attr(mods.FactoredLineStyle(0x00FF, 2))
+            return centre_line
+
+        self.centre_markings = make_centre_line()
+        self.centre_markings.add_attr(self.transform)
+
+        def iter_lane_lines(lanes):
+            for lane_bounds in lanes[:-1]:
+                lane_rear, _, lane_front, lane_left = lane_bounds
+                yield (lane_rear, lane_left), (lane_front, lane_left)
+
+        def make_lane_line(line):
+            lane_line = rendering.make_polyline(line)
+            lane_line.add_attr(mods.FactoredLineStyle(0x00FF, 1))
+            return lane_line
+
+        self.lane_markings = rendering.Compound([make_lane_line(line) for line in iter_lane_lines(road_layout.main_road.outbound_lanes_bounds)] + [make_lane_line(line) for line in iter_lane_lines(road_layout.main_road.inbound_lanes_bounds)])
+        self.lane_markings.add_attr(self.transform)
 
 
 class RoadEnvViewer(rendering.Viewer):
-    def __init__(self, width, height, actors):
+    def __init__(self, width, height, road_layout, actors):
         super().__init__(width, height)
+        self.transform.set_translation(0.0, self.height / 2.0)
 
-        self.road_view = RoadView(self.width, [self.height * 0.25, self.height * 0.5, self.height * 0.75])
-        self.add_geom(self.road_view.markings)
+        self.road_layout_view = RoadLayoutView(road_layout)
+        self.add_geom(self.road_layout_view.edge_markings)
+        self.add_geom(self.road_layout_view.centre_markings)
+        self.add_geom(self.road_layout_view.lane_markings)
 
         self.actor_views = list()
         self.vehicle_views = list()

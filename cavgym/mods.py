@@ -3,6 +3,7 @@ import os
 import time
 
 from gym import error
+from gym.envs.classic_control.rendering import LineStyle, glEnable, glLineStipple, GL_LINE_STIPPLE, glDisable
 from gym.utils import atomic_write
 from gym.utils.json_utils import json_encode_np
 
@@ -109,3 +110,13 @@ class JointStatsRecorder(object):
 
 def make_joint_stats_recorder(env, agents):
     return JointStatsRecorder(env.directory, '{}.episode_batch.{}'.format(env.file_prefix, env.file_infix), agents, autoreset=env.env_semantics_autoreset, env_id='(unknown)' if env.env.spec is None else env.env.spec.id)
+
+
+class FactoredLineStyle(LineStyle):
+    def __init__(self, style, factor):
+        super().__init__(style)
+        self.factor = factor
+
+    def enable(self):
+        glEnable(GL_LINE_STIPPLE)
+        glLineStipple(self.factor, self.style)
