@@ -153,6 +153,13 @@ class Vehicle(DynamicActor):
     def __init__(self, init_state, constants):
         super().__init__(init_state, constants)
 
+    def stopping_bounds(self):
+        rear, right, front, left = self.bounds
+        braking_distance = self.state.velocity * 0.675  # To do: implement correct equation
+        thinking_distance = self.state.velocity * 0.2  # To do: implement correct equation
+        front_braking = front + braking_distance
+        return (front, right, front_braking, left), (front_braking, right, front_braking + thinking_distance, left)
+
 
 class Pedestrian(DynamicActor):
     def __init__(self, init_state, constants):

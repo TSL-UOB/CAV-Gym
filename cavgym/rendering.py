@@ -28,8 +28,21 @@ class VehicleView(ActorView):
             LightState.FULL: (1, 1)
         }
 
-        self.body = rendering.make_polygon([(front, right), (front, left), (rear, left), (rear, right)])
         self.transform = rendering.Transform(translation=(vehicle.state.position.x, vehicle.state.position.y), rotation=vehicle.state.orientation)
+
+        braking_bounds, thinking_bounds = vehicle.stopping_bounds()
+
+        braking_rear, braking_right, braking_front, braking_left = braking_bounds
+        self.braking = rendering.make_polygon([(braking_front, braking_right), (braking_front, braking_left), (braking_rear, braking_left), (braking_rear, braking_right)])
+        self.braking.set_color(0.9, 0.9, 0.9)
+        self.braking.add_attr(self.transform)
+
+        thinking_rear, thinking_right, thinking_front, thinking_left = thinking_bounds
+        self.thinking = rendering.make_polygon([(thinking_front, thinking_right), (thinking_front, thinking_left), (thinking_rear, thinking_left), (thinking_rear, thinking_right)])
+        self.thinking.set_color(0.95, 0.95, 0.95)
+        self.thinking.add_attr(self.transform)
+
+        self.body = rendering.make_polygon([(front, right), (front, left), (rear, left), (rear, right)])
         self.body.add_attr(self.transform)
 
         self.roof = rendering.make_polygon([(front - roof_offset, right), (front - roof_offset, left), (rear + roof_offset, left), (rear + roof_offset, right)])
@@ -95,6 +108,14 @@ class VehicleView(ActorView):
     def update(self, vehicle):
         self.transform.set_translation(vehicle.state.position.x, vehicle.state.position.y)
         self.transform.set_rotation(vehicle.state.orientation)
+
+        braking_bounds, thinking_bounds = vehicle.stopping_bounds()
+
+        braking_rear, braking_right, braking_front, braking_left = braking_bounds
+        self.braking.v = [(braking_front, braking_right), (braking_front, braking_left), (braking_rear, braking_left), (braking_rear, braking_right)]
+
+        thinking_rear, thinking_right, thinking_front, thinking_left = thinking_bounds
+        self.thinking.v = [(thinking_front, thinking_right), (thinking_front, thinking_left), (thinking_rear, thinking_left), (thinking_rear, thinking_right)]
 
         if vehicle.state.angular_velocity > 0:
             if vehicle.state.angular_velocity == vehicle.constants.normal_left_turn:
@@ -259,6 +280,10 @@ class RoadEnvViewer(rendering.Viewer):
             self.add_geom(traffic_light_view.red_light)
             self.add_geom(traffic_light_view.amber_light)
             self.add_geom(traffic_light_view.green_light)
+
+        for vehicle_view in self.vehicle_views:
+            self.add_geom(vehicle_view.braking)
+            self.add_geom(vehicle_view.thinking)
 
         for vehicle_view in self.vehicle_views:
             self.add_geom(vehicle_view.right_indicators)
