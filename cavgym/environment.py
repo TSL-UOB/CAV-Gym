@@ -13,6 +13,8 @@ from cavgym.rendering import RoadEnvViewer
 
 DEG2RAD = 0.017453292519943295
 
+REACTION_TIME = 0.675
+
 
 class Actor:
     def __init__(self, init_state, constants):
@@ -154,11 +156,18 @@ class Vehicle(DynamicActor):
         super().__init__(init_state, constants)
 
     def stopping_bounds(self):
+        assert self.bounds is not None
         rear, right, front, left = self.bounds
-        braking_distance = self.state.velocity * 0.675  # To do: implement correct equation
-        thinking_distance = self.state.velocity * 0.2  # To do: implement correct equation
+        braking_distance = (self.state.velocity ** 2) / (2 * -self.constants.hard_deceleration)
+        reaction_distance = self.state.velocity * REACTION_TIME
         front_braking = front + braking_distance
-        return (front, right, front_braking, left), (front_braking, right, front_braking + thinking_distance, left)
+        return (front, right, front_braking, left), (front_braking, right, front_braking + reaction_distance, left)
+
+    def reaction_zone(self):
+        _, reaction_bounds = self.stopping_bounds()
+        box = geometry.box(*reaction_bounds)
+        rotated_box = affinity.rotate(box, self.state.orientation, use_radians=True)
+        return affinity.translate(rotated_box, self.state.position.x, self.state.position.y)
 
 
 class Pedestrian(DynamicActor):

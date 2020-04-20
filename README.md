@@ -5,8 +5,8 @@ A custom OpenAI Gym environment that supports Markov games (joint actions, joint
 
 ## Usage
 ```
-$ python3 main.py --help
-usage: main.py [-h] [-d] [-r DIR] [-v]
+$ python3 cavgym.py --help
+usage: cavgym.py [-h] [-d] [-r DIR] [-v]
                [{bus-stop,crossroads,pelican-crossing}]
 
 positional arguments:
