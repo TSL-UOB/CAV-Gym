@@ -39,7 +39,7 @@ def run_pelican_crossing(record_dir=None, debug=False):
     env = gym.make('PelicanCrossing-v0')
 
     human_agent = HumanDynamicActorAgent()
-    agents = [human_agent, RandomDynamicActorAgent(), RandomTrafficLightAgent(), RandomTrafficLightAgent(), RandomDynamicActorAgent()]
+    agents = [human_agent, RandomDynamicActorAgent(), RandomTrafficLightAgent(), RandomDynamicActorAgent()]
 
     if record_dir is not None:
         env = wrappers.Monitor(env, record_dir, video_callable=lambda episode_id: True, force=True)  # save all episodes instead of default behaviour (episodes 1, 8, 27, 64, ...)

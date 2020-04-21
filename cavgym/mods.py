@@ -3,9 +3,10 @@ import os
 import time
 
 from gym import error
-from gym.envs.classic_control.rendering import LineStyle, glEnable, glLineStipple, GL_LINE_STIPPLE, glDisable
+from gym.envs.classic_control.rendering import LineStyle, glEnable, glLineStipple, GL_LINE_STIPPLE
 from gym.utils import atomic_write
 from gym.utils.json_utils import json_encode_np
+
 
 class JointStatsRecorder(object):
     """

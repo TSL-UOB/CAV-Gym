@@ -2,10 +2,10 @@ from enum import Enum
 
 from gym.envs.classic_control import rendering
 
-from cavgym import environment, mods
+from cavgym import environment, mods, utilities
 
 
-class LightState(Enum):
+class BulbState(Enum):
     OFF = 0
     DIM = 1
     FULL = 2
@@ -23,9 +23,9 @@ class VehicleView(ActorView):
         roof_offset = vehicle.constants.length * 0.25
 
         self.scale = {
-            LightState.OFF: (0, 0),
-            LightState.DIM: (0.75, 0.75),
-            LightState.FULL: (1, 1)
+            BulbState.OFF: (0, 0),
+            BulbState.DIM: (0.75, 0.75),
+            BulbState.FULL: (1, 1)
         }
 
         self.transform = rendering.Transform(translation=(vehicle.state.position.x, vehicle.state.position.y), rotation=vehicle.state.orientation)
@@ -53,8 +53,8 @@ class VehicleView(ActorView):
         rear_right_indicator = rendering.make_circle(vehicle.constants.width * 0.2)
         self.right_indicators = rendering.Compound([front_right_indicator, rear_right_indicator])
         self.right_indicators.set_color(1, 0.75, 0)
-        self.front_right_indicator_transform = rendering.Transform(translation=(front - light_offset, right), scale=self.scale[LightState.OFF])
-        self.rear_right_indicator_transform = rendering.Transform(translation=(rear + light_offset, right), scale=self.scale[LightState.OFF])
+        self.front_right_indicator_transform = rendering.Transform(translation=(front - light_offset, right), scale=self.scale[BulbState.OFF])
+        self.rear_right_indicator_transform = rendering.Transform(translation=(rear + light_offset, right), scale=self.scale[BulbState.OFF])
         front_right_indicator.add_attr(self.front_right_indicator_transform)
         rear_right_indicator.add_attr(self.rear_right_indicator_transform)
         self.right_indicators.add_attr(self.transform)
@@ -63,8 +63,8 @@ class VehicleView(ActorView):
         rear_left_indicator = rendering.make_circle(vehicle.constants.width * 0.2)
         self.left_indicators = rendering.Compound([front_left_indicator, rear_left_indicator])
         self.left_indicators.set_color(1, 0.75, 0)
-        self.front_left_indicator_transform = rendering.Transform(translation=(front - light_offset, left), scale=self.scale[LightState.OFF])
-        self.rear_left_indicator_transform = rendering.Transform(translation=(rear + light_offset, left), scale=self.scale[LightState.OFF])
+        self.front_left_indicator_transform = rendering.Transform(translation=(front - light_offset, left), scale=self.scale[BulbState.OFF])
+        self.rear_left_indicator_transform = rendering.Transform(translation=(rear + light_offset, left), scale=self.scale[BulbState.OFF])
         front_left_indicator.add_attr(self.front_left_indicator_transform)
         rear_left_indicator.add_attr(self.rear_left_indicator_transform)
         self.left_indicators.add_attr(self.transform)
@@ -73,8 +73,8 @@ class VehicleView(ActorView):
         brake_light_right = rendering.make_circle(vehicle.constants.width * 0.2)
         self.brake_lights = rendering.Compound([brake_light_left, brake_light_right])
         self.brake_lights.set_color(1, 0, 0)
-        self.brake_light_left_transform = rendering.Transform(translation=(rear, left - light_offset), scale=self.scale[LightState.OFF])
-        self.brake_light_right_transform = rendering.Transform(translation=(rear, right + light_offset), scale=self.scale[LightState.OFF])
+        self.brake_light_left_transform = rendering.Transform(translation=(rear, left - light_offset), scale=self.scale[BulbState.OFF])
+        self.brake_light_right_transform = rendering.Transform(translation=(rear, right + light_offset), scale=self.scale[BulbState.OFF])
         brake_light_left.add_attr(self.brake_light_left_transform)
         brake_light_right.add_attr(self.brake_light_right_transform)
         self.brake_lights.add_attr(self.transform)
@@ -83,8 +83,8 @@ class VehicleView(ActorView):
         headlight_right = rendering.make_circle(vehicle.constants.width * 0.2)
         self.headlights = rendering.Compound([headlight_left, headlight_right])
         self.headlights.set_color(1, 1, 0)
-        self.headlight_left_transform = rendering.Transform(translation=(front, left - light_offset), scale=self.scale[LightState.OFF])
-        self.headlight_right_transform = rendering.Transform(translation=(front, right + light_offset), scale=self.scale[LightState.OFF])
+        self.headlight_left_transform = rendering.Transform(translation=(front, left - light_offset), scale=self.scale[BulbState.OFF])
+        self.headlight_right_transform = rendering.Transform(translation=(front, right + light_offset), scale=self.scale[BulbState.OFF])
         headlight_left.add_attr(self.headlight_left_transform)
         headlight_right.add_attr(self.headlight_right_transform)
         self.headlights.add_attr(self.transform)
@@ -119,35 +119,35 @@ class VehicleView(ActorView):
 
         if vehicle.state.angular_velocity > 0:
             if vehicle.state.angular_velocity == vehicle.constants.normal_left_turn:
-                self.set_left_indicators(LightState.DIM)
+                self.set_left_indicators(BulbState.DIM)
             else:
-                self.set_left_indicators(LightState.FULL)
-            self.set_right_indicators(LightState.OFF)
+                self.set_left_indicators(BulbState.FULL)
+            self.set_right_indicators(BulbState.OFF)
         elif vehicle.state.angular_velocity < 0:
             if vehicle.state.angular_velocity == vehicle.constants.normal_right_turn:
-                self.set_right_indicators(LightState.DIM)
+                self.set_right_indicators(BulbState.DIM)
             else:
-                self.set_right_indicators(LightState.FULL)
-            self.set_left_indicators(LightState.OFF)
+                self.set_right_indicators(BulbState.FULL)
+            self.set_left_indicators(BulbState.OFF)
         else:
-            self.set_left_indicators(LightState.OFF)
-            self.set_right_indicators(LightState.OFF)
+            self.set_left_indicators(BulbState.OFF)
+            self.set_right_indicators(BulbState.OFF)
 
         if vehicle.state.acceleration < 0:
             if vehicle.state.acceleration == vehicle.constants.normal_deceleration:
-                self.set_brake_lights(LightState.DIM)
+                self.set_brake_lights(BulbState.DIM)
             else:
-                self.set_brake_lights(LightState.FULL)
-            self.set_headlights(LightState.OFF)
+                self.set_brake_lights(BulbState.FULL)
+            self.set_headlights(BulbState.OFF)
         elif vehicle.state.acceleration > 0:
             if vehicle.state.acceleration == vehicle.constants.normal_acceleration:
-                self.set_headlights(LightState.DIM)
+                self.set_headlights(BulbState.DIM)
             else:
-                self.set_headlights(LightState.FULL)
-            self.set_brake_lights(LightState.OFF)
+                self.set_headlights(BulbState.FULL)
+            self.set_brake_lights(BulbState.OFF)
         else:
-            self.set_brake_lights(LightState.OFF)
-            self.set_headlights(LightState.OFF)
+            self.set_brake_lights(BulbState.OFF)
+            self.set_headlights(BulbState.OFF)
 
 
 class PedestrianView(ActorView):
@@ -168,28 +168,30 @@ class PedestrianView(ActorView):
 
 
 class TrafficLightView(ActorView):
-    def __init__(self, traffic_light):
-        rear, right, front, left = traffic_light.bounds
+    def __init__(self, width, height, position):
+        self.transform = rendering.Transform(translation=(position.x, position.y), rotation=0.0)
+
+        rear, front = -width / 2.0, width / 2.0
+        right, left = -height / 2.0, height / 2.0
 
         self.body = rendering.make_polygon([(front, right), (front, left), (rear, left), (rear, right)])
-        self.transform = rendering.Transform(translation=(traffic_light.constants.position.x, traffic_light.constants.position.y), rotation=traffic_light.constants.orientation)
         self.body.add_attr(self.transform)
 
-        self.red_light = rendering.make_circle(traffic_light.constants.width * 0.25)
+        self.red_light = rendering.make_circle(width * 0.25)
         self.red_light.set_color(1, 0, 0)
-        self.red_light_transform = rendering.Transform(translation=(0, traffic_light.constants.height * 0.25))
+        self.red_light_transform = rendering.Transform(translation=(0, height * 0.25))
         self.red_light.add_attr(self.red_light_transform)
         self.red_light.add_attr(self.transform)
 
-        self.amber_light = rendering.make_circle(traffic_light.constants.width * 0.25)
+        self.amber_light = rendering.make_circle(width * 0.25)
         self.amber_light.set_color(1, 0.75, 0)
         self.amber_light_transform = rendering.Transform(translation=(0, 0))
         self.amber_light.add_attr(self.amber_light_transform)
         self.amber_light.add_attr(self.transform)
 
-        self.green_light = rendering.make_circle(traffic_light.constants.width * 0.25)
+        self.green_light = rendering.make_circle(width * 0.25)
         self.green_light.set_color(0, 1, 0)
-        self.green_light_transform = rendering.Transform(translation=(0, -traffic_light.constants.height * 0.25))
+        self.green_light_transform = rendering.Transform(translation=(0, -height * 0.25))
         self.green_light.add_attr(self.green_light_transform)
         self.green_light.add_attr(self.transform)
 
@@ -217,6 +219,49 @@ class TrafficLightView(ActorView):
             self.set_green_light()
 
 
+class PelicanCrossingView(ActorView):
+    def __init__(self, pelican_crossing):
+        self.transform = rendering.Transform(translation=(pelican_crossing.constants.x_position, 0.0), rotation=0.0)
+
+        rear, right, front, left = pelican_crossing.bounds
+
+        self.area = rendering.make_polygon([(front, right), (front, left), (rear, left), (rear, right)])
+        self.area.set_color(1, 1, 1)
+        self.area.add_attr(self.transform)
+
+        _, outbound_right, _, outbound_left = pelican_crossing.constants.road.outbound_bounds
+        self.outbound_marking = rendering.Compound([rendering.make_polyline([(rear + i, outbound_left), (rear + i, outbound_right)]) for i in range(2)])
+        self.outbound_marking.add_attr(self.transform)
+
+        _, inbound_right, _, inbound_left = pelican_crossing.constants.road.inbound_bounds
+        self.inbound_marking = rendering.Compound([rendering.make_polyline([(front - i, inbound_left), (front - i, inbound_right)]) for i in range(2)])
+        self.inbound_marking.add_attr(self.transform)
+
+        inner_rear = rear + (pelican_crossing.constants.width * 0.15)
+        inner_front = front - (pelican_crossing.constants.width * 0.15)
+        self.inner = rendering.make_polygon([(inner_front, right), (inner_front, left), (inner_rear, left), (inner_rear, right)], filled=False)
+        self.inner.add_attr(mods.FactoredLineStyle(0x0F0F, 1))
+        self.inner.add_attr(self.transform)
+
+        self.outbound_traffic_light_view = TrafficLightView(10.0, 20.0, utilities.Point(-pelican_crossing.constants.width / 2.0, left + 20.0))
+        self.outbound_traffic_light_view.body.add_attr(self.transform)
+        self.outbound_traffic_light_view.red_light.add_attr(self.transform)
+        self.outbound_traffic_light_view.amber_light.add_attr(self.transform)
+        self.outbound_traffic_light_view.green_light.add_attr(self.transform)
+        self.outbound_traffic_light_view.set_green_light()
+
+        self.inbound_traffic_light_view = TrafficLightView(10.0, 20.0, utilities.Point(pelican_crossing.constants.width / 2.0, right - 20.0))
+        self.inbound_traffic_light_view.body.add_attr(self.transform)
+        self.inbound_traffic_light_view.red_light.add_attr(self.transform)
+        self.inbound_traffic_light_view.amber_light.add_attr(self.transform)
+        self.inbound_traffic_light_view.green_light.add_attr(self.transform)
+        self.inbound_traffic_light_view.set_green_light()
+
+    def update(self, pelican_crossing):
+        self.outbound_traffic_light_view.update(pelican_crossing)
+        self.inbound_traffic_light_view.update(pelican_crossing)
+
+
 class RoadLayoutView:
     def __init__(self, road_layout):
         rear, right, front, left = road_layout.main_road.bounds
@@ -240,11 +285,28 @@ class RoadLayoutView:
 
         def make_lane_line(line):
             lane_line = rendering.make_polyline(line)
-            lane_line.add_attr(mods.FactoredLineStyle(0x00FF, 1))
+            lane_line.add_attr(mods.FactoredLineStyle(0x00FF, 2))
             return lane_line
 
         self.lane_markings = rendering.Compound([make_lane_line(line) for line in iter_lane_lines(road_layout.main_road.outbound_lanes_bounds)] + [make_lane_line(line) for line in iter_lane_lines(road_layout.main_road.inbound_lanes_bounds)])
         self.lane_markings.add_attr(self.transform)
+
+        self.pelican_crossing_view = None
+
+    def set_pelican_crossing(self, pelican_crossing):
+        self.pelican_crossing_view = PelicanCrossingView(pelican_crossing)
+        self.pelican_crossing_view.area.add_attr(self.transform)
+        self.pelican_crossing_view.outbound_marking.add_attr(self.transform)
+        self.pelican_crossing_view.inbound_marking.add_attr(self.transform)
+        self.pelican_crossing_view.inner.add_attr(self.transform)
+        self.pelican_crossing_view.outbound_traffic_light_view.body.add_attr(self.transform)
+        self.pelican_crossing_view.outbound_traffic_light_view.red_light.add_attr(self.transform)
+        self.pelican_crossing_view.outbound_traffic_light_view.amber_light.add_attr(self.transform)
+        self.pelican_crossing_view.outbound_traffic_light_view.green_light.add_attr(self.transform)
+        self.pelican_crossing_view.inbound_traffic_light_view.body.add_attr(self.transform)
+        self.pelican_crossing_view.inbound_traffic_light_view.red_light.add_attr(self.transform)
+        self.pelican_crossing_view.inbound_traffic_light_view.amber_light.add_attr(self.transform)
+        self.pelican_crossing_view.inbound_traffic_light_view.green_light.add_attr(self.transform)
 
 
 class RoadEnvViewer(rendering.Viewer):
@@ -253,9 +315,6 @@ class RoadEnvViewer(rendering.Viewer):
         self.transform.set_translation(0.0, self.height / 2.0)
 
         self.road_layout_view = RoadLayoutView(road_layout)
-        self.add_geom(self.road_layout_view.edge_markings)
-        self.add_geom(self.road_layout_view.centre_markings)
-        self.add_geom(self.road_layout_view.lane_markings)
 
         self.actor_views = list()
         self.vehicle_views = list()
@@ -266,14 +325,30 @@ class RoadEnvViewer(rendering.Viewer):
                 vehicle_view = VehicleView(actor)
                 self.actor_views.append(vehicle_view)
                 self.vehicle_views.append(vehicle_view)
-            elif isinstance(actor, environment.TrafficLight):
-                traffic_light_view = TrafficLightView(actor)
-                self.actor_views.append(traffic_light_view)
-                self.traffic_light_views.append(traffic_light_view)
             elif isinstance(actor, environment.Pedestrian):
                 pedestrian_view = PedestrianView(actor)
                 self.actor_views.append(pedestrian_view)
                 self.pedestrian_views.append(pedestrian_view)
+            elif isinstance(actor, environment.PelicanCrossing):
+                self.road_layout_view.set_pelican_crossing(actor)
+                self.actor_views.append(self.road_layout_view.pelican_crossing_view)
+
+        self.add_geom(self.road_layout_view.centre_markings)
+        self.add_geom(self.road_layout_view.lane_markings)
+        self.add_geom(self.road_layout_view.pelican_crossing_view.area)
+        self.add_geom(self.road_layout_view.pelican_crossing_view.outbound_marking)
+        self.add_geom(self.road_layout_view.pelican_crossing_view.inbound_marking)
+        self.add_geom(self.road_layout_view.pelican_crossing_view.inner)
+        self.add_geom(self.road_layout_view.pelican_crossing_view.outbound_traffic_light_view.body)
+        self.add_geom(self.road_layout_view.pelican_crossing_view.outbound_traffic_light_view.red_light)
+        self.add_geom(self.road_layout_view.pelican_crossing_view.outbound_traffic_light_view.amber_light)
+        self.add_geom(self.road_layout_view.pelican_crossing_view.outbound_traffic_light_view.green_light)
+        self.add_geom(self.road_layout_view.pelican_crossing_view.inbound_traffic_light_view.body)
+        self.add_geom(self.road_layout_view.pelican_crossing_view.inbound_traffic_light_view.red_light)
+        self.add_geom(self.road_layout_view.pelican_crossing_view.inbound_traffic_light_view.amber_light)
+        self.add_geom(self.road_layout_view.pelican_crossing_view.inbound_traffic_light_view.green_light)
+
+        self.add_geom(self.road_layout_view.edge_markings)
 
         for traffic_light_view in self.traffic_light_views:
             self.add_geom(traffic_light_view.body)

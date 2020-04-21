@@ -8,12 +8,9 @@ from gym import spaces
 from gym.utils import seeding
 from shapely import geometry, affinity
 
+from cavgym import utilities
 from cavgym.actions import TrafficLightAction, AccelerationAction, TurnAction
 from cavgym.rendering import RoadEnvViewer
-
-DEG2RAD = 0.017453292519943295
-
-REACTION_TIME = 0.675
 
 
 class Actor:
@@ -40,17 +37,8 @@ class Actor:
 
 
 @dataclass
-class Point:
-    x: float
-    y: float
-
-    def __copy__(self):
-        return Point(self.x, self.y)
-
-
-@dataclass
 class DynamicActorState:
-    position: Point
+    position: utilities.Point
     velocity: float
     orientation: float
     acceleration: float
@@ -131,14 +119,14 @@ class DynamicActor(Actor):
 
         """Simple vehicle dynamics: http://engineeringdotnet.blogspot.com/2010/04/simple-2d-car-physics-in-games.html"""
 
-        front_wheel_position = Point(
+        front_wheel_position = utilities.Point(
             self.state.position.x + ((self.constants.wheelbase / 2.0) * math.cos(self.state.orientation)),
             self.state.position.y + ((self.constants.wheelbase / 2.0) * math.sin(self.state.orientation))
         )
         front_wheel_position.x += self.state.velocity * time_resolution * math.cos(self.state.orientation + self.state.angular_velocity)
         front_wheel_position.y += self.state.velocity * time_resolution * math.sin(self.state.orientation + self.state.angular_velocity)
 
-        back_wheel_position = Point(
+        back_wheel_position = utilities.Point(
             self.state.position.x - ((self.constants.wheelbase / 2.0) * math.cos(self.state.orientation)),
             self.state.position.y - ((self.constants.wheelbase / 2.0) * math.sin(self.state.orientation))
         )
@@ -158,10 +146,11 @@ class Vehicle(DynamicActor):
     def stopping_bounds(self):
         assert self.bounds is not None
         rear, right, front, left = self.bounds
-        braking_distance = (self.state.velocity ** 2) / (2 * -self.constants.hard_deceleration)
-        reaction_distance = self.state.velocity * REACTION_TIME
-        front_braking = front + braking_distance
-        return (front, right, front_braking, left), (front_braking, right, front_braking + reaction_distance, left)
+        normal_braking_distance = (self.state.velocity ** 2) / (2 * -self.constants.normal_deceleration)
+        hard_braking_distance = (self.state.velocity ** 2) / (2 * -self.constants.hard_deceleration)
+        # reaction_distance = self.state.velocity * utilities.REACTION_TIME
+        front_hard_braking = front + hard_braking_distance
+        return (front, right, front_hard_braking, left), (front_hard_braking, right, front + normal_braking_distance, left)
 
     def reaction_zone(self):
         _, reaction_bounds = self.stopping_bounds()
@@ -185,62 +174,13 @@ class TrafficLightState(Enum):
 
 
 @dataclass(frozen=True)
-class StaticActorConstants:
-    height: float
-    width: float
-
-    position: Point
-    orientation: float
-
-
-class StaticActor(Actor):
-    def __init__(self, init_state, constants):
-        super().__init__(init_state, constants)
-
-        rear, front = -self.constants.width / 2.0, self.constants.width / 2.0
-        right, left = -self.constants.height / 2.0, self.constants.height / 2.0
-        self.bounds = rear, right, front, left
-
-        box = geometry.box(*self.bounds)
-        rotated_box = affinity.rotate(box, self.constants.orientation, use_radians=True)
-        self.static_bounding_box = affinity.translate(rotated_box, self.constants.position.x, self.constants.position.y)
-
-    def bounding_box(self):
-        return self.static_bounding_box
-
-    def step_action(self, joint_action, index):
-        raise NotImplementedError
-
-    def step_dynamics(self, time_resolution):
-        raise NotImplementedError
-
-
-class TrafficLight(StaticActor):
-    def __init__(self, init_state, constants):
-        super().__init__(init_state, constants)
-
-    def step_action(self, joint_action, index):
-        traffic_light_action = TrafficLightAction(joint_action[index])
-
-        if traffic_light_action is TrafficLightAction.TURN_RED:
-            self.state = TrafficLightState.RED
-        elif traffic_light_action is TrafficLightAction.TURN_AMBER:
-            self.state = TrafficLightState.AMBER
-        elif traffic_light_action is TrafficLightAction.TURN_GREEN:
-            self.state = TrafficLightState.GREEN
-
-    def step_dynamics(self, time_resolution):
-        pass
-
-
-@dataclass(frozen=True)
 class RoadConstants:
     length: float
     num_outbound_lanes: int
     num_inbound_lanes: int
     lane_width: float
 
-    position: Point
+    position: utilities.Point
     orientation: float
 
 
@@ -273,6 +213,42 @@ class Road:
             lane_right = lane_left
             lane_left = lane_right + self.constants.lane_width
             yield rear, lane_right, front, lane_left
+
+
+@dataclass(frozen=True)
+class PelicanCrossingConstants:
+    road: Road
+    width: float
+    x_position: float
+
+
+class PelicanCrossing(Actor):
+    def __init__(self, init_state, constants):
+        super().__init__(init_state, constants)
+
+        rear, front = -self.constants.width / 2.0, self.constants.width / 2.0
+        right, left = -self.constants.road.width / 2.0, self.constants.road.width / 2.0
+        self.bounds = rear, right, front, left
+
+        box = geometry.box(*self.bounds)
+        rotated_box = affinity.rotate(box, self.constants.road.constants.orientation, use_radians=True)
+        self.static_bounding_box = affinity.translate(rotated_box, self.constants.x_position, self.constants.road.constants.position.y)
+
+    def bounding_box(self):
+        return self.static_bounding_box
+
+    def step_action(self, joint_action, index):
+        traffic_light_action = TrafficLightAction(joint_action[index])
+
+        if traffic_light_action is TrafficLightAction.TURN_RED:
+            self.state = TrafficLightState.RED
+        elif traffic_light_action is TrafficLightAction.TURN_AMBER:
+            self.state = TrafficLightState.AMBER
+        elif traffic_light_action is TrafficLightAction.TURN_GREEN:
+            self.state = TrafficLightState.GREEN
+
+    def step_dynamics(self, time_resolution):
+        pass
 
 
 class RoadLayout:
@@ -336,7 +312,7 @@ class RoadEnv(MarkovGameEnv):
         for actor in self.actors:
             if isinstance(actor, Vehicle) or isinstance(actor, Pedestrian):
                 actor_spaces.append(spaces.Tuple([spaces.Discrete(AccelerationAction.__len__()), spaces.Discrete(TurnAction.__len__())]))
-            elif isinstance(actor, TrafficLight):
+            elif isinstance(actor, PelicanCrossing):
                 actor_spaces.append(spaces.Discrete(TrafficLightAction.__len__()))
         self.action_space = spaces.Tuple(actor_spaces)
         self.observation_space = spaces.Tuple([spaces.Discrete(1) for _ in self.actors])
@@ -356,7 +332,7 @@ class RoadEnv(MarkovGameEnv):
         for actor in self.actors:
             actor.step_dynamics(self.constants.time_resolution)
 
-        joint_reward = [-1 if any(vehicle.intersects(other_vehicle) for other_vehicle in self.actors if vehicle is not other_vehicle) else 0 for vehicle in self.actors]
+        joint_reward = [-1 if any(vehicle.intersects(other_vehicle) for other_vehicle in self.actors if vehicle is not other_vehicle and not isinstance(vehicle, PelicanCrossing) and not isinstance(other_vehicle, PelicanCrossing)) else 0 for vehicle in self.actors]
 
         return self.observation_space.sample(), joint_reward, any(reward < 0 for reward in joint_reward), None
 
