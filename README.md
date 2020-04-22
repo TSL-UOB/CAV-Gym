@@ -1,7 +1,14 @@
 # CAV-Gym
 A custom OpenAI Gym environment that supports Markov games (joint actions, joint observations, joint rewards) and simple vehicle physics.
 
-![](demo.gif)
+## Scenarios
+
+- Bus stop
+![](demos/bus_stop.gif)
+- Crossroads
+![](demos/crossroads.gif)
+- Pelican crossing
+![](demos/pelican_crossing.gif)
 
 ## Usage
 ```
