@@ -29,24 +29,31 @@ def parse_arguments():
 
 
 def run(scenario, record_dir=None, debug=False):
+    human_agent = HumanDynamicActorAgent()
     if scenario is Scenario.PELICAN_CROSSING:
-        run_pelican_crossing(record_dir=record_dir, debug=debug)
+        env = gym.make('PelicanCrossing-v0')
+        agents = [human_agent, RandomDynamicActorAgent(), RandomTrafficLightAgent(), RandomDynamicActorAgent()]
+        run_simulation(env, agents, human_agent=human_agent, record_dir=record_dir, debug=debug)
+    elif scenario is Scenario.BUS_STOP:
+        env = gym.make('BusStop-v0')
+        agents = [ RandomDynamicActorAgent(), human_agent, RandomDynamicActorAgent()]
+        run_simulation(env, agents, human_agent=human_agent, record_dir=record_dir, debug=debug)
+    elif scenario is Scenario.CROSSROADS:
+        env = gym.make('Crossroads-v0')
+        agents = [human_agent, RandomDynamicActorAgent()]
+        run_simulation(env, agents, human_agent=human_agent, record_dir=record_dir, debug=debug)
     else:
         print(f"{scenario} scenario is not yet implemented")
 
 
-def run_pelican_crossing(record_dir=None, debug=False):
-    env = gym.make('PelicanCrossing-v0')
-
-    human_agent = HumanDynamicActorAgent()
-    agents = [human_agent, RandomDynamicActorAgent(), RandomTrafficLightAgent(), RandomDynamicActorAgent()]
-
+def run_simulation(env, agents, human_agent=None, record_dir=None, debug=False):
     if record_dir is not None:
         env = wrappers.Monitor(env, record_dir, video_callable=lambda episode_id: True, force=True)  # save all episodes instead of default behaviour (episodes 1, 8, 27, 64, ...)
         env.stats_recorder = mods.make_joint_stats_recorder(env, len(agents))  # workaround to avoid bugs due to existence of joint rewards
 
-    env.render()  # must render before key_press can be assigned
-    env.unwrapped.viewer.window.on_key_press = human_agent.key_press
+    if human_agent is not None:
+        env.render()  # must render before key_press can be assigned
+        env.unwrapped.viewer.window.on_key_press = human_agent.key_press
 
     for episode in range(1):
         joint_observation = env.reset()
