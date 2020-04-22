@@ -25,38 +25,34 @@ def make_rectangle_coordinates(bounds):
 def make_rectangle(bounds, rgb=None, transform=None):
     coordinates = make_rectangle_coordinates(bounds)
     rectangle = rendering.make_polygon(coordinates)
-    if rgb is not None:
-        rectangle.set_color(*rgb)
-    if transform is not None:
-        rectangle.add_attr(transform)
-    return rectangle
+    return attributed_shape(rectangle, rgb=rgb, transform=transform)
 
 
 def make_circle(diameter, rgb=None, transform=None):
     circle = rendering.make_circle(diameter)
-    if rgb is not None:
-        circle.set_color(*rgb)
-    if transform is not None:
-        circle.add_attr(transform)
-    return circle
+    return attributed_shape(circle, rgb=rgb, transform=transform)
 
 
 def make_compound(elements, rgb=None, transform=None):
     compound = rendering.Compound(elements)
+    return attributed_shape(compound, rgb=rgb, transform=transform)
+
+
+def attributed_shape(shape, rgb=None, transform=None):
     if rgb is not None:
-        compound.set_color(*rgb)
+        shape.set_color(*rgb)
     if transform is not None:
-        compound.add_attr(transform)
-    return compound
+        shape.add_attr(transform)
+    return shape
 
 
 class DynamicActorView(ActorView):
     def __init__(self, dynamic_actor):
         self.transform = rendering.Transform(translation=(dynamic_actor.state.position.x, dynamic_actor.state.position.y), rotation=dynamic_actor.state.orientation)
 
-        braking_bounds, thinking_bounds = dynamic_actor.stopping_bounds()
-        self.braking = make_rectangle(braking_bounds, rgb=(0.9, 0.9, 0.9), transform=self.transform)
-        self.thinking = make_rectangle(thinking_bounds, rgb=(0.95, 0.95, 0.95), transform=self.transform)
+        hard_braking_bounds, normal_braking_bounds = dynamic_actor.stopping_bounds()
+        self.hard_braking = make_rectangle(hard_braking_bounds, rgb=(0.9, 0.9, 0.9), transform=self.transform)
+        self.normal_braking = make_rectangle(normal_braking_bounds, rgb=(0.95, 0.95, 0.95), transform=self.transform)
 
         self.body = make_rectangle(dynamic_actor.bounds, transform=self.transform)
 
@@ -64,9 +60,9 @@ class DynamicActorView(ActorView):
         self.transform.set_translation(dynamic_actor.state.position.x, dynamic_actor.state.position.y)
         self.transform.set_rotation(dynamic_actor.state.orientation)
 
-        braking_bounds, thinking_bounds = dynamic_actor.stopping_bounds()
-        self.braking.v = make_rectangle_coordinates(braking_bounds)
-        self.thinking.v = make_rectangle_coordinates(thinking_bounds)
+        hard_braking_bounds, normal_braking_bounds = dynamic_actor.stopping_bounds()
+        self.hard_braking.v = make_rectangle_coordinates(hard_braking_bounds)
+        self.normal_braking.v = make_rectangle_coordinates(normal_braking_bounds)
 
 
 class VehicleView(DynamicActorView):
@@ -124,37 +120,23 @@ class VehicleView(DynamicActorView):
     def update(self, vehicle):
         super().update(vehicle)
 
+        left_indicator_state = BulbState.OFF
+        right_indicator_state = BulbState.OFF
         if vehicle.state.angular_velocity > 0:
-            if vehicle.state.angular_velocity == vehicle.constants.normal_left_turn:
-                self.set_left_indicators(BulbState.DIM)
-            else:
-                self.set_left_indicators(BulbState.FULL)
-            self.set_right_indicators(BulbState.OFF)
+            left_indicator_state = BulbState.DIM if vehicle.state.angular_velocity == vehicle.constants.normal_left_turn else BulbState.FULL
         elif vehicle.state.angular_velocity < 0:
-            if vehicle.state.angular_velocity == vehicle.constants.normal_right_turn:
-                self.set_right_indicators(BulbState.DIM)
-            else:
-                self.set_right_indicators(BulbState.FULL)
-            self.set_left_indicators(BulbState.OFF)
-        else:
-            self.set_left_indicators(BulbState.OFF)
-            self.set_right_indicators(BulbState.OFF)
+            right_indicator_state = BulbState.DIM if vehicle.state.angular_velocity == vehicle.constants.normal_right_turn else BulbState.FULL
+        self.set_left_indicators(left_indicator_state)
+        self.set_right_indicators(right_indicator_state)
 
+        brake_lights_state = BulbState.OFF
+        headlights_state = BulbState.OFF
         if vehicle.state.acceleration < 0:
-            if vehicle.state.acceleration == vehicle.constants.normal_deceleration:
-                self.set_brake_lights(BulbState.DIM)
-            else:
-                self.set_brake_lights(BulbState.FULL)
-            self.set_headlights(BulbState.OFF)
+            brake_lights_state = BulbState.DIM if vehicle.state.acceleration == vehicle.constants.normal_deceleration else BulbState.FULL
         elif vehicle.state.acceleration > 0:
-            if vehicle.state.acceleration == vehicle.constants.normal_acceleration:
-                self.set_headlights(BulbState.DIM)
-            else:
-                self.set_headlights(BulbState.FULL)
-            self.set_brake_lights(BulbState.OFF)
-        else:
-            self.set_brake_lights(BulbState.OFF)
-            self.set_headlights(BulbState.OFF)
+            headlights_state = BulbState.DIM if vehicle.state.acceleration == vehicle.constants.normal_acceleration else BulbState.FULL
+        self.set_brake_lights(brake_lights_state)
+        self.set_headlights(headlights_state)
 
 
 class CarView(VehicleView):
@@ -344,8 +326,8 @@ class RoadEnvViewer(rendering.Viewer):
         self.dynamic_actor_views = [actor_view for actor_view in self.actor_views if isinstance(actor_view, DynamicActorView)]
 
         for dynamic_actor_view in self.dynamic_actor_views:
-            self.add_geom(dynamic_actor_view.braking)
-            self.add_geom(dynamic_actor_view.thinking)
+            self.add_geom(dynamic_actor_view.hard_braking)
+            self.add_geom(dynamic_actor_view.normal_braking)
 
         self.vehicle_views = [dynamic_actor_view for dynamic_actor_view in self.dynamic_actor_views if isinstance(dynamic_actor_view, VehicleView)]
 
