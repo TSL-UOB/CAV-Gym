@@ -48,6 +48,6 @@ class Road:
 
 
 class RoadMap:
-    def __init__(self, main_road, minor_roads=None):
-        self.main_road = main_road
+    def __init__(self, major_road, minor_roads=None):
+        self.major_road = major_road
         self.minor_roads = minor_roads

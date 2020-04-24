@@ -253,13 +253,13 @@ class PelicanCrossingView(ActorView):
 
 class RoadLayoutView:
     def __init__(self, road_layout):
-        rear, right, front, left = road_layout.main_road.bounds
+        rear, right, front, left = road_layout.major_road.bounds
         self.edge_markings = rendering.make_polygon([(front, right), (front, left), (rear, left), (rear, right)], filled=False)
-        self.transform = rendering.Transform(translation=(road_layout.main_road.constants.position.x, road_layout.main_road.constants.position.y), rotation=road_layout.main_road.constants.orientation)
+        self.transform = rendering.Transform(translation=(road_layout.major_road.constants.position.x, road_layout.major_road.constants.position.y), rotation=road_layout.major_road.constants.orientation)
         self.edge_markings.add_attr(self.transform)
 
         def make_centre_line():
-            inbound_rear, _, inbound_front, inbound_left = road_layout.main_road.inbound_bounds
+            inbound_rear, _, inbound_front, inbound_left = road_layout.major_road.inbound_bounds
             centre_line = rendering.make_polyline([(inbound_rear, inbound_left), (inbound_front, inbound_left)])
             centre_line.add_attr(mods.FactoredLineStyle(0x00FF, 2))
             centre_line.add_attr(self.transform)
@@ -277,7 +277,7 @@ class RoadLayoutView:
             lane_line.add_attr(mods.FactoredLineStyle(0x00FF, 2))
             return lane_line
 
-        self.lane_markings = make_compound([make_lane_line(line) for line in iter_lane_lines(road_layout.main_road.outbound_lanes_bounds)] + [make_lane_line(line) for line in iter_lane_lines(road_layout.main_road.inbound_lanes_bounds)], transform=self.transform)
+        self.lane_markings = make_compound([make_lane_line(line) for line in iter_lane_lines(road_layout.major_road.outbound_lanes_bounds)] + [make_lane_line(line) for line in iter_lane_lines(road_layout.major_road.inbound_lanes_bounds)], transform=self.transform)
 
         self.pelican_crossing_view = None
 
