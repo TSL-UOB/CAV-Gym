@@ -251,15 +251,15 @@ class PelicanCrossingView(ActorView):
         yield from self.inbound_traffic_light_view.items()
 
 
-class RoadLayoutView:
-    def __init__(self, road_layout):
-        rear, right, front, left = road_layout.major_road.bounds
+class RoadView:
+    def __init__(self, road):
+        rear, right, front, left = road.bounds
         self.edge_markings = rendering.make_polygon([(front, right), (front, left), (rear, left), (rear, right)], filled=False)
-        self.transform = rendering.Transform(translation=(road_layout.major_road.constants.position.x, road_layout.major_road.constants.position.y), rotation=road_layout.major_road.constants.orientation)
+        self.transform = rendering.Transform(translation=(road.constants.position.x, road.constants.position.y), rotation=road.constants.orientation)
         self.edge_markings.add_attr(self.transform)
 
         def make_centre_line():
-            inbound_rear, _, inbound_front, inbound_left = road_layout.major_road.inbound_bounds
+            inbound_rear, _, inbound_front, inbound_left = road.inbound_bounds
             centre_line = rendering.make_polyline([(inbound_rear, inbound_left), (inbound_front, inbound_left)])
             centre_line.add_attr(mods.FactoredLineStyle(0x00FF, 2))
             centre_line.add_attr(self.transform)
@@ -277,7 +277,7 @@ class RoadLayoutView:
             lane_line.add_attr(mods.FactoredLineStyle(0x00FF, 2))
             return lane_line
 
-        self.lane_markings = make_compound([make_lane_line(line) for line in iter_lane_lines(road_layout.major_road.outbound_lanes_bounds)] + [make_lane_line(line) for line in iter_lane_lines(road_layout.major_road.inbound_lanes_bounds)], transform=self.transform)
+        self.lane_markings = make_compound([make_lane_line(line) for line in iter_lane_lines(road.outbound_lanes_bounds)] + [make_lane_line(line) for line in iter_lane_lines(road.inbound_lanes_bounds)], transform=self.transform)
 
         self.pelican_crossing_view = None
 
@@ -290,14 +290,25 @@ class RoadLayoutView:
         yield from [self.centre_markings, self.lane_markings, self.edge_markings]
 
 
+class RoadMapView:
+    def __init__(self, road_map):
+        self.major_road_view = RoadView(road_map.major_road)
+        self.minor_road_views = [RoadView(minor_road) for minor_road in road_map.minor_roads] if road_map.minor_roads is not None else list()
+
+    def markings(self):
+        yield from self.major_road_view.markings()
+        for minor_road_view in self.minor_road_views:
+            yield from minor_road_view.markings()
+
+
 class RoadEnvViewer(rendering.Viewer):
-    def __init__(self, width, height, road_layout, actors):
+    def __init__(self, width, height, road_map, actors):
         super().__init__(width, height)
-        self.transform.set_translation(0.0, self.height / 2.0)
+        self.transform.set_translation(0.0, self.height / 2.0)  # Specify that (0, 0) should be centre-left of viewer (default is bottom-left)
 
-        self.road_layout_view = RoadLayoutView(road_layout)
+        self.road_map_view = RoadMapView(road_map)
 
-        for marking in self.road_layout_view.markings():
+        for marking in self.road_map_view.markings():
             self.add_geom(marking)
 
         self.actor_views = list()
@@ -315,13 +326,13 @@ class RoadEnvViewer(rendering.Viewer):
                 pedestrian_view = PedestrianView(actor)
                 self.actor_views.append(pedestrian_view)
             elif isinstance(actor, PelicanCrossing):
-                self.road_layout_view.set_pelican_crossing(actor)
-                self.actor_views.append(self.road_layout_view.pelican_crossing_view)
+                self.road_map_view.major_road_view.set_pelican_crossing(actor)
+                self.actor_views.append(self.road_map_view.major_road_view.pelican_crossing_view)
 
-        if self.road_layout_view.pelican_crossing_view is not None:
-            for item in self.road_layout_view.pelican_crossing_view.items():
+        if self.road_map_view.major_road_view.pelican_crossing_view is not None:
+            for item in self.road_map_view.major_road_view.pelican_crossing_view.items():
                 self.add_geom(item)
-            self.add_geom(self.road_layout_view.edge_markings)  # Need to redraw on top of pelican crossing
+            self.add_geom(self.road_map_view.major_road_view.edge_markings)  # Need to redraw on top of pelican crossing
 
         self.dynamic_actor_views = [actor_view for actor_view in self.actor_views if isinstance(actor_view, DynamicActorView)]
 

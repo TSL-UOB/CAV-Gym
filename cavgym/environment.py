@@ -46,7 +46,7 @@ class CAVEnvConstants:
     viewer_width: int
     viewer_height: int
     time_resolution: float
-    road_layout: RoadMap
+    road_map: RoadMap
 
 
 class CAVEnv(MarkovGameEnv):
@@ -95,7 +95,7 @@ class CAVEnv(MarkovGameEnv):
 
     def render(self, mode='human'):
         if not self.viewer:
-            self.viewer = RoadEnvViewer(self.constants.viewer_width, self.constants.viewer_height, self.constants.road_layout, self.actors)
+            self.viewer = RoadEnvViewer(self.constants.viewer_width, self.constants.viewer_height, self.constants.road_map, self.actors)
         else:
             self.viewer.update(self.actors)
         
