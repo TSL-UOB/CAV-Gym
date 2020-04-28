@@ -9,11 +9,11 @@ road_map = RoadMap(
     major_road=Road(
         constants=RoadConstants(
             length=1600.0,
-            num_outbound_lanes=1,
-            num_inbound_lanes=1,
+            num_outbound_lanes=3,
+            num_inbound_lanes=2,
             lane_width=40.0,
             position=utilities.Point(0.0, 0.0),
-            orientation=0.0
+            orientation=utilities.DEG2RAD * 0.0
         )
     )
 )
@@ -25,12 +25,21 @@ env_constants = CAVEnvConstants(
     road_map=road_map
 )
 
+pelican_crossing = PelicanCrossing(
+    init_state=TrafficLightState.GREEN,
+    constants=PelicanCrossingConstants(
+        road=road_map.major_road,
+        width=road_map.major_road.constants.lane_width * 1.5,
+        x_position=road_map.major_road.constants.length / 2.0
+    )
+)
+
 actors = [
     Car(
         init_state=DynamicActorState(
-            position=utilities.Point(0.0, road_map.major_road.outbound_lanes_bounds[0][1] + (road_map.major_road.constants.lane_width / 2.0)),
+            position=road_map.major_road.outbound.lane_spawns[0],
             velocity=100.0,
-            orientation=0.0,
+            orientation=road_map.major_road.outbound_orientation,
             acceleration=0.0,
             angular_velocity=0.0
         ),
@@ -38,27 +47,20 @@ actors = [
     ),
     Car(
         init_state=DynamicActorState(
-            position=utilities.Point(env_constants.viewer_width, road_map.major_road.inbound_lanes_bounds[-1][3] - (road_map.major_road.constants.lane_width / 2.0)),
+            position=road_map.major_road.inbound.lane_spawns[0],
             velocity=100.0,
-            orientation=utilities.DEG2RAD * 180.0,
+            orientation=road_map.major_road.inbound_orientation,
             acceleration=0.0,
             angular_velocity=0.0
         ),
         constants=car_constants
     ),
-    PelicanCrossing(
-        init_state=TrafficLightState.GREEN,
-        constants=PelicanCrossingConstants(
-            road=road_map.major_road,
-            width=road_map.major_road.constants.lane_width * 1.5,
-            x_position=road_map.major_road.constants.length / 2.0
-        )
-    ),
+    pelican_crossing,
     Pedestrian(
         init_state=DynamicActorState(
-            position=utilities.Point(env_constants.viewer_width / 2.0, -(env_constants.viewer_height / 2.0) + (road_map.major_road.constants.lane_width * 0.75)),
+            position=pelican_crossing.inbound_spawn,
             velocity=0.0,
-            orientation=utilities.DEG2RAD * 90.0,
+            orientation=road_map.major_road.outbound_orientation + (utilities.DEG2RAD * 90.0),
             acceleration=0.0,
             angular_velocity=0.0
         ),

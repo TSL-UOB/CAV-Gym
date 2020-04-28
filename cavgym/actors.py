@@ -3,11 +3,10 @@ from copy import copy
 from dataclasses import dataclass
 from enum import Enum
 
-from shapely import geometry, affinity
-
 from cavgym import utilities
 from cavgym.actions import AccelerationAction, TurnAction, TrafficLightAction
-from cavgym.assets import Road
+from cavgym.assets import Road, TrafficLight
+from cavgym.utilities import Bounds, Point
 
 
 class Actor:
@@ -22,9 +21,6 @@ class Actor:
 
     def bounding_box(self):
         raise NotImplementedError
-
-    def intersects(self, other):
-        return self.bounding_box().intersects(other.bounding_box())
 
     def step_action(self, joint_action, index):
         raise NotImplementedError
@@ -68,30 +64,23 @@ class DynamicActor(Actor):
     def __init__(self, init_state, constants):
         super().__init__(init_state, constants)
 
-        rear, front = -self.constants.length / 2.0, self.constants.length / 2.0
-        right, left = -self.constants.width / 2.0, self.constants.width / 2.0
-        self.bounds = rear, right, front, left
+        self.relative_bounds = Bounds(rear=-self.constants.length / 2.0, left=self.constants.width / 2.0, front=self.constants.length / 2.0, right=-self.constants.width / 2.0)
 
     def bounding_box(self):
-        assert self.bounds is not None
-        box = geometry.box(*self.bounds)
-        rotated_box = affinity.rotate(box, self.state.orientation, use_radians=True)
-        return affinity.translate(rotated_box, self.state.position.x, self.state.position.y)
+        return utilities.make_bounding_box(self.state.position, self.relative_bounds, self.state.orientation)
 
     def stopping_bounds(self):
-        assert self.bounds is not None
-        rear, right, front, left = self.bounds
-        normal_braking_distance = (self.state.velocity ** 2) / (2 * -self.constants.normal_deceleration)
         hard_braking_distance = (self.state.velocity ** 2) / (2 * -self.constants.hard_deceleration)
-        # reaction_distance = self.state.velocity * utilities.REACTION_TIME
-        front_hard_braking = front + hard_braking_distance
-        return (front, right, front_hard_braking, left), (front_hard_braking, right, front + normal_braking_distance, left)
+        reaction_distance = self.state.velocity * utilities.REACTION_TIME
+        hard_braking_relative_bounds = Bounds(rear=self.relative_bounds.front, left=self.relative_bounds.left, front=self.relative_bounds.front + hard_braking_distance, right=self.relative_bounds.right)
+        reaction_relative_bounds = Bounds(rear=self.relative_bounds.front + hard_braking_distance, left=self.relative_bounds.left, front=self.relative_bounds.front + hard_braking_distance + reaction_distance, right=self.relative_bounds.right)
+        return hard_braking_relative_bounds, reaction_relative_bounds
 
-    def reaction_zone(self):
-        _, reaction_bounds = self.stopping_bounds()
-        box = geometry.box(*reaction_bounds)
-        rotated_box = affinity.rotate(box, self.state.orientation, use_radians=True)
-        return affinity.translate(rotated_box, self.state.position.x, self.state.position.y)
+    def stopping_zones(self):
+        hard_braking_relative_bounds, reaction_relative_bounds = self.stopping_bounds()
+        hard_braking_relative_bounding_box = utilities.make_bounding_box(self.state.position, hard_braking_relative_bounds, self.state.orientation)
+        reaction_relative_bounding_box = utilities.make_bounding_box(self.state.position, reaction_relative_bounds, self.state.orientation)
+        return hard_braking_relative_bounding_box, reaction_relative_bounding_box
 
     def step_action(self, joint_action, index_self):
         acceleration_action_id, turn_action_id = joint_action[index_self]
@@ -156,12 +145,51 @@ class Pedestrian(DynamicActor):
         super().__init__(init_state, constants)
 
 
-class Car(DynamicActor):
+class Vehicle(DynamicActor):
     def __init__(self, init_state, constants):
         super().__init__(init_state, constants)
 
+        light_offset = self.constants.width * 0.25
 
-class Bus(DynamicActor):
+        self.indicator_relative_bounds = Bounds(
+            rear=self.relative_bounds.rear + light_offset,
+            left=self.relative_bounds.left,
+            front=self.relative_bounds.front - light_offset,
+            right=self.relative_bounds.right
+        )
+
+        self.longitudinal_relative_bounds = Bounds(
+            rear=self.relative_bounds.rear,
+            left=self.relative_bounds.left - light_offset,
+            front=self.relative_bounds.front,
+            right=self.relative_bounds.right + light_offset
+        )
+
+    def indicators(self):
+        return utilities.make_bounding_box(self.state.position, self.indicator_relative_bounds, self.state.orientation)
+
+    def longitudinal_lights(self):
+        return utilities.make_bounding_box(self.state.position, self.longitudinal_relative_bounds, self.state.orientation)
+
+
+class Car(Vehicle):
+    def __init__(self, init_state, constants):
+        super().__init__(init_state, constants)
+
+        roof_offset = self.constants.length * 0.25
+
+        self.roof_relative_bounds = Bounds(
+            rear=self.relative_bounds.rear + roof_offset,
+            left=self.relative_bounds.left,
+            front=self.relative_bounds.front - roof_offset,
+            right=self.relative_bounds.right
+        )
+
+    def roof(self):
+        return utilities.make_bounding_box(self.state.position, self.roof_relative_bounds, self.state.orientation)
+
+
+class Bus(Vehicle):
     def __init__(self, init_state, constants):
         super().__init__(init_state, constants)
 
@@ -191,13 +219,28 @@ class PelicanCrossing(Actor):
     def __init__(self, init_state, constants):
         super().__init__(init_state, constants)
 
-        rear, front = -self.constants.width / 2.0, self.constants.width / 2.0
-        right, left = -self.constants.road.width / 2.0, self.constants.road.width / 2.0
-        self.bounds = rear, right, front, left
+        relative_bounds = Bounds(
+            rear=-self.constants.width / 2.0,
+            left=self.constants.road.width / 2.0,
+            front=self.constants.width / 2.0,
+            right=-self.constants.road.width / 2.0
+        )
 
-        box = geometry.box(*self.bounds)
-        rotated_box = affinity.rotate(box, self.constants.road.constants.orientation, use_radians=True)
-        self.static_bounding_box = affinity.translate(rotated_box, self.constants.x_position, self.constants.road.constants.position.y)
+        position = Point(self.constants.x_position, 0.0).rotate(self.constants.road.constants.orientation).relative(self.constants.road.constants.position)
+        self.static_bounding_box = utilities.make_bounding_box(position, relative_bounds, self.constants.road.constants.orientation)
+
+        outbound_intersection_relative_bounds = Bounds(rear=relative_bounds.rear, left=relative_bounds.left, front=relative_bounds.front, right=relative_bounds.left - self.constants.road.outbound.width)
+        inbound_intersection_relative_bounds = Bounds(rear=relative_bounds.rear, left=relative_bounds.right + self.constants.road.inbound.width, front=relative_bounds.front, right=relative_bounds.right)
+        self.outbound_intersection_bounding_box = utilities.make_bounding_box(position, outbound_intersection_relative_bounds, self.constants.road.constants.orientation)
+        self.inbound_intersection_bounding_box = utilities.make_bounding_box(position, inbound_intersection_relative_bounds, self.constants.road.constants.orientation)
+
+        outbound_traffic_light_position = utilities.Point(self.static_bounding_box.rear_left.x, self.static_bounding_box.rear_left.y + 20.0)
+        inbound_traffic_light_position = utilities.Point(self.static_bounding_box.front_right.x,self.static_bounding_box.front_right.y - 20.0)
+        self.outbound_traffic_light = TrafficLight(outbound_traffic_light_position, self.constants.road.constants.orientation)
+        self.inbound_traffic_light = TrafficLight(inbound_traffic_light_position, self.constants.road.constants.orientation)
+
+        self.outbound_spawn = Point(self.constants.x_position, (self.constants.road.width / 2.0) + (self.constants.road.constants.lane_width / 2.0)).rotate(self.constants.road.constants.orientation).relative(self.constants.road.constants.position)
+        self.inbound_spawn = Point(self.constants.x_position, -(self.constants.road.width / 2.0) - (self.constants.road.constants.lane_width / 2.0)).rotate(self.constants.road.constants.orientation).relative(self.constants.road.constants.position)
 
     def bounding_box(self):
         return self.static_bounding_box

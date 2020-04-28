@@ -12,7 +12,7 @@ road_map = RoadMap(
             num_inbound_lanes=0,
             lane_width=40.0,
             position=utilities.Point(0.0, 0.0),
-            orientation=0.0
+            orientation=utilities.DEG2RAD * 0.0
         )
     )
 )
@@ -27,9 +27,9 @@ env_constants = CAVEnvConstants(
 actors = [
     Bus(
         init_state=DynamicActorState(
-            position=utilities.Point(0.0, road_map.major_road.outbound_lanes_bounds[2][1] + (road_map.major_road.constants.lane_width / 2.0)),
+            position=road_map.major_road.outbound.lane_spawns[0],
             velocity=100.0,
-            orientation=0.0,
+            orientation=road_map.major_road.outbound_orientation,
             acceleration=0.0,
             angular_velocity=0.0
         ),
@@ -37,9 +37,9 @@ actors = [
     ),
     Car(
         init_state=DynamicActorState(
-            position=utilities.Point(0.0, road_map.major_road.outbound_lanes_bounds[1][1] + (road_map.major_road.constants.lane_width / 2.0)),
+            position=road_map.major_road.outbound.lane_spawns[1],
             velocity=100.0,
-            orientation=0.0,
+            orientation=road_map.major_road.outbound_orientation,
             acceleration=0.0,
             angular_velocity=0.0
         ),
@@ -47,9 +47,9 @@ actors = [
     ),
     Bicycle(
         init_state=DynamicActorState(
-            position=utilities.Point(0.0, road_map.major_road.outbound_lanes_bounds[0][1] + (road_map.major_road.constants.lane_width / 2.0)),
+            position=road_map.major_road.outbound.lane_spawns[2],
             velocity=100.0,
-            orientation=0.0,
+            orientation=road_map.major_road.outbound_orientation,
             acceleration=0.0,
             angular_velocity=0.0
         ),

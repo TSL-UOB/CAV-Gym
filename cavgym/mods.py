@@ -1,9 +1,10 @@
 import json
+import math
 import os
 import time
 
 from gym import error
-from gym.envs.classic_control.rendering import LineStyle, glEnable, glLineStipple, GL_LINE_STIPPLE
+from gym.envs.classic_control.rendering import LineStyle, glEnable, glLineStipple, GL_LINE_STIPPLE, FilledPolygon, PolyLine
 from gym.utils import atomic_write
 from gym.utils.json_utils import json_encode_np
 
@@ -121,3 +122,14 @@ class FactoredLineStyle(LineStyle):
     def enable(self):
         glEnable(GL_LINE_STIPPLE)
         glLineStipple(self.factor, self.style)
+
+
+def make_circle(x, y, radius, res=30, filled=True):
+    points = []
+    for i in range(res):
+        ang = 2*math.pi*i / res
+        points.append((x + math.cos(ang)*radius, y + math.sin(ang)*radius))
+    if filled:
+        return FilledPolygon(points)
+    else:
+        return PolyLine(points, True)

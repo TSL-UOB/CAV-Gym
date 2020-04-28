@@ -4,7 +4,7 @@ import gym
 from gym import spaces
 from gym.utils import seeding
 from cavgym.actions import TrafficLightAction, AccelerationAction, TurnAction
-from cavgym.actors import PelicanCrossing, Pedestrian, DynamicActor
+from cavgym.actors import PelicanCrossing, DynamicActor
 from cavgym.rendering import RoadEnvViewer
 from cavgym.assets import RoadMap
 
@@ -84,7 +84,7 @@ class CAVEnv(MarkovGameEnv):
         for actor in self.actors:
             actor.step_dynamics(self.constants.time_resolution)
 
-        joint_reward = [-1 if any(vehicle.intersects(other_vehicle) for other_vehicle in self.actors if vehicle is not other_vehicle and not isinstance(vehicle, PelicanCrossing) and not isinstance(other_vehicle, PelicanCrossing)) else 0 for vehicle in self.actors]
+        joint_reward = [-1 if any(vehicle.bounding_box().intersects(other_vehicle.bounding_box()) for other_vehicle in self.actors if vehicle is not other_vehicle and not isinstance(vehicle, PelicanCrossing) and not isinstance(other_vehicle, PelicanCrossing)) else 0 for vehicle in self.actors]
 
         return self.observation_space.sample(), joint_reward, any(reward < 0 for reward in joint_reward), None
 
