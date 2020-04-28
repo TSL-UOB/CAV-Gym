@@ -1,6 +1,6 @@
 from cavgym import utilities
-from cavgym.actors import DynamicActorState, TrafficLightState, PelicanCrossingConstants, Car
-from cavgym.environment import CAVEnvConstants, RoadMap, CAVEnv, PelicanCrossing, Pedestrian
+from cavgym.actors import DynamicActorState, TrafficLightState, PelicanCrossingConstants, Car, Pedestrian
+from cavgym.environment import CAVEnvConstants, RoadMap, CAVEnv, PelicanCrossing
 from cavgym.assets import Road, RoadConstants
 from cavgym.scenarios import car_constants, pedestrian_constants
 
