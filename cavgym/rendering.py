@@ -4,6 +4,7 @@ from gym.envs.classic_control import rendering
 
 from cavgym import mods
 from cavgym.actors import TrafficLightState, Car, Bus, Bicycle, Pedestrian, PelicanCrossing
+from cavgym.assets import Road, RoadConstants
 from cavgym.utilities import Point
 
 
@@ -213,6 +214,9 @@ class PelicanCrossingView(ActorView):
 
 class RoadView:
     def __init__(self, road):
+        self.area = rendering.make_polygon(list(road.static_bounding_box))
+        self.area.set_color(1, 1, 1)
+
         coordinates = road.bounding_box()
         self.edge_markings = rendering.Compound([
             rendering.make_polyline([tuple(coordinates.rear_left), tuple(coordinates.front_left)]),
@@ -237,7 +241,7 @@ class RoadView:
         self.pelican_crossing_view = PelicanCrossingView(pelican_crossing)
 
     def geoms(self):
-        yield from [self.centre_markings, self.lane_markings, self.edge_markings]
+        yield from [self.area, self.centre_markings, self.lane_markings, self.edge_markings]
 
 
 class RoadMapView:
@@ -245,10 +249,20 @@ class RoadMapView:
         self.major_road_view = RoadView(road_map.major_road)
         self.minor_road_views = [RoadView(minor_road) for minor_road in road_map.minor_roads] if road_map.minor_roads is not None else list()
 
+        if self.minor_road_views:
+            self.clear_intersections = rendering.Compound([rendering.make_polyline([tuple(bounding_box.front_left), tuple(bounding_box.front_right)]) for bounding_box in road_map.outbound_intersection_bounding_boxes + road_map.inbound_intersection_bounding_boxes])
+            self.clear_intersections.set_color(1, 1, 1)
+
+            self.intersection_markings = rendering.Compound([rendering.make_polyline([tuple(bounding_box.front_left), tuple(bounding_box.front_right)]) for bounding_box in road_map.inbound_intersection_bounding_boxes])
+            self.intersection_markings.add_attr(mods.FactoredLineStyle(0x0F0F, 2))
+
     def geoms(self):
-        yield from self.major_road_view.geoms()
         for minor_road_view in self.minor_road_views:
             yield from minor_road_view.geoms()
+        yield from self.major_road_view.geoms()
+        if self.minor_road_views:
+            yield self.clear_intersections
+            yield self.intersection_markings
 
 
 class RoadEnvViewer(rendering.Viewer):

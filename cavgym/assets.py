@@ -30,10 +30,10 @@ class TrafficLight:
 
 @dataclass(frozen=True)
 class RoadConstants:
-    length: float
+    length: int
     num_outbound_lanes: int
     num_inbound_lanes: int
-    lane_width: float
+    lane_width: int
 
     position: utilities.Point
     orientation: float
@@ -49,7 +49,9 @@ class Lane:
 
 class Direction:
     def __init__(self, position, relative_bounds, orientation, num_lanes, lane_width):
+        self.position = position
         self.relative_bounds = relative_bounds
+        self.orientation = orientation
         self.num_lanes = num_lanes
         self.lane_width = lane_width
 
@@ -125,6 +127,18 @@ class Road:
         self.outbound_orientation = self.constants.orientation
         self.inbound_orientation = self.outbound_orientation + (utilities.DEG2RAD * 180.0)
 
+    def spawn_position(self, relative_position):
+        return relative_position.rotate(self.constants.orientation).relative(self.constants.position)
+
+    def spawn_position_outbound(self, relative_x):
+        return self.spawn_position(Point(relative_x, self.outbound.width))
+
+    def spawn_position_inbound(self, relative_x):
+        return self.spawn_position(Point(relative_x, -self.inbound.width))
+
+    def spawn_orientation(self, relative_orientation):
+        return self.constants.orientation + relative_orientation
+
     def bounding_box(self):
         return self.static_bounding_box
 
@@ -133,3 +147,44 @@ class RoadMap:
     def __init__(self, major_road, minor_roads=None):
         self.major_road = major_road
         self.minor_roads = minor_roads
+
+        if self.minor_roads is not None:
+            def make_intersection(position, relative_bounds, orientation):
+                intersection_relative_bounds = Bounds(
+                    rear=relative_bounds.rear,
+                    left=relative_bounds.left,
+                    front=relative_bounds.rear + self.major_road.width,
+                    right=relative_bounds.right
+                )
+                return utilities.make_bounding_box(position, intersection_relative_bounds, orientation)
+
+            def make_road_intersection(minor_road):
+                return make_intersection(minor_road.constants.position, minor_road.relative_bounds, minor_road.constants.orientation)
+
+            self.intersection_bounding_boxes = [make_road_intersection(minor_road) for minor_road in self.minor_roads]
+
+            def make_direction_intersection(direction):
+                return make_intersection(direction.position, direction.relative_bounds, direction.orientation)
+
+            self.outbound_intersection_bounding_boxes = [make_direction_intersection(minor_road.outbound) for minor_road in self.minor_roads]
+            self.inbound_intersection_bounding_boxes = [make_direction_intersection(minor_road.inbound) for minor_road in self.minor_roads]
+
+            def make_difference(position, relative_bounds, orientation):
+                difference_relative_bounds = Bounds(
+                    rear=relative_bounds.rear + self.major_road.width,
+                    left=relative_bounds.left,
+                    front=relative_bounds.front,
+                    right=relative_bounds.right
+                )
+                return utilities.make_bounding_box(position, difference_relative_bounds, orientation)
+
+            def make_road_difference(minor_road):
+                return make_difference(minor_road.constants.position, minor_road.relative_bounds, minor_road.constants.orientation)
+
+            self.difference_bounding_boxes = [make_road_difference(minor_road) for minor_road in self.minor_roads]
+
+            def make_direction_difference(direction):
+                return make_difference(direction.position, direction.relative_bounds, direction.orientation)
+
+            self.outbound_difference_bounding_boxes = [make_direction_difference(minor_road.outbound) for minor_road in self.minor_roads]
+            self.inbound_difference_bounding_boxes = [make_direction_difference(minor_road.inbound) for minor_road in self.minor_roads]

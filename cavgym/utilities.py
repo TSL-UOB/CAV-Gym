@@ -1,7 +1,7 @@
 import math
 from dataclasses import dataclass, astuple
 
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, MultiPolygon
 
 DEG2RAD = 0.017453292519943295
 REACTION_TIME = 0.675
@@ -60,6 +60,9 @@ class BoundingBox:
 
     def intersects(self, other):
         return Polygon(list(self)).intersects(Polygon(list(other)))
+
+    def exterior(self):
+        return self.rear_left, self.front_left, self.front_right, self.rear_right, self.rear_left
 
 
 def make_bounding_box(anchor: Point, relative_bounds: Bounds, orientation):  # position is taken as (0, 0) in relative_bounds

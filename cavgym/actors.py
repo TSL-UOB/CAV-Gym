@@ -34,7 +34,7 @@ class DynamicActorState:
     position: utilities.Point
     velocity: float
     orientation: float
-    acceleration: float
+    acceleration: int
     angular_velocity: float
 
     def __copy__(self):
@@ -43,17 +43,17 @@ class DynamicActorState:
 
 @dataclass(frozen=True)
 class DynamicActorConstants:
-    length: float
-    width: float
-    wheelbase: float
+    length: int
+    width: int
+    wheelbase: int
 
     min_velocity: float
     max_velocity: float
 
-    normal_acceleration: float
-    normal_deceleration: float
-    hard_acceleration: float
-    hard_deceleration: float
+    normal_acceleration: int
+    normal_deceleration: int
+    hard_acceleration: int
+    hard_deceleration: int
     normal_left_turn: float
     normal_right_turn: float
     hard_left_turn: float
@@ -211,8 +211,8 @@ class TrafficLightState(Enum):
 @dataclass(frozen=True)
 class PelicanCrossingConstants:
     road: Road
-    width: float
-    x_position: float
+    width: int
+    x_position: int
 
 
 class PelicanCrossing(Actor):
@@ -235,7 +235,7 @@ class PelicanCrossing(Actor):
         self.inbound_intersection_bounding_box = utilities.make_bounding_box(position, inbound_intersection_relative_bounds, self.constants.road.constants.orientation)
 
         outbound_traffic_light_position = utilities.Point(self.static_bounding_box.rear_left.x, self.static_bounding_box.rear_left.y + 20.0)
-        inbound_traffic_light_position = utilities.Point(self.static_bounding_box.front_right.x,self.static_bounding_box.front_right.y - 20.0)
+        inbound_traffic_light_position = utilities.Point(self.static_bounding_box.front_right.x, self.static_bounding_box.front_right.y - 20.0)
         self.outbound_traffic_light = TrafficLight(outbound_traffic_light_position, self.constants.road.constants.orientation)
         self.inbound_traffic_light = TrafficLight(inbound_traffic_light_position, self.constants.road.constants.orientation)
 
