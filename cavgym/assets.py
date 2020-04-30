@@ -28,17 +28,6 @@ class TrafficLight:
         self.green_light = make_light(-self.height * 0.25)
 
 
-@dataclass(frozen=True)
-class RoadConstants:
-    length: int
-    num_outbound_lanes: int
-    num_inbound_lanes: int
-    lane_width: int
-
-    position: utilities.Point
-    orientation: float
-
-
 class Lane:
     def __init__(self, position, relative_bounds, orientation):
         self.static_bounding_box = utilities.make_bounding_box(position, relative_bounds, orientation)
@@ -61,6 +50,8 @@ class Direction:
         self.lanes = [Lane(position, lane_relative_bounds, orientation) for lane_relative_bounds in self._iter_lanes_relative_bounds()]
         self.lane_spawns = list(self._iter_lane_spawns())
 
+        self.bus_stop = None
+
     def bounding_box(self):
         return self.static_bounding_box
 
@@ -69,6 +60,9 @@ class Direction:
 
     def _iter_lane_spawns(self):
         raise NotImplementedError
+
+    def set_bus_stop(self, bus_stop):
+        self.bus_stop = bus_stop
 
 
 class Outbound(Direction):
@@ -107,6 +101,72 @@ class Inbound(Direction):
             coordinates = lane.bounding_box()
             spawn = Point(x=coordinates.front_right.x, y=coordinates.front_right.y + (self.lane_width / 2.0))
             yield spawn
+
+
+@dataclass(frozen=True)
+class ObstacleConstants:
+    width: int
+    height: int
+    position: utilities.Point
+    orientation: float
+
+
+class Obstacle:
+    def __init__(self, constants):
+        self.constants = constants
+
+        relative_bounds = Bounds(
+            rear=-self.constants.width / 2.0,
+            left=self.constants.height / 2.0,
+            front=self.constants.width / 2.0,
+            right=-self.constants.height / 2.0
+        )
+
+        self.static_bounding_box = utilities.make_bounding_box(self.constants.position, relative_bounds, self.constants.orientation)
+
+    def bounding_box(self):
+        return self.static_bounding_box
+
+
+@dataclass(frozen=True)
+class BusStopConstants:
+    road_direction: Direction
+    x_position: int
+
+
+class BusStop:
+    def __init__(self, constants):
+        self.constants = constants
+
+        relative_bounds_left = self.constants.road_direction.relative_bounds.left
+        relative_bounds_right = self.constants.road_direction.relative_bounds.right
+
+        if isinstance(self.constants.road_direction, Outbound):
+            relative_bounds_right = self.constants.road_direction.relative_bounds.left - (self.constants.road_direction.lane_width * 0.75)
+        elif isinstance(self.constants.road_direction, Inbound):
+            relative_bounds_left = self.constants.road_direction.relative_bounds.right + (self.constants.road_direction.lane_width * 0.75)
+        else:
+            raise Exception("unknown Direction")
+
+        relative_bounds = Bounds(
+            rear=self.constants.x_position,
+            left=relative_bounds_left,
+            front=self.constants.x_position + (self.constants.road_direction.lane_width * 3),
+            right=relative_bounds_right
+        )
+
+        self.static_bounding_box = utilities.make_bounding_box(self.constants.road_direction.position, relative_bounds, self.constants.road_direction.orientation)
+
+
+@dataclass(frozen=True)
+class RoadConstants:
+    length: int
+    num_outbound_lanes: int
+    num_inbound_lanes: int
+    lane_width: int
+
+    position: utilities.Point
+    orientation: float
 
 
 class Road:
@@ -188,3 +248,8 @@ class RoadMap:
 
             self.outbound_difference_bounding_boxes = [make_direction_difference(minor_road.outbound) for minor_road in self.minor_roads]
             self.inbound_difference_bounding_boxes = [make_direction_difference(minor_road.inbound) for minor_road in self.minor_roads]
+
+        self.obstacle = None
+
+    def set_obstacle(self, obstacle):
+        self.obstacle = obstacle

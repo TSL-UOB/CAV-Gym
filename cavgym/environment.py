@@ -69,6 +69,10 @@ class CAVEnv(MarkovGameEnv):
         self.action_space = spaces.Tuple(actor_spaces)
         self.observation_space = spaces.Tuple([spaces.Discrete(1) for _ in self.actors])
 
+        self.collision_detection = [actor for actor in self.actors if not isinstance(actor, PelicanCrossing)]
+        if self.constants.road_map.obstacle is not None:
+            self.collision_detection.append(self.constants.road_map.obstacle)
+
         self.viewer = None
 
     def seed(self, seed=None):
@@ -84,7 +88,7 @@ class CAVEnv(MarkovGameEnv):
         for actor in self.actors:
             actor.step_dynamics(self.constants.time_resolution)
 
-        joint_reward = [-1 if any(vehicle.bounding_box().intersects(other_vehicle.bounding_box()) for other_vehicle in self.actors if vehicle is not other_vehicle and not isinstance(vehicle, PelicanCrossing) and not isinstance(other_vehicle, PelicanCrossing)) else 0 for vehicle in self.actors]
+        joint_reward = [-1 if not isinstance(actor, PelicanCrossing) and any(actor.bounding_box().intersects(other.bounding_box()) for other in self.collision_detection if actor is not other) else 0 for actor in self.actors]
 
         return self.observation_space.sample(), joint_reward, any(reward < 0 for reward in joint_reward), None
 

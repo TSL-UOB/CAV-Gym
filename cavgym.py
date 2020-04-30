@@ -35,15 +35,15 @@ def run(scenario, render=True, record_dir=None, debug=False):
     agent = human_agent if human_agent is not None else RandomDynamicActorAgent()
     if scenario is Scenario.PELICAN_CROSSING:
         env = gym.make('PelicanCrossing-v0')
-        agents = [agent, RandomDynamicActorAgent(), RandomTrafficLightAgent(), RandomDynamicActorAgent()]
+        agents = [agent, RandomDynamicActorAgent(), RandomTrafficLightAgent(), RandomDynamicActorAgent(), RandomDynamicActorAgent()]
         run_simulation(env, agents, render=render, human_agent=human_agent, record_dir=record_dir, debug=debug)
     elif scenario is Scenario.BUS_STOP:
         env = gym.make('BusStop-v0')
-        agents = [RandomDynamicActorAgent(), agent, RandomDynamicActorAgent()]
+        agents = [RandomDynamicActorAgent(), agent, RandomDynamicActorAgent(), RandomDynamicActorAgent(), RandomDynamicActorAgent()]
         run_simulation(env, agents, render=render, human_agent=human_agent, record_dir=record_dir, debug=debug)
     elif scenario is Scenario.CROSSROADS:
         env = gym.make('Crossroads-v0')
-        agents = [agent, RandomDynamicActorAgent()]
+        agents = [agent, RandomDynamicActorAgent(), RandomDynamicActorAgent()]
         run_simulation(env, agents, render=render, human_agent=human_agent, record_dir=record_dir, debug=debug)
     else:
         print(f"{scenario} scenario is not yet implemented")

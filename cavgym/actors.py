@@ -239,8 +239,8 @@ class PelicanCrossing(Actor):
         self.outbound_traffic_light = TrafficLight(outbound_traffic_light_position, self.constants.road.constants.orientation)
         self.inbound_traffic_light = TrafficLight(inbound_traffic_light_position, self.constants.road.constants.orientation)
 
-        self.outbound_spawn = Point(self.constants.x_position, (self.constants.road.width / 2.0) + (self.constants.road.constants.lane_width / 2.0)).rotate(self.constants.road.constants.orientation).relative(self.constants.road.constants.position)
-        self.inbound_spawn = Point(self.constants.x_position, -(self.constants.road.width / 2.0) - (self.constants.road.constants.lane_width / 2.0)).rotate(self.constants.road.constants.orientation).relative(self.constants.road.constants.position)
+        self.outbound_spawn = Point(self.constants.x_position + (self.constants.width * 0.15), (self.constants.road.width / 2.0) + (self.constants.road.constants.lane_width / 2.0)).rotate(self.constants.road.constants.orientation).relative(self.constants.road.constants.position)
+        self.inbound_spawn = Point(self.constants.x_position - (self.constants.width * 0.15), -(self.constants.road.width / 2.0) - (self.constants.road.constants.lane_width / 2.0)).rotate(self.constants.road.constants.orientation).relative(self.constants.road.constants.position)
 
     def bounding_box(self):
         return self.static_bounding_box

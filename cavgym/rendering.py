@@ -237,11 +237,19 @@ class RoadView:
 
         self.pelican_crossing_view = None
 
+        self.bus_stop_views = list()
+        for direction in [road.outbound, road.inbound]:
+            if direction.bus_stop is not None:
+                markings = rendering.make_polygon(list(direction.bus_stop.static_bounding_box), filled=False)
+                self.bus_stop_views.append(markings)
+
     def set_pelican_crossing(self, pelican_crossing):
         self.pelican_crossing_view = PelicanCrossingView(pelican_crossing)
 
     def geoms(self):
         yield from [self.area, self.centre_markings, self.lane_markings, self.edge_markings]
+        if self.bus_stop_views is not None:
+            yield from self.bus_stop_views
 
 
 class RoadMapView:
@@ -256,6 +264,10 @@ class RoadMapView:
             self.intersection_markings = rendering.Compound([rendering.make_polyline([tuple(bounding_box.front_left), tuple(bounding_box.front_right)]) for bounding_box in road_map.inbound_intersection_bounding_boxes])
             self.intersection_markings.add_attr(mods.FactoredLineStyle(0x0F0F, 2))
 
+        self.obstacle_view = None
+        if road_map.obstacle is not None:
+            self.obstacle_view = rendering.make_polygon(list(road_map.obstacle.static_bounding_box))
+
     def geoms(self):
         for minor_road_view in self.minor_road_views:
             yield from minor_road_view.geoms()
@@ -263,6 +275,8 @@ class RoadMapView:
         if self.minor_road_views:
             yield self.clear_intersections
             yield self.intersection_markings
+        if self.obstacle_view:
+            yield self.obstacle_view
 
 
 class RoadEnvViewer(rendering.Viewer):

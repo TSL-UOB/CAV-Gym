@@ -1,9 +1,8 @@
 from cavgym import utilities
-from cavgym.actors import DynamicActorState, Car
+from cavgym.actors import DynamicActorState, Car, Pedestrian
 from cavgym.environment import CAVEnvConstants, RoadMap, CAVEnv
 from cavgym.assets import RoadConstants, Road
-from cavgym.scenarios import car_constants
-
+from cavgym.scenarios import car_constants, pedestrian_constants
 
 major_road = Road(
     constants=RoadConstants(
@@ -69,6 +68,16 @@ actors = [
             angular_velocity=0.0
         ),
         constants=car_constants
+    ),
+    Pedestrian(
+        init_state=DynamicActorState(
+            position=utilities.Point(160, -20).relative(road_map.intersection_bounding_boxes[0].front_left),
+            velocity=0.0,
+            orientation=road_map.major_road.outbound_orientation + (utilities.DEG2RAD * 180.0),
+            acceleration=0,
+            angular_velocity=0.0
+        ),
+        constants=pedestrian_constants
     )
 ]
 

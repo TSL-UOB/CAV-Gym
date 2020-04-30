@@ -1,7 +1,7 @@
 from cavgym import utilities
 from cavgym.actors import DynamicActorState, Bus, Car, Bicycle
 from cavgym.environment import CAVEnvConstants, RoadMap, CAVEnv
-from cavgym.assets import Road, RoadConstants
+from cavgym.assets import Road, RoadConstants, BusStop, BusStopConstants
 from cavgym.scenarios import car_constants, bicycle_constants, bus_constants
 
 road_map = RoadMap(
@@ -17,6 +17,15 @@ road_map = RoadMap(
     )
 )
 
+road_map.major_road.outbound.set_bus_stop(
+    BusStop(
+        BusStopConstants(
+            road_direction=road_map.major_road.outbound,
+            x_position=1200
+        )
+    )
+)
+
 env_constants = CAVEnvConstants(
     viewer_width=road_map.major_road.constants.length,
     viewer_height=road_map.major_road.constants.lane_width * (road_map.major_road.constants.num_outbound_lanes + road_map.major_road.constants.num_inbound_lanes + 2),
@@ -27,13 +36,33 @@ env_constants = CAVEnvConstants(
 actors = [
     Bus(
         init_state=DynamicActorState(
-            position=road_map.major_road.outbound.lane_spawns[0],
+            position=utilities.Point(400, 0).rotate(road_map.major_road.outbound_orientation).relative(road_map.major_road.outbound.lane_spawns[0]),
             velocity=100.0,
             orientation=road_map.major_road.outbound_orientation,
             acceleration=0,
             angular_velocity=0.0
         ),
         constants=bus_constants
+    ),
+    Car(
+        init_state=DynamicActorState(
+            position=utilities.Point(200, 0).rotate(road_map.major_road.outbound_orientation).relative(road_map.major_road.outbound.lane_spawns[0]),
+            velocity=100.0,
+            orientation=road_map.major_road.outbound_orientation,
+            acceleration=0,
+            angular_velocity=0.0
+        ),
+        constants=car_constants
+    ),
+    Car(
+        init_state=DynamicActorState(
+            position=road_map.major_road.outbound.lane_spawns[0],
+            velocity=100.0,
+            orientation=road_map.major_road.outbound_orientation,
+            acceleration=0,
+            angular_velocity=0.0
+        ),
+        constants=car_constants
     ),
     Car(
         init_state=DynamicActorState(

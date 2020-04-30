@@ -1,7 +1,7 @@
 from cavgym import utilities
 from cavgym.actors import DynamicActorState, TrafficLightState, PelicanCrossingConstants, Car, Pedestrian
 from cavgym.environment import CAVEnvConstants, RoadMap, CAVEnv, PelicanCrossing
-from cavgym.assets import Road, RoadConstants
+from cavgym.assets import Road, RoadConstants, Obstacle, ObstacleConstants
 from cavgym.scenarios import car_constants, pedestrian_constants
 
 
@@ -34,6 +34,17 @@ pelican_crossing = PelicanCrossing(
     )
 )
 
+road_map.set_obstacle(
+    Obstacle(
+        ObstacleConstants(
+            width=40,
+            height=20,
+            position=utilities.Point(-20, -20).rotate(pelican_crossing.constants.road.constants.orientation).relative(pelican_crossing.static_bounding_box.rear_right),
+            orientation=pelican_crossing.constants.road.constants.orientation
+        )
+    )
+)
+
 actors = [
     Car(
         init_state=DynamicActorState(
@@ -61,6 +72,16 @@ actors = [
             position=pelican_crossing.inbound_spawn,
             velocity=0.0,
             orientation=road_map.major_road.outbound_orientation + (utilities.DEG2RAD * 90.0),
+            acceleration=0,
+            angular_velocity=0.0
+        ),
+        constants=pedestrian_constants
+    ),
+    Pedestrian(
+        init_state=DynamicActorState(
+            position=pelican_crossing.outbound_spawn,
+            velocity=0.0,
+            orientation=road_map.major_road.outbound_orientation + (utilities.DEG2RAD * 270.0),
             acceleration=0,
             angular_velocity=0.0
         ),
