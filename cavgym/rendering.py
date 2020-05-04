@@ -4,8 +4,7 @@ from gym.envs.classic_control import rendering
 
 from cavgym import mods
 from cavgym.actors import TrafficLightState, Car, Bus, Bicycle, Pedestrian, PelicanCrossing
-from cavgym.assets import Road, RoadConstants
-from cavgym.utilities import Point
+from cavgym.geometry import Point
 
 
 class BulbState(Enum):
@@ -29,6 +28,9 @@ class DynamicActorView(ActorView):
         self.reaction = rendering.make_polygon(list(reaction_relative_bounding_box))
         self.reaction.set_color(0.95, 0.95, 0.95)
 
+        self.field_of_view = rendering.make_polygon(list(dynamic_actor.field_of_view()), filled=False)
+        self.field_of_view.set_color(0, 1, 0)
+
     def update(self, dynamic_actor):
         self.body.v = list(dynamic_actor.bounding_box())
 
@@ -36,8 +38,10 @@ class DynamicActorView(ActorView):
         self.hard_braking.v = list(hard_braking_relative_bounding_box)
         self.reaction.v = list(reaction_relative_bounding_box)
 
+        self.field_of_view.v = list(dynamic_actor.field_of_view())
+
     def geoms(self):
-        yield from [self.hard_braking, self.reaction, self.body]
+        yield from [self.field_of_view, self.hard_braking, self.reaction, self.body]
 
 
 class VehicleView(DynamicActorView):
@@ -187,6 +191,8 @@ class PelicanCrossingView(ActorView):
         self.markings = rendering.Compound([
             rendering.make_polyline([tuple(pelican_crossing.outbound_intersection_bounding_box.rear_left), tuple(pelican_crossing.outbound_intersection_bounding_box.rear_right)]),
             rendering.make_polyline([tuple(pelican_crossing.inbound_intersection_bounding_box.front_left), tuple(pelican_crossing.inbound_intersection_bounding_box.front_right)]),
+            rendering.make_polyline([tuple(pelican_crossing.static_bounding_box.rear_left), tuple(pelican_crossing.static_bounding_box.front_left)]),
+            rendering.make_polyline([tuple(pelican_crossing.static_bounding_box.rear_right), tuple(pelican_crossing.static_bounding_box.front_right)])
         ])
 
         offset_rear_right = Point(coordinates.rear_right.x + (pelican_crossing.constants.width * 0.15), coordinates.rear_right.y)
@@ -228,7 +234,7 @@ class RoadView:
         self.centre_markings.add_attr(mods.FactoredLineStyle(0x00FF, 2))
 
         lane_lines = list()
-        for lane in road.outbound.lanes[:-1] + road.inbound.lanes[1:]:
+        for lane in road.outbound.lanes[:-1] + road.inbound.lanes[:-1]:
             lane_coordinates = lane.bounding_box()
             lane_line = rendering.make_polyline([tuple(lane_coordinates.rear_right), tuple(lane_coordinates.front_right)])
             lane_lines.append(lane_line)
@@ -258,10 +264,10 @@ class RoadMapView:
         self.minor_road_views = [RoadView(minor_road) for minor_road in road_map.minor_roads] if road_map.minor_roads is not None else list()
 
         if self.minor_road_views:
-            self.clear_intersections = rendering.Compound([rendering.make_polyline([tuple(bounding_box.front_left), tuple(bounding_box.front_right)]) for bounding_box in road_map.outbound_intersection_bounding_boxes + road_map.inbound_intersection_bounding_boxes])
+            self.clear_intersections = rendering.Compound([rendering.make_polyline([tuple(bounding_box.front_left), tuple(bounding_box.front_right)]) for bounding_box in road_map.intersection_bounding_boxes])
             self.clear_intersections.set_color(1, 1, 1)
 
-            self.intersection_markings = rendering.Compound([rendering.make_polyline([tuple(bounding_box.front_left), tuple(bounding_box.front_right)]) for bounding_box in road_map.inbound_intersection_bounding_boxes])
+            self.intersection_markings = rendering.Compound([rendering.make_polyline([tuple(bounding_box.rear_left), tuple(bounding_box.rear_right)]) for bounding_box in road_map.inbound_intersection_bounding_boxes])
             self.intersection_markings.add_attr(mods.FactoredLineStyle(0x0F0F, 2))
 
         self.obstacle_view = None
@@ -310,7 +316,6 @@ class RoadEnvViewer(rendering.Viewer):
         if self.road_map_view.major_road_view.pelican_crossing_view is not None:
             for geom in self.road_map_view.major_road_view.pelican_crossing_view.geoms():
                 self.add_geom(geom)
-            self.add_geom(self.road_map_view.major_road_view.edge_markings)  # Need to redraw on top of pelican crossing
 
         self.dynamic_actor_views = [actor_view for actor_view in self.actor_views if isinstance(actor_view, DynamicActorView)]
 

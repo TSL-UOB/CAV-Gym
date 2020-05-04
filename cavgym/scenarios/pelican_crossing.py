@@ -1,4 +1,4 @@
-from cavgym import utilities
+from cavgym import geometry
 from cavgym.actors import DynamicActorState, TrafficLightState, PelicanCrossingConstants, Car, Pedestrian
 from cavgym.environment import CAVEnvConstants, RoadMap, CAVEnv, PelicanCrossing
 from cavgym.assets import Road, RoadConstants, Obstacle, ObstacleConstants
@@ -12,8 +12,8 @@ road_map = RoadMap(
             num_outbound_lanes=1,
             num_inbound_lanes=1,
             lane_width=40,
-            position=utilities.Point(0.0, 0.0),
-            orientation=utilities.DEG2RAD * 0.0
+            position=geometry.Point(0.0, 0.0),
+            orientation=geometry.DEG2RAD * 0.0
         )
     )
 )
@@ -39,7 +39,7 @@ road_map.set_obstacle(
         ObstacleConstants(
             width=40,
             height=20,
-            position=utilities.Point(-20, -20).rotate(pelican_crossing.constants.road.constants.orientation).relative(pelican_crossing.static_bounding_box.rear_right),
+            position=geometry.Point(-20, -20).transform(pelican_crossing.constants.road.constants.orientation, pelican_crossing.static_bounding_box.rear_right),
             orientation=pelican_crossing.constants.road.constants.orientation
         )
     )
@@ -48,9 +48,9 @@ road_map.set_obstacle(
 actors = [
     Car(
         init_state=DynamicActorState(
-            position=road_map.major_road.outbound.lane_spawns[0],
+            position=road_map.major_road.outbound.lanes[0].spawn,
             velocity=100.0,
-            orientation=road_map.major_road.outbound_orientation,
+            orientation=road_map.major_road.outbound.orientation,
             acceleration=0,
             angular_velocity=0.0
         ),
@@ -58,9 +58,9 @@ actors = [
     ),
     Car(
         init_state=DynamicActorState(
-            position=road_map.major_road.inbound.lane_spawns[0],
+            position=road_map.major_road.inbound.lanes[0].spawn,
             velocity=100.0,
-            orientation=road_map.major_road.inbound_orientation,
+            orientation=road_map.major_road.inbound.orientation,
             acceleration=0,
             angular_velocity=0.0
         ),
@@ -71,7 +71,7 @@ actors = [
         init_state=DynamicActorState(
             position=pelican_crossing.inbound_spawn,
             velocity=0.0,
-            orientation=road_map.major_road.outbound_orientation + (utilities.DEG2RAD * 90.0),
+            orientation=road_map.major_road.outbound.orientation + (geometry.DEG2RAD * 90.0),
             acceleration=0,
             angular_velocity=0.0
         ),
@@ -81,7 +81,7 @@ actors = [
         init_state=DynamicActorState(
             position=pelican_crossing.outbound_spawn,
             velocity=0.0,
-            orientation=road_map.major_road.outbound_orientation + (utilities.DEG2RAD * 270.0),
+            orientation=road_map.major_road.outbound.orientation + (geometry.DEG2RAD * 270.0),
             acceleration=0,
             angular_velocity=0.0
         ),

@@ -1,4 +1,4 @@
-from cavgym import utilities
+from cavgym import geometry
 from cavgym.actors import DynamicActorState, Car, Pedestrian
 from cavgym.environment import CAVEnvConstants, RoadMap, CAVEnv
 from cavgym.assets import RoadConstants, Road
@@ -10,8 +10,8 @@ major_road = Road(
         num_outbound_lanes=1,
         num_inbound_lanes=1,
         lane_width=40,
-        position=utilities.Point(0.0, 0.0),
-        orientation=utilities.DEG2RAD * 0.0
+        position=geometry.Point(0.0, 0.0),
+        orientation=geometry.DEG2RAD * 0.0
     )
 )
 
@@ -24,8 +24,8 @@ road_map = RoadMap(
                 num_outbound_lanes=1,
                 num_inbound_lanes=1,
                 lane_width=40,
-                position=major_road.spawn_position_outbound(790),
-                orientation=major_road.spawn_orientation(utilities.DEG2RAD * 270.0)
+                position=major_road.spawn_position_inbound(790),
+                orientation=major_road.spawn_orientation(geometry.DEG2RAD * 270.0)
             )
         ),
         Road(
@@ -34,8 +34,8 @@ road_map = RoadMap(
                 num_outbound_lanes=1,
                 num_inbound_lanes=1,
                 lane_width=40,
-                position=major_road.spawn_position_inbound(810),
-                orientation=major_road.spawn_orientation(utilities.DEG2RAD * 90.0)
+                position=major_road.spawn_position_outbound(810),
+                orientation=major_road.spawn_orientation(geometry.DEG2RAD * 90.0)
             )
         )
     ]
@@ -51,9 +51,9 @@ env_constants = CAVEnvConstants(
 actors = [
     Car(
         init_state=DynamicActorState(
-            position=road_map.major_road.outbound.lane_spawns[0],
+            position=road_map.major_road.outbound.lanes[0].spawn,
             velocity=100.0,
-            orientation=road_map.major_road.outbound_orientation,
+            orientation=road_map.major_road.outbound.orientation,
             acceleration=0,
             angular_velocity=0.0
         ),
@@ -61,9 +61,9 @@ actors = [
     ),
     Car(
         init_state=DynamicActorState(
-            position=road_map.major_road.inbound.lane_spawns[0],
+            position=road_map.major_road.inbound.lanes[0].spawn,
             velocity=100.0,
-            orientation=road_map.major_road.inbound_orientation,
+            orientation=road_map.major_road.inbound.orientation,
             acceleration=0,
             angular_velocity=0.0
         ),
@@ -71,9 +71,9 @@ actors = [
     ),
     Pedestrian(
         init_state=DynamicActorState(
-            position=utilities.Point(160, -20).relative(road_map.intersection_bounding_boxes[0].front_left),
+            position=geometry.Point(160, -20).relative(road_map.intersection_bounding_boxes[0].front_left),
             velocity=0.0,
-            orientation=road_map.major_road.outbound_orientation + (utilities.DEG2RAD * 180.0),
+            orientation=road_map.major_road.inbound.orientation,
             acceleration=0,
             angular_velocity=0.0
         ),
