@@ -34,25 +34,25 @@ env_constants = CAVEnvConstants(
 )
 
 actors = [
-    Bus(
-        init_state=DynamicActorState(
-            position=geometry.Point(400, 0).rotate(road_map.major_road.outbound.orientation).relative(road_map.major_road.outbound.lanes[0].spawn),
-            velocity=100.0,
-            orientation=road_map.major_road.outbound.orientation,
-            acceleration=0,
-            angular_velocity=0.0
-        ),
-        constants=bus_constants
-    ),
     Car(
         init_state=DynamicActorState(
-            position=geometry.Point(200, 0).rotate(road_map.major_road.outbound.orientation).relative(road_map.major_road.outbound.lanes[0].spawn),
+            position=geometry.Point(200, 0).rotate(road_map.major_road.outbound.orientation).translate(road_map.major_road.outbound.lanes[0].spawn),
             velocity=100.0,
             orientation=road_map.major_road.outbound.orientation,
             acceleration=0,
             angular_velocity=0.0
         ),
         constants=car_constants
+    ),
+    Bus(
+        init_state=DynamicActorState(
+            position=geometry.Point(400, 0).rotate(road_map.major_road.outbound.orientation).translate(road_map.major_road.outbound.lanes[0].spawn),
+            velocity=100.0,
+            orientation=road_map.major_road.outbound.orientation,
+            acceleration=0,
+            angular_velocity=0.0
+        ),
+        constants=bus_constants
     ),
     Car(
         init_state=DynamicActorState(

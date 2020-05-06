@@ -39,7 +39,7 @@ def run(scenario, render=True, record_dir=None, debug=False):
         run_simulation(env, agents, render=render, human_agent=human_agent, record_dir=record_dir, debug=debug)
     elif scenario is Scenario.BUS_STOP:
         env = gym.make('BusStop-v0')
-        agents = [RandomDynamicActorAgent(), agent, RandomDynamicActorAgent(), RandomDynamicActorAgent(), RandomDynamicActorAgent()]
+        agents = [agent, RandomDynamicActorAgent(), RandomDynamicActorAgent(), RandomDynamicActorAgent(), RandomDynamicActorAgent()]
         run_simulation(env, agents, render=render, human_agent=human_agent, record_dir=record_dir, debug=debug)
     elif scenario is Scenario.CROSSROADS:
         env = gym.make('Crossroads-v0')

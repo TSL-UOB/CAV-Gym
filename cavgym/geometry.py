@@ -13,21 +13,26 @@ class Point:
     x: float
     y: float
 
-    def relative(self, anchor):
-        relative_x = anchor.x + self.x
-        relative_y = anchor.y + self.y
-        return Point(x=relative_x, y=relative_y)
+    def distance(self, other):
+        return math.sqrt(((other.x - self.x) ** 2) + ((other.y - self.y) ** 2))
+
+    def translate(self, anchor):
+        translated_x = anchor.x + self.x
+        translated_y = anchor.y + self.y
+        return Point(x=translated_x, y=translated_y)
 
     def rotate(self, angle):  # Rotate point around (0, 0)
         rotated_x = (math.cos(angle) * self.x) - (math.sin(angle) * self.y)
         rotated_y = (math.sin(angle) * self.x) + (math.cos(angle) * self.y)
         return Point(x=rotated_x, y=rotated_y)
 
-    def transform(self, angle, anchor):
-        return self.rotate(angle).relative(anchor)
+    def enlarge(self, center, scale=100):
+        dist_x = self.x - center.x
+        dist_y = self.y - center.y
+        return Point(center.x + (dist_x * scale), center.y + (dist_y * scale))
 
-    def distance(self, other):
-        return math.sqrt(((other.x - self.x) ** 2) + ((other.y - self.y) ** 2))
+    def transform(self, angle, anchor):
+        return self.rotate(angle).translate(anchor)
 
     def __copy__(self):
         return Point(self.x, self.y)
@@ -186,3 +191,36 @@ def make_circle_segment(radius, angle, anchor=Point(0, 0), angle_left_offset=0.5
         rear=anchor,
         arc=arc
     )
+
+
+@dataclass
+class Triangle(Shape):
+    rear: Point
+    front_left: Point
+    front_right: Point
+
+    def angle(self):
+        angle = math.atan2(self.front_left.y - self.rear.y, self.front_left.x - self.rear.x) - math.atan2(self.front_right.y - self.rear.y, self.front_right.x - self.rear.x)
+        if angle > math.pi:
+            angle -= 2 * math.pi
+        elif angle <= -math.pi:
+            angle += 2 * math.pi
+        return angle
+
+    def normalise(self):  # front_left is on the left if angle is postive
+        angle = self.angle()
+        if angle >= 0:
+            return self
+        else:
+            return Triangle(
+                rear=self.rear,
+                front_left=self.front_right,
+                front_right=self.front_left
+            )
+
+    def transform(self, orientation, position):
+        return Triangle(
+            rear=self.rear.transform(orientation, position),
+            front_left=self.front_left.transform(orientation, position),
+            front_right=self.front_right.transform(orientation, position)
+        )

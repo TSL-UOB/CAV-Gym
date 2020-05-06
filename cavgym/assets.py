@@ -1,24 +1,39 @@
+import itertools
 from dataclasses import dataclass
 
 from cavgym import geometry
 from cavgym.geometry import Point
 
 
-class TrafficLight:
-    def __init__(self, position, orientation, width=10.0, height=20.0):
-        self.position = position
-        self.orientation = orientation
-        self.width = width
-        self.height = height
+class Occlusion:
+    def bounding_box(self):
+        raise NotImplementedError
 
-        self.static_bounding_box = geometry.make_rectangle(self.width, self.height).transform(self.orientation, self.position)
+    def occlusion_zone(self, observation_point):
+        points = [Point(x, y) for x, y in self.bounding_box()]
+        max_angle = 0
+        max_triangle = None
+        for pair in itertools.combinations(points, 2):
+            p1, p2 = pair
+            triangle = geometry.Triangle(rear=observation_point, front_left=p1, front_right=p2)
+            angle = triangle.angle()
+            if abs(angle) > abs(max_angle):
+                max_angle = angle
+                max_triangle = triangle
+        anchor_triangle = max_triangle.normalise()
 
-        def make_light(y):
-            return Point(0.0, y).transform(self.orientation, self.position)
+        enlarged = geometry.Triangle(
+            rear=anchor_triangle.rear,
+            front_left=anchor_triangle.front_left.enlarge(anchor_triangle.rear),
+            front_right=anchor_triangle.front_right.enlarge(anchor_triangle.rear)
+        )
 
-        self.red_light = make_light(self.height * 0.25)
-        self.amber_light = make_light(0.0)
-        self.green_light = make_light(-self.height * 0.25)
+        return geometry.ConvexQuadrilateral(
+            rear_left=anchor_triangle.front_left,
+            front_left=enlarged.front_left,
+            front_right=enlarged.front_right,
+            rear_right=anchor_triangle.front_right
+        )
 
 
 class Lane:
@@ -51,53 +66,6 @@ class Direction:
         self.bus_stop = bus_stop
 
 
-# class Outbound(Direction):
-#     def __init__(self, bounding_box, num_lanes, lane_width):
-#         super().__init__(bounding_box, num_lanes, lane_width)
-#
-#         self.lane_spawns = [lane.static_bounding_box.rear_centre() for lane in self.lanes]
-#
-#
-# class Inbound(Direction):
-#     def __init__(self, bounding_box, num_lanes, lane_width):
-#         super().__init__(bounding_box, num_lanes, lane_width)
-#
-#         # self.lanes.reverse()
-#
-#         self.lane_spawns = [lane.static_bounding_box.rear_centre() for lane in self.lanes]
-
-
-@dataclass(frozen=True)
-class ObstacleConstants:
-    width: int
-    height: int
-    position: geometry.Point
-    orientation: float
-
-
-class Obstacle:
-    def __init__(self, constants):
-        self.constants = constants
-
-        self.static_bounding_box = geometry.make_rectangle(self.constants.width, self.constants.height).transform(self.constants.orientation, self.constants.position)
-
-    def bounding_box(self):
-        return self.static_bounding_box
-
-
-@dataclass(frozen=True)
-class BusStopConstants:
-    road_direction: Direction
-    x_position: int
-
-
-class BusStop:
-    def __init__(self, constants):
-        self.constants = constants
-
-        self.static_bounding_box = geometry.make_rectangle(self.constants.road_direction.lane_width * 3, self.constants.road_direction.lane_width * 0.75, left_offset=0).transform(0, Point(self.constants.x_position, 0).transform(0, self.constants.road_direction.static_bounding_box.rear_left))
-
-
 @dataclass(frozen=True)
 class RoadConstants:
     length: int
@@ -122,19 +90,14 @@ class Road:
         self.outbound = Direction(left, self.constants.num_outbound_lanes, self.constants.lane_width, self.constants.orientation)
         self.inbound = Direction(right.flip(), self.constants.num_inbound_lanes, self.constants.lane_width, self.constants.orientation + (geometry.DEG2RAD * 180.0))
 
-        # self.outbound_orientation = self.constants.orientation
-        # self.inbound_orientation = self.outbound_orientation + (geometry.DEG2RAD * 180.0)
-
     def spawn_position(self, relative_position):
-        return relative_position.rotate(self.constants.orientation).relative(self.constants.position)
+        return relative_position.rotate(self.constants.orientation).translate(self.constants.position)
 
     def spawn_position_outbound(self, relative_x):
-        # return self.spawn_position(Point(relative_x, self.outbound.width))
-        return Point(relative_x, 0).rotate(self.constants.orientation).relative(self.static_bounding_box.rear_right)
+        return Point(relative_x, 0).rotate(self.constants.orientation).translate(self.static_bounding_box.rear_right)
 
     def spawn_position_inbound(self, relative_x):
-        # return self.spawn_position(Point(relative_x, -self.inbound.width))
-        return Point(relative_x, 0).rotate(self.constants.orientation).relative(self.static_bounding_box.rear_left)
+        return Point(relative_x, 0).rotate(self.constants.orientation).translate(self.static_bounding_box.rear_left)
 
     def spawn_orientation(self, relative_orientation):
         return self.constants.orientation + relative_orientation
@@ -164,22 +127,38 @@ class RoadMap:
             self.inbound_intersection_bounding_boxes = [intersection for _, intersection in inbound_partitions]
             self.inbound_difference_bounding_boxes = [remainder for remainder, _ in inbound_partitions]
 
-            # def make_outbound_intersection(direction):
-            #     return geometry.make_rectangle(self.major_road.width, direction.width, rear_offset=0).transform(direction.orientation, direction.static_bounding_box.rear_centre())
-            #
-            # def make_inbound_intersection(direction):
-            #     return geometry.make_rectangle(self.major_road.width, direction.width, rear_offset=1).transform(direction.orientation, direction.static_bounding_box.front_centre()).flip_longitudinally()
-            #
-            # self.outbound_intersection_bounding_boxes = [make_outbound_intersection(minor_road.outbound) for minor_road in self.minor_roads]
-            # self.inbound_intersection_bounding_boxes = [make_inbound_intersection(minor_road.inbound) for minor_road in self.minor_roads]
-            #
-            # def make_direction_difference(minor_road, direction):
-            #     return geometry.make_rectangle(minor_road.constants.length - major_road.width, direction.width, rear_offset=0).transform(minor_road.constants.orientation, Point(major_road.width, 0).transform(minor_road.constants.orientation, direction.static_bounding_box.rear_centre()))
-            #
-            # self.outbound_difference_bounding_boxes = [make_direction_difference(minor_road, minor_road.outbound) for minor_road in self.minor_roads]
-            # self.inbound_difference_bounding_boxes = [make_direction_difference(minor_road, minor_road.inbound) for minor_road in self.minor_roads]
-
         self.obstacle = None
 
     def set_obstacle(self, obstacle):
         self.obstacle = obstacle
+
+
+@dataclass(frozen=True)
+class ObstacleConstants:
+    width: int
+    height: int
+    position: geometry.Point
+    orientation: float
+
+
+class Obstacle(Occlusion):
+    def __init__(self, constants):
+        self.constants = constants
+
+        self.static_bounding_box = geometry.make_rectangle(self.constants.width, self.constants.height).transform(self.constants.orientation, self.constants.position)
+
+    def bounding_box(self):
+        return self.static_bounding_box
+
+
+@dataclass(frozen=True)
+class BusStopConstants:
+    road_direction: Direction
+    x_position: int
+
+
+class BusStop:
+    def __init__(self, constants):
+        self.constants = constants
+
+        self.static_bounding_box = geometry.make_rectangle(self.constants.road_direction.lane_width * 3, self.constants.road_direction.lane_width * 0.75, left_offset=0).transform(0, Point(self.constants.x_position, 0).transform(0, self.constants.road_direction.static_bounding_box.rear_left))

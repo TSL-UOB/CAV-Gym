@@ -71,7 +71,7 @@ actors = [
     ),
     Pedestrian(
         init_state=DynamicActorState(
-            position=geometry.Point(160, -20).relative(road_map.intersection_bounding_boxes[0].front_left),
+            position=geometry.Point(160, -20).translate(road_map.intersection_bounding_boxes[0].front_left),
             velocity=0.0,
             orientation=road_map.major_road.inbound.orientation,
             acceleration=0,

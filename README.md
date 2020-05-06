@@ -4,11 +4,11 @@ A custom OpenAI Gym environment that supports Markov games (joint actions, joint
 ## Scenarios
 
 - Bus stop
-![](demos/bus_stop.gif)
+![](demos/bus-stop.gif)
 - Crossroads
 ![](demos/crossroads.gif)
 - Pelican crossing
-![](demos/pelican_crossing.gif)
+![](demos/pelican-crossing.gif)
 
 ## Usage
 ```

@@ -4,9 +4,9 @@ import gym
 from gym import spaces
 from gym.utils import seeding
 from cavgym.actions import TrafficLightAction, AccelerationAction, TurnAction
-from cavgym.actors import PelicanCrossing, DynamicActor
+from cavgym.actors import PelicanCrossing, DynamicActor, TrafficLight
 from cavgym.rendering import RoadEnvViewer
-from cavgym.assets import RoadMap
+from cavgym.assets import RoadMap, Occlusion
 
 
 class MarkovGameEnv(gym.Env):
@@ -60,16 +60,21 @@ class CAVEnv(MarkovGameEnv):
         self.actors = actors
         self.constants = constants
 
+        self.ego = actors[0]
+
         actor_spaces = list()
         for actor in self.actors:
             if isinstance(actor, DynamicActor):
                 actor_spaces.append(spaces.Tuple([spaces.Discrete(AccelerationAction.__len__()), spaces.Discrete(TurnAction.__len__())]))
-            elif isinstance(actor, PelicanCrossing):
+            elif isinstance(actor, PelicanCrossing) or isinstance(actor, TrafficLight):
                 actor_spaces.append(spaces.Discrete(TrafficLightAction.__len__()))
         self.action_space = spaces.Tuple(actor_spaces)
         self.observation_space = spaces.Tuple([spaces.Discrete(1) for _ in self.actors])
 
-        self.collision_detection = [actor for actor in self.actors if not isinstance(actor, PelicanCrossing)]
+        self.collision_detection = [actor for actor in self.actors if isinstance(actor, Occlusion)]
+        for actor in self.actors:
+            if isinstance(actor, PelicanCrossing):
+                self.collision_detection += [actor.outbound_traffic_light, actor.inbound_traffic_light]
         if self.constants.road_map.obstacle is not None:
             self.collision_detection.append(self.constants.road_map.obstacle)
 
@@ -99,9 +104,9 @@ class CAVEnv(MarkovGameEnv):
 
     def render(self, mode='human'):
         if not self.viewer:
-            self.viewer = RoadEnvViewer(self.constants.viewer_width, self.constants.viewer_height, self.constants.road_map, self.actors)
+            self.viewer = RoadEnvViewer(self.constants.viewer_width, self.constants.viewer_height, self.constants.road_map, self.actors, self.ego)
         else:
-            self.viewer.update(self.actors)
+            self.viewer.update(self.actors, self.ego)
         
         return self.viewer.render(return_rgb_array=mode == 'rgb_array')
 

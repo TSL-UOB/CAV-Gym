@@ -5,7 +5,7 @@ from enum import Enum
 
 from cavgym import geometry
 from cavgym.actions import AccelerationAction, TurnAction, TrafficLightAction
-from cavgym.assets import Road, TrafficLight
+from cavgym.assets import Road, Occlusion
 from cavgym.geometry import Point
 
 
@@ -63,7 +63,7 @@ class DynamicActorConstants:
     hard_right_turn: float
 
 
-class DynamicActor(Actor):
+class DynamicActor(Actor, Occlusion):
     def __init__(self, init_state, constants):
         super().__init__(init_state, constants)
 
@@ -191,6 +191,44 @@ class TrafficLightState(Enum):
 
 
 @dataclass(frozen=True)
+class TrafficLightConstants:
+    width: int
+    height: int
+    position: Point
+    orientation: float
+
+
+class TrafficLight(Actor, Occlusion):
+    def __init__(self, init_state, constants):
+        super().__init__(init_state, constants)
+
+        self.static_bounding_box = geometry.make_rectangle(self.constants.width, self.constants.height).transform(self.constants.orientation, self.constants.position)
+
+        def make_light(y):
+            return Point(0.0, y).transform(self.constants.orientation, self.constants.position)
+
+        self.red_light = make_light(self.constants.height * 0.25)
+        self.amber_light = make_light(0.0)
+        self.green_light = make_light(-self.constants.height * 0.25)
+
+    def bounding_box(self):
+        return self.static_bounding_box
+
+    def step_action(self, joint_action, index):
+        traffic_light_action = TrafficLightAction(joint_action[index])
+
+        if traffic_light_action is TrafficLightAction.TURN_RED:
+            self.state = TrafficLightState.RED
+        elif traffic_light_action is TrafficLightAction.TURN_AMBER:
+            self.state = TrafficLightState.AMBER
+        elif traffic_light_action is TrafficLightAction.TURN_GREEN:
+            self.state = TrafficLightState.GREEN
+
+    def step_dynamics(self, time_resolution):
+        pass
+
+
+@dataclass(frozen=True)
 class PelicanCrossingConstants:
     road: Road
     width: int
@@ -210,8 +248,21 @@ class PelicanCrossing(Actor):
 
         outbound_traffic_light_position = geometry.Point(self.static_bounding_box.rear_left.x, self.static_bounding_box.rear_left.y + 20.0)
         inbound_traffic_light_position = geometry.Point(self.static_bounding_box.front_right.x, self.static_bounding_box.front_right.y - 20.0)
-        self.outbound_traffic_light = TrafficLight(outbound_traffic_light_position, self.constants.road.constants.orientation)
-        self.inbound_traffic_light = TrafficLight(inbound_traffic_light_position, self.constants.road.constants.orientation)
+
+        outbound_traffic_light_constants = TrafficLightConstants(
+            width=10,
+            height=20,
+            position=outbound_traffic_light_position,
+            orientation=self.constants.road.constants.orientation
+        )
+        inbound_traffic_light_constants = TrafficLightConstants(
+            width=10,
+            height=20,
+            position=inbound_traffic_light_position,
+            orientation=self.constants.road.constants.orientation
+        )
+        self.outbound_traffic_light = TrafficLight(init_state, outbound_traffic_light_constants)
+        self.inbound_traffic_light = TrafficLight(init_state, inbound_traffic_light_constants)
 
         self.outbound_spawn = Point(self.constants.x_position + (self.constants.width * 0.15), (self.constants.road.width / 2.0) + (self.constants.road.constants.lane_width / 2.0)).transform(self.constants.road.constants.orientation, self.constants.road.constants.position)
         self.inbound_spawn = Point(self.constants.x_position - (self.constants.width * 0.15), -(self.constants.road.width / 2.0) - (self.constants.road.constants.lane_width / 2.0)).transform(self.constants.road.constants.orientation, self.constants.road.constants.position)
@@ -220,14 +271,17 @@ class PelicanCrossing(Actor):
         return self.static_bounding_box
 
     def step_action(self, joint_action, index):
-        traffic_light_action = TrafficLightAction(joint_action[index])
+        pelican_crossing_action = TrafficLightAction(joint_action[index])
 
-        if traffic_light_action is TrafficLightAction.TURN_RED:
+        if pelican_crossing_action is TrafficLightAction.TURN_RED:
             self.state = TrafficLightState.RED
-        elif traffic_light_action is TrafficLightAction.TURN_AMBER:
+        elif pelican_crossing_action is TrafficLightAction.TURN_AMBER:
             self.state = TrafficLightState.AMBER
-        elif traffic_light_action is TrafficLightAction.TURN_GREEN:
+        elif pelican_crossing_action is TrafficLightAction.TURN_GREEN:
             self.state = TrafficLightState.GREEN
+
+        self.outbound_traffic_light.step_action(joint_action, index)
+        self.inbound_traffic_light.step_action(joint_action, index)
 
     def step_dynamics(self, time_resolution):
         pass
