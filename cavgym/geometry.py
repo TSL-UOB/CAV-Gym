@@ -76,6 +76,12 @@ class ConvexQuadrilateral(Shape):
     def rear_centre(self):
         return Point((self.rear_left.x + self.rear_right.x) * 0.5, (self.rear_left.y + self.rear_right.y) * 0.5)
 
+    def left_centre(self):
+        return Point((self.rear_left.x + self.front_left.x) * 0.5, (self.rear_left.y + self.front_left.y) * 0.5)
+
+    def right_centre(self):
+        return Point((self.rear_right.x + self.front_right.x) * 0.5, (self.rear_right.y + self.front_right.y) * 0.5)
+
     def split_laterally(self, left_percentage=0.5):
         front_split = Point((self.front_left.x * (1 - left_percentage)) + (self.front_right.x * left_percentage), (self.front_left.y * (1 - left_percentage)) + (self.front_right.y * left_percentage))
         rear_split = Point((self.rear_left.x * (1 - left_percentage)) + (self.rear_right.x * left_percentage), (self.rear_left.y * (1 - left_percentage)) + (self.rear_right.y * left_percentage))

@@ -11,6 +11,7 @@ from cavgym import mods
 class Scenario(Enum):
     BUS_STOP = "bus-stop"
     CROSSROADS = "crossroads"
+    PEDESTRIANS = "pedestrians"
     PELICAN_CROSSING = "pelican-crossing"
 
     def __str__(self):
@@ -45,11 +46,17 @@ def run(scenario, render=True, record_dir=None, debug=False):
         env = gym.make('Crossroads-v0')
         agents = [agent, RandomDynamicActorAgent(), RandomDynamicActorAgent()]
         run_simulation(env, agents, render=render, human_agent=human_agent, record_dir=record_dir, debug=debug)
+    elif scenario is Scenario.PEDESTRIANS:
+        env = gym.make('Pedestrians-v0')
+        agents = [agent, RandomDynamicActorAgent(), RandomDynamicActorAgent(), RandomDynamicActorAgent()]
+        run_simulation(env, agents, render=render, human_agent=human_agent, record_dir=record_dir, debug=debug)
     else:
         print(f"{scenario} scenario is not yet implemented")
 
 
 def run_simulation(env, agents, render=True, human_agent=None, record_dir=None, debug=False):
+    assert len(env.actors) == len(agents), "each actor must be assigned an agent and vice versa"
+
     if human_agent is not None or record_dir is not None:
         assert render, "human agents and recordings only work in render mode"
 

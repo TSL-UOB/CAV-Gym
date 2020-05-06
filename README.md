@@ -7,17 +7,19 @@ A custom OpenAI Gym environment that supports Markov games (joint actions, joint
 ![](demos/bus-stop.gif)
 - Crossroads
 ![](demos/crossroads.gif)
+- Pedestrians
+![](demos/pedestrians.gif)
 - Pelican crossing
 ![](demos/pelican-crossing.gif)
 
 ## Usage
 ```
-$ python3 cavgym.py --help
+$ python3 cavgym.py --help                           
 usage: cavgym.py [-h] [-d] [-n | -r DIR] [-v]
-                 [{bus-stop,crossroads,pelican-crossing}]
+                 [{bus-stop,crossroads,pedestrians,pelican-crossing}]
 
 positional arguments:
-  {bus-stop,crossroads,pelican-crossing}
+  {bus-stop,crossroads,pedestrians,pelican-crossing}
                         choose scenario to run (default: pelican-crossing)
 
 optional arguments:

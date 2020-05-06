@@ -16,3 +16,8 @@ register(
     id='Crossroads-v0',
     entry_point='cavgym.scenarios.crossroads:CrossroadsEnv'
 )
+
+register(
+    id='Pedestrians-v0',
+    entry_point='cavgym.scenarios.pedestrians:PedestriansEnv'
+)
