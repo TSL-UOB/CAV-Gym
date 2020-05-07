@@ -5,7 +5,6 @@ from shapely.geometry import Polygon
 
 DEG2RAD = 0.017453292519943295
 RAD2DEG = 57.29577951308232
-REACTION_TIME = 0.675
 
 
 @dataclass
@@ -52,7 +51,7 @@ class Shape:
         return Polygon(list(self)).intersects(Polygon(list(other)))
 
 
-@dataclass
+@dataclass(frozen=True)
 class ConvexQuadrilateral(Shape):
     rear_left: Point
     front_left: Point
@@ -157,7 +156,7 @@ def make_rectangle(length, width, anchor=Point(0, 0), rear_offset=0.5, left_offs
     )
 
 
-@dataclass
+@dataclass(frozen=True)
 class CircleSegment(Shape):
     rear: Point
     arc: list
@@ -199,7 +198,7 @@ def make_circle_segment(radius, angle, anchor=Point(0, 0), angle_left_offset=0.5
     )
 
 
-@dataclass
+@dataclass(frozen=True)
 class Triangle(Shape):
     rear: Point
     front_left: Point
