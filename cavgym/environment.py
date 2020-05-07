@@ -2,7 +2,6 @@ from dataclasses import dataclass
 
 import gym
 from gym import spaces
-from gym.utils import seeding
 from cavgym.actions import TrafficLightAction, AccelerationAction, TurnAction
 from cavgym.actors import PelicanCrossing, DynamicActor, TrafficLight
 from cavgym.rendering import RoadEnvViewer
@@ -54,9 +53,7 @@ class CAVEnv(MarkovGameEnv):
         'render.modes': ['human', 'rgb_array']
     }
 
-    def __init__(self, actors, constants, seed=None):
-        self.np_random = None
-        self.seed(seed)
+    def __init__(self, actors, constants):
         self.actors = actors
         self.constants = constants
 
@@ -79,10 +76,6 @@ class CAVEnv(MarkovGameEnv):
             self.collision_detection.append(self.constants.road_map.obstacle)
 
         self.viewer = None
-
-    def seed(self, seed=None):
-        self.np_random, seed = seeding.np_random(seed)
-        return [seed]
 
     def step(self, joint_action):
         assert self.action_space.contains(joint_action), "%r (%s) invalid" % (joint_action, type(joint_action))

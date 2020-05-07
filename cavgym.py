@@ -1,34 +1,30 @@
 import argparse
-from enum import Enum
 
 import gym
 from gym import wrappers
 
 from agents import RandomDynamicActorAgent, RandomTrafficLightAgent, HumanDynamicActorAgent
-from cavgym import mods
-
-
-class Scenario(Enum):
-    BUS_STOP = "bus-stop"
-    CROSSROADS = "crossroads"
-    PEDESTRIANS = "pedestrians"
-    PELICAN_CROSSING = "pelican-crossing"
-
-    def __str__(self):
-        return self.value
+from cavgym import mods, Scenario
 
 
 def parse_arguments():
+    def non_negative_int(value):
+        ivalue = int(value)
+        if ivalue < 0:
+            raise argparse.ArgumentTypeError(f"invalid non-negative int value: {value}")
+        return ivalue
+
     parser = argparse.ArgumentParser()
     parser.add_argument("scenario", type=Scenario, choices=[value for value in Scenario], nargs="?", default=Scenario.PELICAN_CROSSING, help="choose scenario to run (default: %(default)s)")
     parser.add_argument("-d", "--debug", help="print debug information", action="store_true")
     mutually_exclusive = parser.add_mutually_exclusive_group()
     mutually_exclusive.add_argument("-n", "--no-render", help="run without rendering", action="store_true")
     mutually_exclusive.add_argument("-r", "--record", metavar="DIR", help="record video of run to directory %(metavar)s")
+    parser.add_argument("-s", "--seed", type=non_negative_int, metavar="SEED", help="set non-negative int %(metavar)s as random seed")
     parser.add_argument("-v", "--version", action="version", version="%(prog)s 0.1")
 
     args = parser.parse_args()
-    return args.scenario, not args.no_render, args.record, args.debug
+    return args.scenario, not args.no_render, args.record, args.debug, args.seed
 
 
 def run(scenario, render=True, record_dir=None, debug=False):
@@ -98,5 +94,5 @@ def run_simulation(env, agents, render=True, human_agent=None, record_dir=None, 
 
 
 if __name__ == '__main__':
-    arg_scenario, arg_render, arg_record_dir, arg_debug = parse_arguments()
+    arg_scenario, arg_render, arg_record_dir, arg_debug, _ = parse_arguments()
     run(arg_scenario, render=arg_render, record_dir=arg_record_dir, debug=arg_debug)

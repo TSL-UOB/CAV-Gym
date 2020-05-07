@@ -67,13 +67,9 @@ class HumanDynamicActorAgent(Agent):
 
 class RandomAgent(Agent):
     def __init__(self, epsilon=0.1, seed=None):
-        self.np_random = None
-        self.seed(seed)
         self.epsilon = epsilon
 
-    def seed(self, seed=None):
-        self.np_random, seed = seeding.np_random(seed)
-        return [seed]
+        self.np_random, self.seed = seeding.np_random(seed)
 
     def reset(self):
         raise NotImplementedError

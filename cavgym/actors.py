@@ -3,8 +3,6 @@ from copy import copy
 from dataclasses import dataclass
 from enum import Enum
 
-from gym.utils import seeding
-
 from cavgym import geometry
 from cavgym.actions import AccelerationAction, TurnAction, TrafficLightAction
 from cavgym.assets import Road, Occlusion
@@ -150,43 +148,6 @@ class DynamicActor(Actor, Occlusion):
 class Pedestrian(DynamicActor):
     def __init__(self, init_state, constants):
         super().__init__(init_state, constants)
-
-
-@dataclass
-class DynamicActorState:
-    position: geometry.Point
-    velocity: float
-    orientation: float
-    acceleration: int
-    angular_velocity: float
-
-    def __copy__(self):
-        return DynamicActorState(copy(self.position), self.velocity, self.orientation, self.acceleration, self.angular_velocity)
-
-
-class SpawnPedestrian:
-    def __init__(self, spawn_positions, spawn_orientations, velocity, acceleration, angular_velocity, constants, seed=None):
-        self.spawn_positions = spawn_positions
-        self.spawn_orientations = spawn_orientations
-        self.velocity = velocity
-        self.acceleration = acceleration
-        self.angular_velocity = angular_velocity
-        self.constants = constants
-
-        self.np_random, self.seed = seeding.np_random(seed)
-
-    def spawn(self):
-        x = self.np_random.choice(range(self.spawn_positions.rear_left.x, self.spawn_positions.front_left.x))
-        y = self.np_random.choice(range(self.spawn_positions.rear_right.y, self.spawn_positions.rear_left.y))
-        orientation = self.np_random.choice(self.spawn_orientations)
-        init_state = DynamicActorState(
-            position=Point(x, y),
-            velocity=self.velocity,
-            orientation=orientation,
-            acceleration=self.acceleration,
-            angular_velocity=self.angular_velocity
-        )
-        return Pedestrian(init_state, self.constants)
 
 
 class Vehicle(DynamicActor):
