@@ -13,11 +13,13 @@ REACTION_TIME = 0.675
 
 
 class Actor:
-    def __init__(self, init_state, constants):
+    def __init__(self, init_state, constants, **kwargs):
         self.init_state = init_state
         self.constants = constants
 
         self.state = copy(self.init_state)
+
+        super().__init__(**kwargs)  # important to pass on kwargs if class is used as superclass in multiple inheritance
 
     def reset(self):
         self.state = copy(self.init_state)
@@ -68,7 +70,7 @@ class DynamicActorConstants:
 
 class DynamicActor(Actor, Occlusion):
     def __init__(self, init_state, constants):
-        super().__init__(init_state, constants)
+        super().__init__(init_state=init_state, constants=constants)
 
         self.shape = geometry.make_rectangle(self.constants.length, self.constants.width)
 
@@ -203,7 +205,7 @@ class TrafficLightConstants:
 
 class TrafficLight(Actor, Occlusion):
     def __init__(self, init_state, constants):
-        super().__init__(init_state, constants)
+        super().__init__(init_state=init_state, constants=constants)
 
         self.static_bounding_box = geometry.make_rectangle(self.constants.width, self.constants.height).transform(self.constants.orientation, self.constants.position)
 

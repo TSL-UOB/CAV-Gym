@@ -14,12 +14,14 @@ class BulbState(Enum):
 
 
 class OcclusionView:
-    def __init__(self, occlusion, ego):
+    def __init__(self, occlusion, ego, **kwargs):
         self.occlusion_zone = None
 
         if occlusion is not ego:
             self.occlusion_zone = rendering.make_polygon(list(occlusion.occlusion_zone(ego.state.position)), filled=False)
             self.occlusion_zone.set_color(1, 0, 0)
+
+        super().__init__(**kwargs)  # important to pass on kwargs if class is used as superclass in multiple inheritance
 
     def update_occlusion_zone(self, occlusion, ego):
         if occlusion is not ego:
@@ -27,15 +29,20 @@ class OcclusionView:
 
 
 class ActorView:
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)  # important to pass on kwargs if class is used as superclass in multiple inheritance
+
     def update(self, actor, ego):
         raise NotImplementedError
 
 
 class DynamicActorView(ActorView, OcclusionView):
     def __init__(self, dynamic_actor, ego):
-        super().__init__(dynamic_actor, ego)
+        super().__init__(occlusion=dynamic_actor, ego=ego)
 
         self.body = rendering.make_polygon(list(dynamic_actor.bounding_box()))
+        if dynamic_actor is ego:
+            self.body.set_color(1, 0, 0)
 
         hard_braking_relative_bounding_box, reaction_relative_bounding_box = dynamic_actor.stopping_zones()
         self.hard_braking = rendering.make_polygon(list(hard_braking_relative_bounding_box), filled=False)
@@ -117,7 +124,10 @@ class CarView(VehicleView):
         super().__init__(car, ego)
 
         self.roof = rendering.make_polygon(list(car.roof()))
-        self.roof.set_color(0.5, 0.5, 0.5)
+        if car is ego:
+            self.roof.set_color(0.5, 0, 0)
+        else:
+            self.roof.set_color(0.5, 0.5, 0.5)
 
     def update(self, car, ego):
         super().update(car, ego)
@@ -159,9 +169,9 @@ class PedestrianView(DynamicActorView):
         self.head.v = self.make_head(pedestrian).v
 
 
-class TrafficLightView(OcclusionView, ActorView):
+class TrafficLightView(ActorView, OcclusionView):
     def __init__(self, traffic_light, ego):
-        super().__init__(traffic_light, ego)
+        super().__init__(occlusion=traffic_light, ego=ego)
 
         self.body = rendering.make_polygon(list(traffic_light.static_bounding_box))
 

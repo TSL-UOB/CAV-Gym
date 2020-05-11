@@ -6,6 +6,9 @@ from cavgym.geometry import Point
 
 
 class Occlusion:
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)  # important to pass on kwargs if class is used as superclass in multiple inheritance
+
     def bounding_box(self):
         raise NotImplementedError
 
