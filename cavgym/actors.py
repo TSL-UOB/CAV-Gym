@@ -3,6 +3,8 @@ from copy import copy
 from dataclasses import dataclass
 from enum import Enum
 
+from gym.utils import seeding
+
 from cavgym import geometry
 from cavgym.actions import AccelerationAction, TurnAction, TrafficLightAction
 from cavgym.assets import Road, Occlusion
@@ -14,12 +16,12 @@ REACTION_TIME = 0.675
 
 class Actor:
     def __init__(self, init_state, constants, **kwargs):
+        super().__init__(**kwargs)  # important to pass on kwargs if class is used as superclass in multiple inheritance
+
         self.init_state = init_state
         self.constants = constants
 
         self.state = copy(self.init_state)
-
-        super().__init__(**kwargs)  # important to pass on kwargs if class is used as superclass in multiple inheritance
 
     def reset(self):
         self.state = copy(self.init_state)
@@ -150,6 +152,39 @@ class DynamicActor(Actor, Occlusion):
 class Pedestrian(DynamicActor):
     def __init__(self, init_state, constants):
         super().__init__(init_state, constants)
+
+
+@dataclass(frozen=True)
+class SpawnPedestrianState:
+    positions: list
+    velocity: float
+    orientations: list
+    acceleration: int
+    angular_velocity: float
+
+
+class SpawnPedestrian(Pedestrian):
+    def __init__(self, spawn_init_state, constants, np_random=seeding.np_random(None)[0]):
+        self.spawn_init_state = spawn_init_state
+
+        self.np_random = np_random
+
+        super().__init__(self.spawn(), constants)
+
+    def reset(self):
+        self.init_state = self.spawn()
+        super().reset()
+
+    def spawn(self):
+        position = self.np_random.choice(self.spawn_init_state.positions)
+        orientation = self.np_random.choice(self.spawn_init_state.orientations)
+        return DynamicActorState(
+            position=position,
+            velocity=self.spawn_init_state.velocity,
+            orientation=orientation,
+            acceleration=self.spawn_init_state.acceleration,
+            angular_velocity=self.spawn_init_state.angular_velocity
+        )
 
 
 class Vehicle(DynamicActor):

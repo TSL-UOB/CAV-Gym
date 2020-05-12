@@ -2,9 +2,11 @@ import argparse
 
 import gym
 from gym import wrappers
+from gym.utils import seeding
 
 from agents import RandomDynamicActorAgent, RandomTrafficLightAgent, HumanDynamicActorAgent
 from cavgym import mods, Scenario
+from cavgym.actors import DynamicActor, TrafficLight, PelicanCrossing
 
 
 def parse_arguments():
@@ -14,43 +16,51 @@ def parse_arguments():
             raise argparse.ArgumentTypeError(f"invalid non-negative int value: {value}")
         return ivalue
 
+    def positive_int(value):
+        ivalue = int(value)
+        if ivalue < 1:
+            raise argparse.ArgumentTypeError(f"invalid poisitve int value: {value}")
+        return ivalue
+
     parser = argparse.ArgumentParser()
     parser.add_argument("scenario", type=Scenario, choices=[value for value in Scenario], nargs="?", default=Scenario.PELICAN_CROSSING, help="choose scenario to run (default: %(default)s)")
     parser.add_argument("-d", "--debug", help="print debug information", action="store_true")
+    parser.add_argument("-e", "--episodes", type=positive_int, default=1, metavar="N", help="number of episodes (default: %(default)s)")
     mutually_exclusive = parser.add_mutually_exclusive_group()
     mutually_exclusive.add_argument("-n", "--no-render", help="run without rendering", action="store_true")
-    mutually_exclusive.add_argument("-r", "--record", metavar="DIR", help="record video of run to directory %(metavar)s")
-    parser.add_argument("-s", "--seed", type=non_negative_int, metavar="SEED", help="set non-negative int %(metavar)s as random seed")
+    mutually_exclusive.add_argument("-r", "--record", metavar="DIR", help="save video of run to directory")
+    parser.add_argument("-s", "--seed", type=non_negative_int, metavar="N", help="enable fixed random seed")
+    parser.add_argument("-t", "--timesteps", type=positive_int, default=1000, metavar="N", help="max number of timesteps per episode (default: %(default)s)")
     parser.add_argument("-v", "--version", action="version", version="%(prog)s 0.1")
 
     args = parser.parse_args()
-    return args.scenario, not args.no_render, args.record, args.debug, args.seed
+    return args.scenario, args.episodes, args.timesteps, not args.no_render, args.record, args.debug, args.seed
 
 
-def run(scenario, render=True, record_dir=None, debug=False):
-    human_agent = HumanDynamicActorAgent() if render else None
-    agent = human_agent if human_agent is not None else RandomDynamicActorAgent()
+def run(scenario, episodes=1, max_timesteps=1000, render=True, record_dir=None, debug=False, seed=None):
+    np_random, _ = seeding.np_random(seed)
     if scenario is Scenario.PELICAN_CROSSING:
-        env = gym.make('PelicanCrossing-v0')
-        agents = [agent, RandomDynamicActorAgent(), RandomTrafficLightAgent(), RandomDynamicActorAgent(), RandomDynamicActorAgent()]
-        run_simulation(env, agents, render=render, human_agent=human_agent, record_dir=record_dir, debug=debug)
+        env = gym.make('PelicanCrossing-v0', np_random=np_random)
     elif scenario is Scenario.BUS_STOP:
-        env = gym.make('BusStop-v0')
-        agents = [agent, RandomDynamicActorAgent(), RandomDynamicActorAgent(), RandomDynamicActorAgent(), RandomDynamicActorAgent()]
-        run_simulation(env, agents, render=render, human_agent=human_agent, record_dir=record_dir, debug=debug)
+        env = gym.make('BusStop-v0', np_random=np_random)
     elif scenario is Scenario.CROSSROADS:
-        env = gym.make('Crossroads-v0')
-        agents = [agent, RandomDynamicActorAgent(), RandomDynamicActorAgent()]
-        run_simulation(env, agents, render=render, human_agent=human_agent, record_dir=record_dir, debug=debug)
+        env = gym.make('Crossroads-v0', np_random=np_random)
     elif scenario is Scenario.PEDESTRIANS:
-        env = gym.make('Pedestrians-v0')
-        agents = [agent, RandomDynamicActorAgent(), RandomDynamicActorAgent(), RandomDynamicActorAgent()]
-        run_simulation(env, agents, render=render, human_agent=human_agent, record_dir=record_dir, debug=debug)
+        env = gym.make('Pedestrians-v0', np_random=np_random)
     else:
-        print(f"{scenario} scenario is not yet implemented")
+        raise NotImplementedError
+    human_agent = HumanDynamicActorAgent() if render else None
+    agent = human_agent if human_agent is not None else RandomDynamicActorAgent(np_random=np_random)
+    agents = [agent]
+    for actor in env.actors[1:]:
+        if isinstance(actor, DynamicActor):
+            agents.append(RandomDynamicActorAgent(np_random=np_random))
+        elif isinstance(actor, TrafficLight) or isinstance(actor, PelicanCrossing):
+            agents.append(RandomTrafficLightAgent(np_random=np_random))
+    run_simulation(env, agents, episodes=episodes, max_timesteps=max_timesteps, render=render, human_agent=human_agent, record_dir=record_dir, debug=debug)
 
 
-def run_simulation(env, agents, render=True, human_agent=None, record_dir=None, debug=False):
+def run_simulation(env, agents, episodes=1, max_timesteps=1000, render=True, human_agent=None, record_dir=None, debug=False):
     assert len(env.actors) == len(agents), "each actor must be assigned an agent and vice versa"
 
     if human_agent is not None or record_dir is not None:
@@ -64,14 +74,14 @@ def run_simulation(env, agents, render=True, human_agent=None, record_dir=None, 
         env.render()  # must render before key_press can be assigned
         env.unwrapped.viewer.window.on_key_press = human_agent.key_press
 
-    for episode in range(1):
+    for episode in range(episodes):
         joint_observation = env.reset()
         done = False
 
         for agent in agents:
             agent.reset()
 
-        for timestep in range(1000):
+        for timestep in range(max_timesteps):
             if render:
                 env.render()
 
@@ -94,5 +104,5 @@ def run_simulation(env, agents, render=True, human_agent=None, record_dir=None, 
 
 
 if __name__ == '__main__':
-    arg_scenario, arg_render, arg_record_dir, arg_debug, _ = parse_arguments()
-    run(arg_scenario, render=arg_render, record_dir=arg_record_dir, debug=arg_debug)
+    arg_scenario, arg_episodes, arg_timesteps, arg_render, arg_record_dir, arg_debug, arg_seed = parse_arguments()
+    run(arg_scenario, episodes=arg_episodes, max_timesteps=arg_timesteps, render=arg_render, record_dir=arg_record_dir, debug=arg_debug, seed=arg_seed)

@@ -1,3 +1,5 @@
+from gym.utils import seeding
+
 from cavgym import geometry
 from cavgym.actors import DynamicActorState, Car, Pedestrian
 from cavgym.environment import CAVEnvConstants, RoadMap, CAVEnv
@@ -83,5 +85,5 @@ actors = [
 
 
 class CrossroadsEnv(CAVEnv):
-    def __init__(self):
-        super().__init__(actors=actors, constants=env_constants)
+    def __init__(self, np_random=seeding.np_random(None)[0]):
+        super().__init__(actors=actors, constants=env_constants, np_random=np_random)

@@ -66,10 +66,9 @@ class HumanDynamicActorAgent(Agent):
 
 
 class RandomAgent(Agent):
-    def __init__(self, epsilon=0.1, seed=None):
+    def __init__(self, epsilon=0.1, np_random=seeding.np_random(None)[0]):
         self.epsilon = epsilon
-
-        self.np_random, self.seed = seeding.np_random(seed)
+        self.np_random = np_random
 
     def reset(self):
         raise NotImplementedError
@@ -82,8 +81,8 @@ class RandomAgent(Agent):
 
 
 class RandomDynamicActorAgent(RandomAgent):
-    def __init__(self, epsilon=0.1, seed=None):
-        super().__init__(epsilon, seed)
+    def __init__(self, epsilon=0.1, np_random=seeding.np_random(None)[0]):
+        super().__init__(epsilon, np_random)
 
         self.acceleration_action = AccelerationAction.NEUTRAL
         self.turn_action = TurnAction.NEUTRAL
@@ -103,8 +102,8 @@ class RandomDynamicActorAgent(RandomAgent):
 
 
 class RandomTrafficLightAgent(RandomAgent):
-    def __init__(self, epsilon=0.1, seed=None):
-        super().__init__(epsilon, seed)
+    def __init__(self, epsilon=0.1, np_random=seeding.np_random(None)[0]):
+        super().__init__(epsilon, np_random)
 
         self.action = TrafficLightAction.NOOP
 

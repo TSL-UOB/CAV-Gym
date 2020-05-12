@@ -2,6 +2,8 @@ from dataclasses import dataclass
 
 import gym
 from gym import spaces
+from gym.utils import seeding
+
 from cavgym.actions import TrafficLightAction, AccelerationAction, TurnAction
 from cavgym.actors import PelicanCrossing, DynamicActor, TrafficLight
 from cavgym.rendering import RoadEnvViewer
@@ -53,29 +55,53 @@ class CAVEnv(MarkovGameEnv):
         'render.modes': ['human', 'rgb_array']
     }
 
-    def __init__(self, actors, constants):
+    def __init__(self, actors, constants, np_random=seeding.np_random(None)[0]):
         self.actors = actors
         self.constants = constants
 
-        self.ego = actors[0]
+        self.np_random = np_random
+
+        self.ego = self.actors[0]
 
         actor_spaces = list()
         for actor in self.actors:
             if isinstance(actor, DynamicActor):
-                actor_spaces.append(spaces.Tuple([spaces.Discrete(AccelerationAction.__len__()), spaces.Discrete(TurnAction.__len__())]))
+                acceleration_action_space = spaces.Discrete(AccelerationAction.__len__())
+                turn_action_space = spaces.Discrete(TurnAction.__len__())
+                dynamic_actor_space = spaces.Tuple([acceleration_action_space, turn_action_space])
+                actor_spaces.append(dynamic_actor_space)
             elif isinstance(actor, PelicanCrossing) or isinstance(actor, TrafficLight):
-                actor_spaces.append(spaces.Discrete(TrafficLightAction.__len__()))
+                traffic_light_action_space = spaces.Discrete(TrafficLightAction.__len__())
+                actor_spaces.append(traffic_light_action_space)
         self.action_space = spaces.Tuple(actor_spaces)
-        self.observation_space = spaces.Tuple([spaces.Discrete(1) for _ in self.actors])
+        self.action_space.np_random = self.np_random
 
-        self.collision_detection = [actor for actor in self.actors if isinstance(actor, Occlusion)]
-        for actor in self.actors:
-            if isinstance(actor, PelicanCrossing):
-                self.collision_detection += [actor.outbound_traffic_light, actor.inbound_traffic_light]
-        if self.constants.road_map.obstacle is not None:
-            self.collision_detection.append(self.constants.road_map.obstacle)
+        def set_np_random(space):
+            space.np_random = self.np_random
+            if isinstance(space, spaces.Tuple):
+                for subspace in space:
+                    set_np_random(subspace)
+
+        set_np_random(self.action_space)
+
+        observation_spaces = list()
+        for _ in self.actors:
+            empty_observation_space = spaces.Discrete(1)
+            empty_observation_space.np_random = self.np_random
+            observation_spaces.append(empty_observation_space)
+        self.observation_space = spaces.Tuple(observation_spaces)
+        self.observation_space.np_random = self.np_random
 
         self.viewer = None
+
+    def determine_collidable(self):
+        collidable = [actor for actor in self.actors if isinstance(actor, Occlusion)]
+        for actor in self.actors:
+            if isinstance(actor, PelicanCrossing):
+                collidable += [actor.outbound_traffic_light, actor.inbound_traffic_light]
+        if self.constants.road_map.obstacle is not None:
+            collidable.append(self.constants.road_map.obstacle)
+        return collidable
 
     def step(self, joint_action):
         assert self.action_space.contains(joint_action), "%r (%s) invalid" % (joint_action, type(joint_action))
@@ -86,13 +112,13 @@ class CAVEnv(MarkovGameEnv):
         for actor in self.actors:
             actor.step_dynamics(self.constants.time_resolution)
 
-        joint_reward = [-1 if not isinstance(actor, PelicanCrossing) and any(actor.bounding_box().intersects(other.bounding_box()) for other in self.collision_detection if actor is not other) else 0 for actor in self.actors]
+        joint_reward = [-1 if not isinstance(actor, PelicanCrossing) and any(actor.bounding_box().intersects(other.bounding_box()) for other in self.determine_collidable() if actor is not other) else 0 for actor in self.actors]
 
         return self.observation_space.sample(), joint_reward, any(reward < 0 for reward in joint_reward), None
 
     def reset(self):
-        for vehicle in self.actors:
-            vehicle.reset()
+        for actor in self.actors:
+            actor.reset()
         return self.observation_space.sample()
 
     def render(self, mode='human'):
