@@ -4,8 +4,9 @@ import gym
 from gym import spaces
 from gym.utils import seeding
 
-from cavgym.actions import TrafficLightAction, AccelerationAction, TurnAction
+from cavgym.actions import TrafficLightAction, OrientationAction, VelocityAction
 from cavgym.actors import PelicanCrossing, DynamicActor, TrafficLight
+from cavgym.observations import OrientationObservation, EmptyObservation, VelocityObservation
 from cavgym.rendering import RoadEnvViewer
 from cavgym.assets import RoadMap, Occlusion
 
@@ -61,36 +62,37 @@ class CAVEnv(MarkovGameEnv):
 
         self.np_random = np_random
 
-        self.ego = self.actors[0]
-
-        actor_spaces = list()
-        for actor in self.actors:
-            if isinstance(actor, DynamicActor):
-                acceleration_action_space = spaces.Discrete(AccelerationAction.__len__())
-                turn_action_space = spaces.Discrete(TurnAction.__len__())
-                dynamic_actor_space = spaces.Tuple([acceleration_action_space, turn_action_space])
-                actor_spaces.append(dynamic_actor_space)
-            elif isinstance(actor, PelicanCrossing) or isinstance(actor, TrafficLight):
-                traffic_light_action_space = spaces.Discrete(TrafficLightAction.__len__())
-                actor_spaces.append(traffic_light_action_space)
-        self.action_space = spaces.Tuple(actor_spaces)
-        self.action_space.np_random = self.np_random
-
         def set_np_random(space):
             space.np_random = self.np_random
             if isinstance(space, spaces.Tuple):
                 for subspace in space:
                     set_np_random(subspace)
 
+        actor_spaces = list()
+        for actor in self.actors:
+            if isinstance(actor, DynamicActor):
+                velocity_action_space = spaces.Discrete(VelocityAction.__len__())
+                orientation_action_space = spaces.Discrete(OrientationAction.__len__())
+                actor_space = spaces.Tuple([velocity_action_space, orientation_action_space])
+            elif isinstance(actor, PelicanCrossing) or isinstance(actor, TrafficLight):
+                actor_space = spaces.Discrete(TrafficLightAction.__len__())
+            actor_spaces.append(actor_space)
+        self.action_space = spaces.Tuple(actor_spaces)
         set_np_random(self.action_space)
 
         observation_spaces = list()
-        for _ in self.actors:
-            empty_observation_space = spaces.Discrete(1)
-            empty_observation_space.np_random = self.np_random
-            observation_spaces.append(empty_observation_space)
+        for actor in self.actors:
+            if isinstance(actor, DynamicActor):
+                velocity_observation_space = spaces.Discrete(VelocityObservation.__len__())
+                orientation_observation_space = spaces.Discrete(OrientationObservation.__len__())
+                observation_space = spaces.Tuple([velocity_observation_space, orientation_observation_space])
+            else:
+                observation_space = spaces.Discrete(EmptyObservation.__len__())
+            observation_spaces.append(observation_space)
         self.observation_space = spaces.Tuple(observation_spaces)
-        self.observation_space.np_random = self.np_random
+        set_np_random(self.observation_space)
+
+        self.ego = self.actors[0]
 
         self.viewer = None
 
@@ -112,9 +114,18 @@ class CAVEnv(MarkovGameEnv):
         for actor in self.actors:
             actor.step_dynamics(self.constants.time_resolution)
 
+        joint_observation = list()
+        for actor in self.actors:
+            if isinstance(actor, DynamicActor):
+                velocity_observation = VelocityObservation.ACTIVE if actor.target_velocity is not None else VelocityObservation.INACTIVE
+                orientation_observation = OrientationObservation.ACTIVE if actor.target_orientation is not None else OrientationObservation.INACTIVE
+                joint_observation.append(tuple([velocity_observation.value, orientation_observation.value]))
+            else:
+                joint_observation.append(EmptyObservation.NONE.value)
+
         joint_reward = [-1 if not isinstance(actor, PelicanCrossing) and any(actor.bounding_box().intersects(other.bounding_box()) for other in self.determine_collidable() if actor is not other) else 0 for actor in self.actors]
 
-        return self.observation_space.sample(), joint_reward, any(reward < 0 for reward in joint_reward), None
+        return joint_observation, joint_reward, any(reward < 0 for reward in joint_reward), None
 
     def reset(self):
         for actor in self.actors:

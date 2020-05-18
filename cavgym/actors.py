@@ -6,7 +6,7 @@ from enum import Enum
 from gym.utils import seeding
 
 from cavgym import geometry
-from cavgym.actions import AccelerationAction, TurnAction, TrafficLightAction
+from cavgym.actions import TrafficLightAction, OrientationAction, VelocityAction
 from cavgym.assets import Road, Occlusion
 from cavgym.geometry import Point
 
@@ -54,20 +54,20 @@ class DynamicActorConstants:
     width: int
     wheelbase: int
 
-    view_distance: int
-    view_angle: float
+    min_velocity: int
+    max_velocity: int
 
-    min_velocity: float
-    max_velocity: float
+    acceleration_rate: int
+    deceleration_rate: int
+    left_turn_rate: float
+    right_turn_rate: float
 
-    normal_acceleration: int
-    normal_deceleration: int
-    hard_acceleration: int
-    hard_deceleration: int
-    normal_left_turn: float
-    normal_right_turn: float
-    hard_left_turn: float
-    hard_right_turn: float
+    target_slow_velocity: int
+    target_fast_velocity: int
+
+    def __post_init__(self):
+        assert self.min_velocity <= self.target_slow_velocity <= self.max_velocity
+        assert self.min_velocity <= self.target_fast_velocity <= self.max_velocity
 
 
 class DynamicActor(Actor, Occlusion):
@@ -76,47 +76,73 @@ class DynamicActor(Actor, Occlusion):
 
         self.shape = geometry.make_rectangle(self.constants.length, self.constants.width)
 
-        self.field_of_view_shape = geometry.make_circle_segment(self.constants.view_distance, self.constants.view_angle)
+        self.target_velocity = None
+        self.target_orientation = None
+
+    def reset(self):
+        super().reset()
+
+        self.target_velocity = None
+        self.target_orientation = None
 
     def bounding_box(self):
         return self.shape.transform(self.state.orientation, self.state.position)
 
     def stopping_zones(self):
-        hard_braking_distance = (self.state.velocity ** 2) / (2 * -self.constants.hard_deceleration)
+        braking_distance = (self.state.velocity ** 2) / (2 * -self.constants.deceleration_rate)
         reaction_distance = self.state.velocity * REACTION_TIME
-        hard_braking_zone = geometry.make_rectangle(hard_braking_distance, self.constants.width, rear_offset=0).transform(self.state.orientation, Point(self.constants.length * 0.5, 0).transform(self.state.orientation, self.state.position))
-        reaction_zone = geometry.make_rectangle(reaction_distance, self.constants.width, rear_offset=0).transform(self.state.orientation, Point((self.constants.length * 0.5) + hard_braking_distance, 0).transform(self.state.orientation, self.state.position))
-        return hard_braking_zone, reaction_zone
-
-    def field_of_view(self):
-        return self.field_of_view_shape.transform(self.state.orientation, self.state.position)
+        braking_zone = geometry.make_rectangle(braking_distance, self.constants.width, rear_offset=0).transform(self.state.orientation, Point(self.constants.length * 0.5, 0).transform(self.state.orientation, self.state.position))
+        reaction_zone = geometry.make_rectangle(reaction_distance, self.constants.width, rear_offset=0).transform(self.state.orientation, Point((self.constants.length * 0.5) + braking_distance, 0).transform(self.state.orientation, self.state.position))
+        return braking_zone, reaction_zone
 
     def step_action(self, joint_action, index_self):
-        acceleration_action_id, turn_action_id = joint_action[index_self]
-        acceleration_action = AccelerationAction(acceleration_action_id)
-        turn_action = TurnAction(turn_action_id)
+        velocity_action_id, orientation_action_id = joint_action[index_self]
+        velocity_action = VelocityAction(velocity_action_id)
+        orientation_action = OrientationAction(orientation_action_id)
 
-        if acceleration_action is AccelerationAction.NEUTRAL:
-            self.state.acceleration = 0
-        elif acceleration_action is AccelerationAction.NORMAL_ACCELERATE:
-            self.state.acceleration = self.constants.normal_acceleration
-        elif acceleration_action is AccelerationAction.NORMAL_DECELERATE:
-            self.state.acceleration = self.constants.normal_deceleration
-        elif acceleration_action is AccelerationAction.HARD_ACCELERATE:
-            self.state.acceleration = self.constants.hard_acceleration
-        elif acceleration_action is AccelerationAction.HARD_DECELERATE:
-            self.state.acceleration = self.constants.hard_deceleration
+        if velocity_action is VelocityAction.STOP:
+            self.target_velocity = 0
+        elif velocity_action is VelocityAction.SLOW:
+            self.target_velocity = self.constants.target_slow_velocity
+        elif velocity_action is VelocityAction.FAST:
+            self.target_velocity = self.constants.target_fast_velocity
 
-        if turn_action is TurnAction.NEUTRAL:
-            self.state.angular_velocity = 0
-        elif turn_action is TurnAction.NORMAL_LEFT:
-            self.state.angular_velocity = self.constants.normal_left_turn
-        elif turn_action is TurnAction.NORMAL_RIGHT:
-            self.state.angular_velocity = self.constants.normal_right_turn
-        elif turn_action is TurnAction.HARD_LEFT:
-            self.state.angular_velocity = self.constants.hard_left_turn
-        elif turn_action is TurnAction.HARD_RIGHT:
-            self.state.angular_velocity = self.constants.hard_right_turn
+        if self.target_velocity is not None:
+            difference = self.target_velocity - self.state.velocity
+            if difference < 0:
+                self.state.acceleration = self.constants.deceleration_rate
+            elif difference > 0:
+                self.state.acceleration = self.constants.acceleration_rate
+            else:
+                self.target_velocity = None
+
+        if orientation_action is OrientationAction.FORWARD_LEFT:
+            self.target_orientation = self.state.orientation + (geometry.DEG2RAD * 45)
+        elif orientation_action is OrientationAction.LEFT:
+            self.target_orientation = self.state.orientation + (geometry.DEG2RAD * 90)
+        elif orientation_action is OrientationAction.REAR_LEFT:
+            self.target_orientation = self.state.orientation + (geometry.DEG2RAD * 135)
+        elif orientation_action is OrientationAction.REAR:
+            self.target_orientation = self.state.orientation + (geometry.DEG2RAD * 180)
+        elif orientation_action is OrientationAction.REAR_RIGHT:
+            self.target_orientation = self.state.orientation - (geometry.DEG2RAD * 135)
+        elif orientation_action is OrientationAction.RIGHT:
+            self.target_orientation = self.state.orientation - (geometry.DEG2RAD * 90)
+        elif orientation_action is OrientationAction.FORWARD_RIGHT:
+            self.target_orientation = self.state.orientation - (geometry.DEG2RAD * 45)
+
+        if self.target_orientation is not None:
+            self.target_orientation = geometry.normalise_angle(self.target_orientation)
+            assert -math.pi < self.target_orientation <= math.pi
+
+        if orientation_action is not OrientationAction.NOOP and self.target_orientation is not None:
+            difference = geometry.normalise_angle(self.target_orientation - self.state.orientation)
+            if difference < 0:
+                self.state.angular_velocity = self.constants.right_turn_rate
+            elif difference > 0:
+                self.state.angular_velocity = self.constants.left_turn_rate
+            else:
+                self.target_orientation = None
 
     def step_dynamics(self, time_resolution):
         self.state.velocity = max(
@@ -146,7 +172,18 @@ class DynamicActor(Actor, Occlusion):
         self.state.position.x = (front_wheel_position.x + back_wheel_position.x) / 2.0
         self.state.position.y = (front_wheel_position.y + back_wheel_position.y) / 2.0
 
-        self.state.orientation = math.atan2(front_wheel_position.y - back_wheel_position.y, front_wheel_position.x - back_wheel_position.x)
+        self.state.orientation = math.atan2(front_wheel_position.y - back_wheel_position.y, front_wheel_position.x - back_wheel_position.x)  # range is [-math.pi, math.pi] (min or max may be exclusive)
+        assert -math.pi < self.state.orientation <= math.pi
+
+        if self.target_velocity is not None and abs(self.state.velocity - self.target_velocity) < 2:
+            self.state.velocity = self.target_velocity
+            self.target_velocity = None
+            self.state.acceleration = 0
+
+        if self.target_orientation is not None and abs(geometry.normalise_angle(self.target_orientation - self.state.orientation)) < (geometry.DEG2RAD * 2):  # not sure if 2 degrees precision error is needed
+            self.state.orientation = self.target_orientation
+            self.target_orientation = None
+            self.state.angular_velocity = 0
 
 
 class Pedestrian(DynamicActor):

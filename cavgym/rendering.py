@@ -44,23 +44,23 @@ class DynamicActorView(ActorView, OcclusionView):
         if dynamic_actor is ego:
             self.body.set_color(1, 0, 0)
 
-        hard_braking_relative_bounding_box, reaction_relative_bounding_box = dynamic_actor.stopping_zones()
-        self.hard_braking = rendering.make_polygon(list(hard_braking_relative_bounding_box), filled=False)
-        self.hard_braking.set_color(0, 1, 0)
+        braking_relative_bounding_box, reaction_relative_bounding_box = dynamic_actor.stopping_zones()
+        self.braking = rendering.make_polygon(list(braking_relative_bounding_box), filled=False)
+        self.braking.set_color(0, 1, 0)
         self.reaction = rendering.make_polygon(list(reaction_relative_bounding_box), filled=False)
         self.reaction.set_color(0, 0, 1)
 
     def update(self, dynamic_actor, ego):
         self.body.v = list(dynamic_actor.bounding_box())
 
-        hard_braking_relative_bounding_box, reaction_relative_bounding_box = dynamic_actor.stopping_zones()
-        self.hard_braking.v = list(hard_braking_relative_bounding_box)
+        braking_relative_bounding_box, reaction_relative_bounding_box = dynamic_actor.stopping_zones()
+        self.braking.v = list(braking_relative_bounding_box)
         self.reaction.v = list(reaction_relative_bounding_box)
 
         self.update_occlusion_zone(dynamic_actor, ego)
 
     def geoms(self):
-        yield from [self.body, self.hard_braking, self.reaction]
+        yield from [self.body, self.braking, self.reaction]
         if self.occlusion_zone is not None:
             yield self.occlusion_zone
 
@@ -99,9 +99,9 @@ class VehicleView(DynamicActorView):
         left_indicator_state = BulbState.OFF
         right_indicator_state = BulbState.OFF
         if vehicle.state.angular_velocity > 0:
-            left_indicator_state = BulbState.DIM if vehicle.state.angular_velocity == vehicle.constants.normal_left_turn else BulbState.FULL
+            left_indicator_state = BulbState.FULL
         elif vehicle.state.angular_velocity < 0:
-            right_indicator_state = BulbState.DIM if vehicle.state.angular_velocity == vehicle.constants.normal_right_turn else BulbState.FULL
+            right_indicator_state = BulbState.FULL
 
         indicator_bounding_box = vehicle.indicators()
         self.left_indicators.gs = self.make_lights(indicator_bounding_box.rear_left, indicator_bounding_box.front_left, left_indicator_state).gs
@@ -110,9 +110,9 @@ class VehicleView(DynamicActorView):
         brake_lights_state = BulbState.OFF
         headlights_state = BulbState.OFF
         if vehicle.state.acceleration < 0:
-            brake_lights_state = BulbState.DIM if vehicle.state.acceleration == vehicle.constants.normal_deceleration else BulbState.FULL
+            brake_lights_state = BulbState.FULL
         elif vehicle.state.acceleration > 0:
-            headlights_state = BulbState.DIM if vehicle.state.acceleration == vehicle.constants.normal_acceleration else BulbState.FULL
+            headlights_state = BulbState.FULL
 
         longitudinal_bounding_box = vehicle.longitudinal_lights()
         self.brake_lights.gs = self.make_lights(longitudinal_bounding_box.rear_left, longitudinal_bounding_box.rear_right, brake_lights_state).gs

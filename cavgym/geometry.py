@@ -229,3 +229,11 @@ class Triangle(Shape):
             front_left=self.front_left.transform(orientation, position),
             front_right=self.front_right.transform(orientation, position)
         )
+
+
+def normalise_angle(radians):
+    while radians <= -math.pi:
+        radians += 2 * math.pi
+    while radians > math.pi:
+        radians -= 2 * math.pi
+    return radians

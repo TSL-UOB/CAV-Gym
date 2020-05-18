@@ -1,6 +1,8 @@
 from gym.utils import seeding
 
-from cavgym.environment import TurnAction, TrafficLightAction, AccelerationAction
+from cavgym.actions import OrientationAction, VelocityAction
+from cavgym.environment import TrafficLightAction
+from cavgym.observations import OrientationObservation, VelocityObservation
 
 
 class Agent:
@@ -15,54 +17,61 @@ class Agent:
 
 
 class HumanDynamicActorAgent(Agent):
-    key_acceleration_actions = {
-        32: {
-            False: AccelerationAction.NEUTRAL,
-            True: AccelerationAction.NEUTRAL
-        },
-        65362: {
-            False: AccelerationAction.NORMAL_ACCELERATE,
-            True: AccelerationAction.HARD_ACCELERATE
-        },
-        65364: {
-            False: AccelerationAction.NORMAL_DECELERATE,
-            True: AccelerationAction.HARD_DECELERATE
-        }
+    key_velocity_actions = {
+        65365: VelocityAction.FAST,  # page up
+        65366: VelocityAction.SLOW,  # page down
+        65367: VelocityAction.STOP,  # end
     }
-    key_turn_actions = {
-        32: {
-            False: TurnAction.NEUTRAL,
-            True: TurnAction.NEUTRAL
-        },
-        65361: {
-            False: TurnAction.NORMAL_LEFT,
-            True: TurnAction.HARD_LEFT
-        },
-        65363: {
-            False: TurnAction.NORMAL_RIGHT,
-            True: TurnAction.HARD_RIGHT
-        }
+
+    key_orientation_actions = {
+        65361: OrientationAction.LEFT,  # arrow left
+        65363: OrientationAction.RIGHT,  # arrow right
+        65364: OrientationAction.REAR,  # arrow down
+
+        65457: OrientationAction.REAR_LEFT,  # numpad 1
+        65458: OrientationAction.REAR,  # numpad 2
+        65459: OrientationAction.REAR_RIGHT,  # numpad 3
+        65460: OrientationAction.LEFT,  # numpad 4
+        65462: OrientationAction.RIGHT,  # numpad 6
+        65463: OrientationAction.FORWARD_LEFT,  # numpad 7
+        65465: OrientationAction.FORWARD_RIGHT  # numpad 9
     }
 
     def __init__(self):
-        self.acceleration_action = AccelerationAction.NEUTRAL
-        self.turn_action = TurnAction.NEUTRAL
+        self.pending_velocity_action = VelocityAction.NOOP
+        self.pending_orientation_action = OrientationAction.NOOP
 
     def reset(self):
-        self.acceleration_action = AccelerationAction.NEUTRAL
-        self.turn_action = TurnAction.NEUTRAL
+        self.pending_velocity_action = VelocityAction.NOOP
+        self.pending_orientation_action = OrientationAction.NOOP
 
     def choose_action(self, observation, action_space):
-        return self.acceleration_action.value, self.turn_action.value
+        velocity_observation_id, orientation_observation_id = observation
+
+        velocity_observation = VelocityObservation(velocity_observation_id)
+        if velocity_observation is not VelocityObservation.ACTIVE:
+            velocity_action = self.pending_velocity_action
+            self.pending_velocity_action = VelocityAction.NOOP
+        else:
+            velocity_action = VelocityAction.NOOP
+
+        orientation_observation = OrientationObservation(orientation_observation_id)
+        if orientation_observation is not OrientationObservation.ACTIVE:
+            orientation_action = self.pending_orientation_action
+            self.pending_orientation_action = OrientationAction.NOOP
+        else:
+            orientation_action = OrientationAction.NOOP
+
+        return velocity_action.value, orientation_action.value
 
     def process_feedback(self, previous_observation, action, observation, reward):
         pass
 
     def key_press(self, key, mod):
-        if key in self.key_acceleration_actions:
-            self.acceleration_action = self.key_acceleration_actions[key][mod == 644]
-        if key in self.key_turn_actions:
-            self.turn_action = self.key_turn_actions[key][mod == 644]
+        if key in self.key_velocity_actions:
+            self.pending_velocity_action = self.key_velocity_actions[key]
+        if key in self.key_orientation_actions:
+            self.pending_orientation_action = self.key_orientation_actions[key]
 
 
 class RandomAgent(Agent):
@@ -84,18 +93,27 @@ class RandomDynamicActorAgent(RandomAgent):
     def __init__(self, epsilon=0.1, np_random=seeding.np_random(None)[0]):
         super().__init__(epsilon, np_random)
 
-        self.acceleration_action = AccelerationAction.NEUTRAL
-        self.turn_action = TurnAction.NEUTRAL
-
     def reset(self):
-        self.acceleration_action = AccelerationAction.NEUTRAL
-        self.turn_action = TurnAction.NEUTRAL
+        pass
 
     def choose_action(self, observation, action_space):
-        if self.np_random.uniform(0.0, 1.0) < self.epsilon:
-            acceleration_action_id, _ = action_space.sample()
-            self.acceleration_action = AccelerationAction(acceleration_action_id)
-        return self.acceleration_action.value, TurnAction.NEUTRAL.value
+        velocity_observation_id, orientation_observation_id = observation
+
+        velocity_observation = VelocityObservation(velocity_observation_id)
+        if velocity_observation is not VelocityObservation.ACTIVE and self.np_random.uniform(0.0, 1.0) < self.epsilon:
+            velocity_action_id, _ = action_space.sample()
+            velocity_action = VelocityAction(velocity_action_id)
+        else:
+            velocity_action = VelocityAction.NOOP
+
+        # orientation_observation = OrientationObservation(orientation_observation_id)
+        # if orientation_observation is not OrientationObservation.ACTIVE and self.np_random.uniform(0.0, 1.0) < self.epsilon:
+        #     _, orientation_action_id = action_space.sample()
+        #     orientation_action = OrientationAction(orientation_action_id)
+        # else:
+        #     orientation_action = OrientationAction.NOOP
+
+        return velocity_action.value, OrientationAction.NOOP.value
 
     def process_feedback(self, previous_observation, action, observation, reward):
         pass
