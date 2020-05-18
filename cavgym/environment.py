@@ -130,7 +130,7 @@ class CAVEnv(MarkovGameEnv):
     def reset(self):
         for actor in self.actors:
             actor.reset()
-        return self.observation_space.sample()
+        return list(self.observation_space.sample())
 
     def render(self, mode='human'):
         if not self.viewer:
