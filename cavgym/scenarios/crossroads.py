@@ -85,5 +85,5 @@ actors = [
 
 
 class CrossroadsEnv(CAVEnv):
-    def __init__(self, np_random=seeding.np_random(None)[0]):
-        super().__init__(actors=actors, constants=env_constants, np_random=np_random)
+    def __init__(self, **kwargs):
+        super().__init__(actors=actors, constants=env_constants, **kwargs)

@@ -23,16 +23,18 @@ def parse_arguments():
         return ivalue
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("scenario", type=Scenario, choices=[value for value in Scenario], help="choose scenario to run")
     parser.add_argument("-d", "--debug", help="print debug information", action="store_true")
     parser.add_argument("-e", "--episodes", type=positive_int, default=1, metavar="N", help="number of episodes (default: %(default)s)")
     parser.add_argument("-s", "--seed", type=non_negative_int, metavar="N", help="enable fixed random seed")
     parser.add_argument("-t", "--timesteps", type=positive_int, default=1000, metavar="N", help="max number of timesteps per episode (default: %(default)s)")
     parser.add_argument("-v", "--version", action="version", version="%(prog)s 0.1")
-    parser.add_argument("scenario", type=Scenario, choices=[value for value in Scenario], nargs="?", default=Scenario.PELICAN_CROSSING, help="choose scenario to run (default: %(default)s)")
 
     parser.set_defaults(keyboard_agent=False, record=None)
 
-    subparsers = parser.add_subparsers(dest="mode", help="render run to screen")
+    subparsers = parser.add_subparsers(dest="mode", required=True, help="choose mode to run scenario")
+
+    subparsers.add_parser("headless")  # headless mode has no additional options
 
     render_parser = subparsers.add_parser("render")
     render_parser.add_argument("-k", "--keyboard-agent", help="run with keyboard-controlled agent", action="store_true")
@@ -113,4 +115,3 @@ def run_simulation(env, agents, episodes=1, max_timesteps=1000, render=True, key
 if __name__ == '__main__':
     arg_scenario, arg_episodes, arg_timesteps, arg_render, arg_keyboard_agent, arg_record_dir, arg_debug, arg_seed = parse_arguments()
     run(arg_scenario, episodes=arg_episodes, max_timesteps=arg_timesteps, render=arg_render, keyboard_agent=KeyboardAgent() if arg_keyboard_agent else None, record_dir=arg_record_dir, debug=arg_debug, seed=arg_seed)
-    # run(Scenario.PEDESTRIANS, episodes=10, max_timesteps=1200, render=True, keyboard_agent=None, record_dir=None, debug=False, seed=0)

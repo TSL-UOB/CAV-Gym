@@ -79,6 +79,9 @@ class RandomAgent(Agent):
         self.epsilon = epsilon
         self.np_random = np_random
 
+    def epsilon_valid(self):
+        return self.np_random.uniform(0.0, 1.0) < self.epsilon
+
     def reset(self):
         raise NotImplementedError
 
@@ -90,8 +93,8 @@ class RandomAgent(Agent):
 
 
 class RandomVehicleAgent(RandomAgent):
-    def __init__(self, epsilon=0.1, np_random=seeding.np_random(None)[0]):
-        super().__init__(epsilon, np_random)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def reset(self):
         pass
@@ -99,10 +102,11 @@ class RandomVehicleAgent(RandomAgent):
     def choose_action(self, observation, action_space):
         velocity_observation_id, _ = observation
 
+        epsilon_valid = self.epsilon_valid()
+
         velocity_observation = VelocityObservation(velocity_observation_id)
-        if velocity_observation is not VelocityObservation.ACTIVE and self.np_random.uniform(0.0, 1.0) < self.epsilon:
-            velocity_action_id, _ = action_space.sample()
-            velocity_action = VelocityAction(velocity_action_id)
+        if velocity_observation is not VelocityObservation.ACTIVE and epsilon_valid:
+            velocity_action = self.np_random.choice([value for value in VelocityAction if value is not VelocityAction.STOP])
         else:
             velocity_action = VelocityAction.NOOP
 
@@ -113,8 +117,8 @@ class RandomVehicleAgent(RandomAgent):
 
 
 class RandomPedestrianAgent(RandomAgent):
-    def __init__(self, epsilon=0.1, np_random=seeding.np_random(None)[0]):
-        super().__init__(epsilon, np_random)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def reset(self):
         pass
@@ -122,15 +126,17 @@ class RandomPedestrianAgent(RandomAgent):
     def choose_action(self, observation, action_space):
         velocity_observation_id, orientation_observation_id = observation
 
+        epsilon_valid = self.epsilon_valid()
+
         velocity_observation = VelocityObservation(velocity_observation_id)
-        if velocity_observation is not VelocityObservation.ACTIVE and self.np_random.uniform(0.0, 1.0) < self.epsilon:
+        if velocity_observation is not VelocityObservation.ACTIVE and epsilon_valid:
             velocity_action_id, _ = action_space.sample()
             velocity_action = VelocityAction(velocity_action_id)
         else:
             velocity_action = VelocityAction.NOOP
 
         orientation_observation = OrientationObservation(orientation_observation_id)
-        if orientation_observation is not OrientationObservation.ACTIVE and self.np_random.uniform(0.0, 1.0) < self.epsilon:
+        if orientation_observation is not OrientationObservation.ACTIVE and epsilon_valid:
             _, orientation_action_id = action_space.sample()
             orientation_action = OrientationAction(orientation_action_id)
         else:
@@ -143,18 +149,21 @@ class RandomPedestrianAgent(RandomAgent):
 
 
 class RandomTrafficLightAgent(RandomAgent):
-    def __init__(self, epsilon=0.1, np_random=seeding.np_random(None)[0]):
-        super().__init__(epsilon, np_random)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def reset(self):
         pass
 
     def choose_action(self, observation, action_space):
-        if self.np_random.uniform(0.0, 1.0) < self.epsilon:
+        epsilon_valid = self.epsilon_valid()
+
+        if epsilon_valid:
             action_id = action_space.sample()
             action = TrafficLightAction(action_id)
         else:
             action = TrafficLightAction.NOOP
+
         return action.value
 
     def process_feedback(self, previous_observation, action, observation, reward):
