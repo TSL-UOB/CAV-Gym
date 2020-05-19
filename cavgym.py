@@ -23,19 +23,23 @@ def parse_arguments():
         return ivalue
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("scenario", type=Scenario, choices=[value for value in Scenario], nargs="?", default=Scenario.PELICAN_CROSSING, help="choose scenario to run (default: %(default)s)")
     parser.add_argument("-d", "--debug", help="print debug information", action="store_true")
     parser.add_argument("-e", "--episodes", type=positive_int, default=1, metavar="N", help="number of episodes (default: %(default)s)")
-    parser.add_argument("-k", "--keyboard-agent", help="run with keyboard-controlled agent", action="store_true")
-    mutually_exclusive = parser.add_mutually_exclusive_group()
-    mutually_exclusive.add_argument("-n", "--no-render", help="run without rendering", action="store_true")
-    mutually_exclusive.add_argument("-r", "--record", metavar="DIR", help="save video of run to directory")
     parser.add_argument("-s", "--seed", type=non_negative_int, metavar="N", help="enable fixed random seed")
     parser.add_argument("-t", "--timesteps", type=positive_int, default=1000, metavar="N", help="max number of timesteps per episode (default: %(default)s)")
     parser.add_argument("-v", "--version", action="version", version="%(prog)s 0.1")
+    parser.add_argument("scenario", type=Scenario, choices=[value for value in Scenario], nargs="?", default=Scenario.PELICAN_CROSSING, help="choose scenario to run (default: %(default)s)")
+
+    parser.set_defaults(keyboard_agent=False, record=None)
+
+    subparsers = parser.add_subparsers(dest="mode", help="render run to screen")
+
+    render_parser = subparsers.add_parser("render")
+    render_parser.add_argument("-k", "--keyboard-agent", help="run with keyboard-controlled agent", action="store_true")
+    render_parser.add_argument("-r", "--record", metavar="DIR", help="save video of run to directory")
 
     args = parser.parse_args()
-    return args.scenario, args.episodes, args.timesteps, not args.no_render, args.keyboard_agent, args.record, args.debug, args.seed
+    return args.scenario, args.episodes, args.timesteps, True if args.mode == "render" else False, args.keyboard_agent, args.record, args.debug, args.seed
 
 
 def run(scenario, episodes=1, max_timesteps=1000, render=True, keyboard_agent=None, record_dir=None, debug=False, seed=None):
