@@ -7,6 +7,17 @@ from cavgym.actors import TrafficLightState, Car, Bus, Bicycle, Pedestrian, Peli
 from cavgym.geometry import Point
 
 
+class RGB(Enum):
+    BLACK = (0, 0, 0)
+    BLUE = (0, 0, 1)
+    GREEN = (0, 1, 0)
+    RED = (1, 0, 0)
+    CYAN = (0, 1, 1)
+    MAGENTA = (1, 0, 1)
+    YELLOW = (1, 1, 0)
+    WHITE = (1, 1, 1)
+
+
 class BulbState(Enum):
     OFF = 0
     DIM = 1
@@ -19,7 +30,7 @@ class OcclusionView:
 
         if occlusion is not ego:
             self.occlusion_zone = rendering.make_polygon(list(occlusion.occlusion_zone(ego.state.position)), filled=False)
-            self.occlusion_zone.set_color(1, 0, 0)
+            self.occlusion_zone.set_color(*RGB.RED.value)
 
         super().__init__(**kwargs)  # important to pass on kwargs if class is used as superclass in multiple inheritance
 
@@ -37,18 +48,25 @@ class ActorView:
 
 
 class DynamicActorView(ActorView, OcclusionView):
-    def __init__(self, dynamic_actor, ego):
+    def __init__(self, dynamic_actor, ego, road):
         super().__init__(occlusion=dynamic_actor, ego=ego)
 
         self.body = rendering.make_polygon(list(dynamic_actor.bounding_box()))
         if dynamic_actor is ego:
-            self.body.set_color(1, 0, 0)
+            self.body.set_color(*RGB.RED.value)
 
         braking_relative_bounding_box, reaction_relative_bounding_box = dynamic_actor.stopping_zones()
         self.braking = rendering.make_polygon(list(braking_relative_bounding_box), filled=False)
-        self.braking.set_color(0, 1, 0)
+        self.braking.set_color(*RGB.GREEN.value)
         self.reaction = rendering.make_polygon(list(reaction_relative_bounding_box), filled=False)
-        self.reaction.set_color(0, 0, 1)
+        self.reaction.set_color(*RGB.BLUE.value)
+
+        self.focal_road = road
+        if dynamic_actor.bounding_box().intersects(self.focal_road.bounding_box()):
+            self.road_angle = rendering.make_polyline(list())
+        else:
+            self.road_angle = rendering.make_polyline(list(dynamic_actor.line_anchor(self.focal_road)))
+        self.road_angle.set_color(*RGB.MAGENTA.value)
 
     def update(self, dynamic_actor, ego):
         self.body.v = list(dynamic_actor.bounding_box())
@@ -59,15 +77,20 @@ class DynamicActorView(ActorView, OcclusionView):
 
         self.update_occlusion_zone(dynamic_actor, ego)
 
+        if dynamic_actor.bounding_box().intersects(self.focal_road.bounding_box()):
+            self.road_angle.v = list()
+        else:
+            self.road_angle.v = list(dynamic_actor.line_anchor(self.focal_road))
+
     def geoms(self):
-        yield from [self.body, self.braking, self.reaction]
+        yield from [self.body, self.braking, self.reaction, self.road_angle]
         if self.occlusion_zone is not None:
             yield self.occlusion_zone
 
 
 class VehicleView(DynamicActorView):
-    def __init__(self, vehicle, ego):
-        super().__init__(vehicle, ego)
+    def __init__(self, vehicle, ego, road):
+        super().__init__(vehicle, ego, road)
 
         self.scale = {
             BulbState.OFF: 0.0,
@@ -83,9 +106,9 @@ class VehicleView(DynamicActorView):
 
         longitudinal_bounding_box = vehicle.longitudinal_lights()
         self.brake_lights = self.make_lights(longitudinal_bounding_box.rear_left, longitudinal_bounding_box.rear_right, BulbState.FULL)
-        self.brake_lights.set_color(1, 0, 0)
+        self.brake_lights.set_color(*RGB.RED.value)
         self.headlights = self.make_lights(longitudinal_bounding_box.front_left, longitudinal_bounding_box.front_right, BulbState.FULL)
-        self.headlights.set_color(1, 1, 0)
+        self.headlights.set_color(*RGB.YELLOW.value)
 
     def make_lights(self, position1, position2, state):
         return rendering.Compound([
@@ -120,8 +143,8 @@ class VehicleView(DynamicActorView):
 
 
 class CarView(VehicleView):
-    def __init__(self, car, ego):
-        super().__init__(car, ego)
+    def __init__(self, car, ego, road):
+        super().__init__(car, ego, road)
 
         self.roof = rendering.make_polygon(list(car.roof()))
         if car is ego:
@@ -136,8 +159,8 @@ class CarView(VehicleView):
 
 
 class BicycleView(DynamicActorView):
-    def __init__(self, bicycle, ego):
-        super().__init__(bicycle, ego)
+    def __init__(self, bicycle, ego, road):
+        super().__init__(bicycle, ego, road)
 
         self.head = self.make_head(bicycle)
 
@@ -153,8 +176,8 @@ class BicycleView(DynamicActorView):
 
 
 class PedestrianView(DynamicActorView):
-    def __init__(self, pedestrian, ego):
-        super().__init__(pedestrian, ego)
+    def __init__(self, pedestrian, ego, road):
+        super().__init__(pedestrian, ego, road)
 
         self.head = self.make_head(pedestrian)
 
@@ -182,19 +205,19 @@ class TrafficLightView(ActorView, OcclusionView):
         self.set_green_light()
 
     def set_red_light(self):
-        self.red_light.set_color(1, 0, 0)
+        self.red_light.set_color(*RGB.RED.value)
         for light in [self.amber_light, self.green_light]:
-            light.set_color(0, 0, 0)
+            light.set_color(*RGB.BLACK.value)
 
     def set_amber_light(self):
         self.amber_light.set_color(1, 0.75, 0)
         for light in [self.red_light, self.green_light]:
-            light.set_color(0, 0, 0)
+            light.set_color(*RGB.BLACK.value)
 
     def set_green_light(self):
-        self.green_light.set_color(0, 1, 0)
+        self.green_light.set_color(*RGB.GREEN.value)
         for light in [self.red_light, self.amber_light]:
-            light.set_color(0, 0, 0)
+            light.set_color(*RGB.BLACK.value)
 
     def update(self, traffic_light, ego):
         if traffic_light.state is TrafficLightState.RED:
@@ -214,7 +237,7 @@ class PelicanCrossingView(ActorView):
     def __init__(self, pelican_crossing, ego):
         coordinates = pelican_crossing.bounding_box()
         self.area = rendering.make_polygon(list(coordinates))
-        self.area.set_color(1, 1, 1)
+        self.area.set_color(*RGB.WHITE.value)
 
         self.markings = rendering.Compound([
             rendering.make_polyline([tuple(pelican_crossing.outbound_intersection_bounding_box.rear_left), tuple(pelican_crossing.outbound_intersection_bounding_box.rear_right)]),
@@ -249,7 +272,7 @@ class PelicanCrossingView(ActorView):
 class RoadView:
     def __init__(self, road):
         self.area = rendering.make_polygon(list(road.static_bounding_box))
-        self.area.set_color(1, 1, 1)
+        self.area.set_color(*RGB.WHITE.value)
 
         coordinates = road.bounding_box()
         self.edge_markings = rendering.Compound([
@@ -306,7 +329,7 @@ class RoadMapView:
 
         if self.minor_road_views:
             self.clear_intersections = rendering.Compound([rendering.make_polyline([tuple(bounding_box.front_left), tuple(bounding_box.front_right)]) for bounding_box in road_map.intersection_bounding_boxes])
-            self.clear_intersections.set_color(1, 1, 1)
+            self.clear_intersections.set_color(*RGB.WHITE.value)
 
             self.intersection_markings = rendering.Compound([rendering.make_polyline([tuple(bounding_box.rear_left), tuple(bounding_box.rear_right)]) for bounding_box in road_map.inbound_intersection_bounding_boxes])
             self.intersection_markings.add_attr(mods.FactoredLineStyle(0x0F0F, 2))
@@ -340,16 +363,16 @@ class RoadEnvViewer(rendering.Viewer):
         self.actor_views = list()
         for actor in actors:
             if isinstance(actor, Car):
-                car_view = CarView(actor, ego)
+                car_view = CarView(actor, ego, road_map.major_road)
                 self.actor_views.append(car_view)
             elif isinstance(actor, Bus):
-                bus_view = VehicleView(actor, ego)
+                bus_view = VehicleView(actor, ego, road_map.major_road)
                 self.actor_views.append(bus_view)
             elif isinstance(actor, Bicycle):
-                bicycle_view = BicycleView(actor, ego)
+                bicycle_view = BicycleView(actor, ego, road_map.major_road)
                 self.actor_views.append(bicycle_view)
             elif isinstance(actor, Pedestrian):
-                pedestrian_view = PedestrianView(actor, ego)
+                pedestrian_view = PedestrianView(actor, ego, road_map.major_road)
                 self.actor_views.append(pedestrian_view)
             elif isinstance(actor, PelicanCrossing):
                 self.road_map_view.major_road_view.set_pelican_crossing(actor, ego)

@@ -4,7 +4,7 @@ import gym
 from gym import wrappers
 from gym.utils import seeding
 
-from cavgym.agents import RandomTrafficLightAgent, RandomVehicleAgent, RandomPedestrianAgent, KeyboardAgent
+from cavgym.agents import RandomTrafficLightAgent, RandomVehicleAgent, KeyboardAgent, RandomConstrainedPedestrianAgent
 from cavgym import mods, Scenario
 from cavgym.actors import DynamicActor, TrafficLight, PelicanCrossing, Pedestrian
 
@@ -37,7 +37,7 @@ def parse_arguments():
     subparsers.add_parser("headless")  # headless mode has no additional options
 
     render_parser = subparsers.add_parser("render")
-    render_parser.add_argument("-k", "--keyboard-agent", help="run with keyboard-controlled agent", action="store_true")
+    render_parser.add_argument("-k", "--keyboard-agent", help="enable keyboard-controlled agent", action="store_true")
     render_parser.add_argument("-r", "--record", metavar="DIR", help="save video of run to directory")
 
     args = parser.parse_args()
@@ -45,7 +45,8 @@ def parse_arguments():
 
 
 def run(scenario, episodes=1, max_timesteps=1000, render=True, keyboard_agent=None, record_dir=None, debug=False, seed=None):
-    np_random, _ = seeding.np_random(seed)
+    np_random, np_seed = seeding.np_random(seed)
+    print(f"seed={np_seed}")
     if scenario is Scenario.PELICAN_CROSSING:
         env = gym.make('PelicanCrossing-v0', np_random=np_random)
     elif scenario is Scenario.BUS_STOP:
@@ -61,7 +62,7 @@ def run(scenario, episodes=1, max_timesteps=1000, render=True, keyboard_agent=No
     for actor in env.actors[1:]:
         if isinstance(actor, DynamicActor):
             if isinstance(actor, Pedestrian):
-                agents.append(RandomPedestrianAgent(np_random=np_random))
+                agents.append(RandomConstrainedPedestrianAgent(np_random=np_random))
             else:
                 agents.append(RandomVehicleAgent(np_random=np_random))
         elif isinstance(actor, TrafficLight) or isinstance(actor, PelicanCrossing):

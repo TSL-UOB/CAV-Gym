@@ -1,5 +1,3 @@
-from gym.utils import seeding
-
 from cavgym import geometry
 from cavgym.actors import DynamicActorState, Car, Pedestrian
 from cavgym.environment import CAVEnvConstants, RoadMap, CAVEnv

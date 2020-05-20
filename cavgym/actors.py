@@ -95,6 +95,14 @@ class DynamicActor(Actor, Occlusion):
         reaction_zone = geometry.make_rectangle(reaction_distance, self.constants.width, rear_offset=0).transform(self.state.orientation, Point((self.constants.length * 0.5) + braking_distance, 0).transform(self.state.orientation, self.state.position))
         return braking_zone, reaction_zone
 
+    def line_anchor(self, road):
+        closest = road.bounding_box().longitudinal_line().closest_point_from(self.state.position)
+        return geometry.Line(self.state.position, closest)
+
+    def line_anchor_relative_angle(self, road):
+        angle = self.line_anchor(road).orientation()
+        return geometry.normalise_angle(angle - self.state.orientation)
+
     def step_action(self, joint_action, index_self):
         velocity_action_id, orientation_action_id = joint_action[index_self]
         velocity_action = VelocityAction(velocity_action_id)
@@ -180,7 +188,7 @@ class DynamicActor(Actor, Occlusion):
             self.target_velocity = None
             self.state.acceleration = 0
 
-        if self.target_orientation is not None and abs(geometry.normalise_angle(self.target_orientation - self.state.orientation)) < (geometry.DEG2RAD * 2):  # not sure if 2 degrees precision error is needed
+        if self.target_orientation is not None and abs(geometry.normalise_angle(self.target_orientation - self.state.orientation)) < (geometry.DEG2RAD * 5):  # experimentally, pedestrians seem to require a +/- 5 degrees error bound
             self.state.orientation = self.target_orientation
             self.target_orientation = None
             self.state.angular_velocity = 0

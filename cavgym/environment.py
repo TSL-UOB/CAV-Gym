@@ -4,9 +4,10 @@ import gym
 from gym import spaces
 from gym.utils import seeding
 
+from cavgym import geometry
 from cavgym.actions import TrafficLightAction, OrientationAction, VelocityAction
 from cavgym.actors import PelicanCrossing, DynamicActor, TrafficLight
-from cavgym.observations import OrientationObservation, EmptyObservation, VelocityObservation
+from cavgym.observations import OrientationObservation, EmptyObservation, VelocityObservation, RoadObservation
 from cavgym.rendering import RoadEnvViewer
 from cavgym.assets import RoadMap, Occlusion
 
@@ -85,7 +86,8 @@ class CAVEnv(MarkovGameEnv):
             if isinstance(actor, DynamicActor):
                 velocity_observation_space = spaces.Discrete(VelocityObservation.__len__())
                 orientation_observation_space = spaces.Discrete(OrientationObservation.__len__())
-                observation_space = spaces.Tuple([velocity_observation_space, orientation_observation_space])
+                road_observation_space = spaces.Discrete(RoadObservation.__len__())
+                observation_space = spaces.Tuple([velocity_observation_space, orientation_observation_space, road_observation_space])
             else:
                 observation_space = spaces.Discrete(EmptyObservation.__len__())
             observation_spaces.append(observation_space)
@@ -119,7 +121,34 @@ class CAVEnv(MarkovGameEnv):
             if isinstance(actor, DynamicActor):
                 velocity_observation = VelocityObservation.ACTIVE if actor.target_velocity is not None else VelocityObservation.INACTIVE
                 orientation_observation = OrientationObservation.ACTIVE if actor.target_orientation is not None else OrientationObservation.INACTIVE
-                joint_observation.append(tuple([velocity_observation.value, orientation_observation.value]))
+
+                def find_road_observation(road):
+                    if actor.bounding_box().intersects(road.bounding_box()):
+                        return RoadObservation.ON_ROAD
+                    else:
+                        relative_angle = actor.line_anchor_relative_angle(road)
+
+                        if geometry.DEG2RAD * -157.5 <= relative_angle < geometry.DEG2RAD * -112.5:
+                            return RoadObservation.ROAD_REAR_RIGHT
+                        elif geometry.DEG2RAD * -112.5 <= relative_angle < geometry.DEG2RAD * -67.5:
+                            return RoadObservation.ROAD_RIGHT
+                        elif geometry.DEG2RAD * -67.5 <= relative_angle < geometry.DEG2RAD * -22.5:
+                            return RoadObservation.ROAD_FRONT_RIGHT
+                        elif geometry.DEG2RAD * -22.5 <= relative_angle < geometry.DEG2RAD * 22.5:
+                            return RoadObservation.ROAD_FRONT
+                        elif geometry.DEG2RAD * 22.5 <= relative_angle < geometry.DEG2RAD * 67.5:
+                            return RoadObservation.ROAD_FRONT_LEFT
+                        elif geometry.DEG2RAD * 67.5 <= relative_angle < geometry.DEG2RAD * 112.5:
+                            return RoadObservation.ROAD_LEFT
+                        elif geometry.DEG2RAD * 112.5 <= relative_angle < geometry.DEG2RAD * 157.5:
+                            return RoadObservation.ROAD_REAR_LEFT
+                        elif geometry.DEG2RAD * 157.5 <= relative_angle <= geometry.DEG2RAD * 180 or geometry.DEG2RAD * -180 < relative_angle < geometry.DEG2RAD * -157.5:
+                            return RoadObservation.ROAD_REAR
+                        else:
+                            raise Exception("relative angle is not in the interval (-math.pi, math.pi]")
+
+                road_observation = find_road_observation(self.constants.road_map.major_road)
+                joint_observation.append(tuple([velocity_observation.value, orientation_observation.value, road_observation.value]))
             else:
                 joint_observation.append(EmptyObservation.NONE.value)
 

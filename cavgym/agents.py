@@ -1,8 +1,10 @@
+from enum import Enum
+
 from gym.utils import seeding
 
 from cavgym.actions import OrientationAction, VelocityAction
 from cavgym.environment import TrafficLightAction
-from cavgym.observations import OrientationObservation, VelocityObservation
+from cavgym.observations import OrientationObservation, VelocityObservation, RoadObservation
 
 
 class Agent:
@@ -46,7 +48,7 @@ class KeyboardAgent(Agent):
         self.pending_orientation_action = OrientationAction.NOOP
 
     def choose_action(self, observation, action_space):
-        velocity_observation_id, orientation_observation_id = observation
+        velocity_observation_id, orientation_observation_id, _ = observation
 
         velocity_observation = VelocityObservation(velocity_observation_id)
         if velocity_observation is not VelocityObservation.ACTIVE:
@@ -100,7 +102,7 @@ class RandomVehicleAgent(RandomAgent):
         pass
 
     def choose_action(self, observation, action_space):
-        velocity_observation_id, _ = observation
+        velocity_observation_id, _, _ = observation
 
         epsilon_valid = self.epsilon_valid()
 
@@ -124,7 +126,7 @@ class RandomPedestrianAgent(RandomAgent):
         pass
 
     def choose_action(self, observation, action_space):
-        velocity_observation_id, orientation_observation_id = observation
+        velocity_observation_id, orientation_observation_id, _ = observation
 
         epsilon_valid = self.epsilon_valid()
 
@@ -141,6 +143,75 @@ class RandomPedestrianAgent(RandomAgent):
             orientation_action = OrientationAction(orientation_action_id)
         else:
             orientation_action = OrientationAction.NOOP
+
+        return velocity_action.value, orientation_action.value
+
+    def process_feedback(self, previous_observation, action, observation, reward):
+        pass
+
+
+class RandomConstrainedPedestrianAgent(RandomAgent):
+    def __init__(self, epsilon=0.005, **kwargs):
+        super().__init__(epsilon=epsilon, **kwargs)
+
+        self.crossing_action = None
+        self.entered_road = False
+        self.delay_count = 0
+
+        self.road_action = {
+            RoadObservation.ROAD_FRONT: OrientationAction.NOOP,
+            RoadObservation.ROAD_FRONT_LEFT: OrientationAction.FORWARD_LEFT,
+            RoadObservation.ROAD_LEFT: OrientationAction.LEFT,
+            RoadObservation.ROAD_REAR_LEFT: OrientationAction.REAR_LEFT,
+            RoadObservation.ROAD_REAR: OrientationAction.REAR,
+            RoadObservation.ROAD_REAR_RIGHT: OrientationAction.REAR_RIGHT,
+            RoadObservation.ROAD_RIGHT: OrientationAction.RIGHT,
+            RoadObservation.ROAD_FRONT_RIGHT: OrientationAction.FORWARD_RIGHT
+        }
+
+        self.reorientate_action = {
+            OrientationAction.NOOP: OrientationAction.LEFT,
+            OrientationAction.FORWARD_LEFT: OrientationAction.RIGHT,
+            OrientationAction.LEFT: OrientationAction.RIGHT,
+            OrientationAction.REAR_LEFT: OrientationAction.RIGHT,
+            OrientationAction.REAR: OrientationAction.LEFT,
+            OrientationAction.REAR_RIGHT: OrientationAction.LEFT,
+            OrientationAction.RIGHT: OrientationAction.LEFT,
+            OrientationAction.FORWARD_RIGHT: OrientationAction.LEFT
+        }
+
+    def reset(self):
+        self.crossing_action = None
+        self.entered_road = False
+        self.delay_count = 0
+
+    def choose_action(self, observation, action_space):
+        velocity_observation_id, orientation_observation_id, road_observation_id = observation
+
+        velocity_observation = VelocityObservation(velocity_observation_id)
+        if velocity_observation is not VelocityObservation.ACTIVE:
+            velocity_action = self.np_random.choice([value for value in VelocityAction if value is not VelocityAction.STOP])
+        else:
+            velocity_action = VelocityAction.NOOP
+
+        epsilon_valid = self.epsilon_valid()
+
+        orientation_observation = OrientationObservation(orientation_observation_id)
+        road_observation = RoadObservation(road_observation_id)
+
+        orientation_action = OrientationAction.NOOP
+        if self.crossing_action is not None and not self.entered_road and road_observation is RoadObservation.ON_ROAD:
+            self.entered_road = True
+        elif self.crossing_action is not None and self.entered_road and road_observation is not RoadObservation.ON_ROAD:
+            self.delay_count += 1
+            if self.delay_count >= 30:
+                orientation_action = self.reorientate_action[self.crossing_action]
+                self.crossing_action = None
+                self.entered_road = False
+                self.delay_count = 0
+        elif self.crossing_action is None and orientation_observation is not OrientationObservation.ACTIVE and road_observation is not RoadObservation.ON_ROAD and epsilon_valid:
+            self.crossing_action = self.road_action[road_observation]
+            orientation_action = self.crossing_action
 
         return velocity_action.value, orientation_action.value
 

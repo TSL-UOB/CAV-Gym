@@ -13,7 +13,7 @@ class Point:
     y: float
 
     def distance(self, other):
-        return math.sqrt(((other.x - self.x) ** 2) + ((other.y - self.y) ** 2))
+        return math.sqrt(((other.y - self.y) ** 2) + ((other.x - self.x) ** 2))
 
     def translate(self, anchor):
         translated_x = anchor.x + self.x
@@ -142,6 +142,9 @@ class ConvexQuadrilateral(Shape):
     def flip(self):
         return self.flip_longitudinally().flip_laterally()
 
+    def longitudinal_line(self):
+        return Line(self.rear_centre(), self.front_centre())
+
 
 def make_rectangle(length, width, anchor=Point(0, 0), rear_offset=0.5, left_offset=0.5):
     rear = anchor.x - (length * rear_offset)
@@ -237,3 +240,26 @@ def normalise_angle(radians):
     while radians > math.pi:
         radians -= 2 * math.pi
     return radians
+
+
+@dataclass(frozen=True)
+class Line(Shape):
+    start: Point
+    end: Point
+
+    def transform(self, orientation, position):
+        return Line(
+            start=self.start.transform(orientation, position),
+            end=self.end.transform(orientation, position)
+        )
+
+    def closest_point_from(self, point):  # https://stackoverflow.com/a/47198877
+        dx, dy = self.end.x - self.start.x, self.end.y - self.start.y
+        denominator = (dx * dx) + (dy * dy)
+        a = (dy * (point.y - self.start.y) + dx * (point.x - self.start.x)) / denominator
+        return Point(self.start.x + a * dx, self.start.y + a * dy)
+
+    def orientation(self):
+        delta_x = self.end.x - self.start.x
+        delta_y = self.end.y - self.start.y
+        return math.atan2(delta_y, delta_x)
