@@ -1,5 +1,3 @@
-from enum import Enum
-
 from gym.utils import seeding
 
 from cavgym.actions import OrientationAction, VelocityAction

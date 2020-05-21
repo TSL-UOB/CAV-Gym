@@ -1,4 +1,6 @@
 import argparse
+import logging
+import sys
 
 import gym
 from gym import wrappers
@@ -7,6 +9,22 @@ from gym.utils import seeding
 from cavgym.agents import RandomTrafficLightAgent, RandomVehicleAgent, KeyboardAgent, RandomConstrainedPedestrianAgent
 from cavgym import mods, Scenario
 from cavgym.actors import DynamicActor, TrafficLight, PelicanCrossing, Pedestrian
+
+
+root = logging.getLogger()
+root.setLevel(logging.INFO)
+
+stdout_handler = logging.StreamHandler(sys.stdout)
+stdout_handler.addFilter(lambda record: record.levelno <= logging.INFO)
+stderr_handler = logging.StreamHandler(sys.stderr)
+stderr_handler.addFilter(lambda record: record.levelno > logging.INFO)
+
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+for handler in [stdout_handler, stderr_handler]:
+    handler.setFormatter(formatter)
+    root.addHandler(handler)
+
+logger = logging.getLogger(__name__)  # Add this line to any file that uses logging
 
 
 def parse_arguments():
@@ -45,8 +63,10 @@ def parse_arguments():
 
 
 def run(scenario, episodes=1, max_timesteps=1000, render=True, keyboard_agent=None, record_dir=None, debug=False, seed=None):
+    if debug:
+        root.setLevel(logging.DEBUG)
     np_random, np_seed = seeding.np_random(seed)
-    print(f"seed={np_seed}")
+    logger.info(f"seed={np_seed}")
     if scenario is Scenario.PELICAN_CROSSING:
         env = gym.make('PelicanCrossing-v0', np_random=np_random)
     elif scenario is Scenario.BUS_STOP:
@@ -67,11 +87,13 @@ def run(scenario, episodes=1, max_timesteps=1000, render=True, keyboard_agent=No
                 agents.append(RandomVehicleAgent(np_random=np_random))
         elif isinstance(actor, TrafficLight) or isinstance(actor, PelicanCrossing):
             agents.append(RandomTrafficLightAgent(np_random=np_random))
-    run_simulation(env, agents, episodes=episodes, max_timesteps=max_timesteps, render=render, keyboard_agent=keyboard_agent, record_dir=record_dir, debug=debug)
+    run_simulation(env, agents, episodes=episodes, max_timesteps=max_timesteps, render=render, keyboard_agent=keyboard_agent, record_dir=record_dir)
 
 
-def run_simulation(env, agents, episodes=1, max_timesteps=1000, render=True, keyboard_agent=None, record_dir=None, debug=False):
+def run_simulation(env, agents, episodes=1, max_timesteps=1000, render=True, keyboard_agent=None, record_dir=None):
     assert len(env.actors) == len(agents), "each actor must be assigned an agent and vice versa"
+
+    logger.info(f"agents={[(agent.__class__.__name__, actor.__class__.__name__) for agent, actor in zip(agents, env.actors)]}")
 
     if keyboard_agent is not None or record_dir is not None:
         assert render, "keyboard agents and recordings only work in render mode"
@@ -86,6 +108,7 @@ def run_simulation(env, agents, episodes=1, max_timesteps=1000, render=True, key
 
     for episode in range(episodes):
         joint_observation = env.reset()
+        logger.debug(f"init: observation={joint_observation}")
         done = False
 
         for agent in agents:
@@ -96,17 +119,16 @@ def run_simulation(env, agents, episodes=1, max_timesteps=1000, render=True, key
                 env.render()
 
             if done:
-                print(f"episode {episode+1} terminated after {timestep} timestep(s)")
+                logging.info(f"episode={episode+1}: terminated after {timestep} timestep(s)")
                 break
 
             previous_joint_observation = joint_observation
             joint_action = [agent.choose_action(previous_observation, action_space) for agent, previous_observation, action_space in zip(agents, previous_joint_observation, env.action_space)]
             joint_observation, joint_reward, done, info = env.step(joint_action)
 
-            if debug:
-                print(f"{timestep+1}: {previous_joint_observation} {joint_action} -> {joint_observation} {joint_reward} {done} {info}")
+            logger.debug(f"timestep={timestep+1}: action={joint_action} observation={joint_observation} reward={joint_reward} done={done} info={info}")
         else:
-            print(f"episode {episode+1} completed")
+            logger.info(f"episode={episode+1}: completed")
             if record_dir is not None:
                 env.stats_recorder.done = True  # need to manually tell the monitor that the episode is over (not sure why)
 
