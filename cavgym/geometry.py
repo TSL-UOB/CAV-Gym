@@ -1,5 +1,5 @@
 import math
-from dataclasses import dataclass, astuple
+from dataclasses import dataclass
 
 from shapely.geometry import Polygon
 
@@ -7,7 +7,7 @@ DEG2RAD = 0.017453292519943295
 RAD2DEG = 57.29577951308232
 
 
-@dataclass
+@dataclass(frozen=True)
 class Point:
     x: float
     y: float
@@ -36,13 +36,14 @@ class Point:
     def __copy__(self):
         return Point(self.x, self.y)
 
-    def __iter__(self):
-        yield from astuple(self)
+    def __iter__(self):  # massive performance improvement over astuple(self)
+        yield self.x
+        yield self.y
 
 
 class Shape:
     def __iter__(self):
-        yield from astuple(self)
+        raise NotImplementedError
 
     def transform(self, orientation, position):
         raise NotImplementedError
@@ -57,6 +58,12 @@ class ConvexQuadrilateral(Shape):
     front_left: Point
     front_right: Point
     rear_right: Point
+
+    def __iter__(self):
+        yield tuple(self.rear_left)
+        yield tuple(self.front_left)
+        yield tuple(self.front_right)
+        yield tuple(self.rear_right)
 
     def transform(self, orientation, position):
         return ConvexQuadrilateral(
@@ -207,6 +214,11 @@ class Triangle(Shape):
     front_left: Point
     front_right: Point
 
+    def __iter__(self):
+        yield tuple(self.rear)
+        yield tuple(self.front_left)
+        yield tuple(self.front_right)
+
     def angle(self):
         angle = math.atan2(self.front_left.y - self.rear.y, self.front_left.x - self.rear.x) - math.atan2(self.front_right.y - self.rear.y, self.front_right.x - self.rear.x)
         if angle > math.pi:
@@ -246,6 +258,10 @@ def normalise_angle(radians):
 class Line(Shape):
     start: Point
     end: Point
+
+    def __iter__(self):
+        yield tuple(self.start)
+        yield tuple(self.end)
 
     def transform(self, orientation, position):
         return Line(

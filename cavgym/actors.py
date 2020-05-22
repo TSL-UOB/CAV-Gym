@@ -167,18 +167,24 @@ class DynamicActor(Actor, Occlusion):
             self.state.position.x + ((self.constants.wheelbase / 2.0) * math.cos(self.state.orientation)),
             self.state.position.y + ((self.constants.wheelbase / 2.0) * math.sin(self.state.orientation))
         )
-        front_wheel_position.x += self.state.velocity * time_resolution * math.cos(self.state.orientation + self.state.angular_velocity)
-        front_wheel_position.y += self.state.velocity * time_resolution * math.sin(self.state.orientation + self.state.angular_velocity)
+        front_wheel_position = Point(
+            x=front_wheel_position.x + (self.state.velocity * time_resolution * math.cos(self.state.orientation + self.state.angular_velocity)),
+            y=front_wheel_position.y + (self.state.velocity * time_resolution * math.sin(self.state.orientation + self.state.angular_velocity))
+        )
 
         back_wheel_position = geometry.Point(
             self.state.position.x - ((self.constants.wheelbase / 2.0) * math.cos(self.state.orientation)),
             self.state.position.y - ((self.constants.wheelbase / 2.0) * math.sin(self.state.orientation))
         )
-        back_wheel_position.x += self.state.velocity * time_resolution * math.cos(self.state.orientation)
-        back_wheel_position.y += self.state.velocity * time_resolution * math.sin(self.state.orientation)
+        back_wheel_position = Point(
+            x=back_wheel_position.x + (self.state.velocity * time_resolution * math.cos(self.state.orientation)),
+            y=back_wheel_position.y + (self.state.velocity * time_resolution * math.sin(self.state.orientation))
+        )
 
-        self.state.position.x = (front_wheel_position.x + back_wheel_position.x) / 2.0
-        self.state.position.y = (front_wheel_position.y + back_wheel_position.y) / 2.0
+        self.state.position = Point(
+            x=(front_wheel_position.x + back_wheel_position.x) / 2.0,
+            y=(front_wheel_position.y + back_wheel_position.y) / 2.0
+        )
 
         self.state.orientation = math.atan2(front_wheel_position.y - back_wheel_position.y, front_wheel_position.x - back_wheel_position.x)  # range is [-math.pi, math.pi] (min or max may be exclusive)
         assert -math.pi < self.state.orientation <= math.pi
