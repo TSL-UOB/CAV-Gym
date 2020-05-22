@@ -163,23 +163,25 @@ class DynamicActor(Actor, Occlusion):
 
         """Simple vehicle dynamics: http://engineeringdotnet.blogspot.com/2010/04/simple-2d-car-physics-in-games.html"""
 
-        front_wheel_position = geometry.Point(
-            self.state.position.x + ((self.constants.wheelbase / 2.0) * math.cos(self.state.orientation)),
-            self.state.position.y + ((self.constants.wheelbase / 2.0) * math.sin(self.state.orientation))
+        front_wheel_calculate_position = geometry.Point(
+            x=self.state.position.x + ((self.constants.wheelbase / 2.0) * math.cos(self.state.orientation)),
+            y=self.state.position.y + ((self.constants.wheelbase / 2.0) * math.sin(self.state.orientation))
         )
-        front_wheel_position = Point(
-            x=front_wheel_position.x + (self.state.velocity * time_resolution * math.cos(self.state.orientation + self.state.angular_velocity)),
-            y=front_wheel_position.y + (self.state.velocity * time_resolution * math.sin(self.state.orientation + self.state.angular_velocity))
+        front_wheel_apply_angular_velocity = Point(
+            x=self.state.velocity * time_resolution * math.cos(self.state.orientation + self.state.angular_velocity),
+            y=self.state.velocity * time_resolution * math.sin(self.state.orientation + self.state.angular_velocity)
         )
+        front_wheel_position = front_wheel_calculate_position + front_wheel_apply_angular_velocity
 
-        back_wheel_position = geometry.Point(
-            self.state.position.x - ((self.constants.wheelbase / 2.0) * math.cos(self.state.orientation)),
-            self.state.position.y - ((self.constants.wheelbase / 2.0) * math.sin(self.state.orientation))
+        back_wheel_calculate_position = geometry.Point(
+            x=self.state.position.x - ((self.constants.wheelbase / 2.0) * math.cos(self.state.orientation)),
+            y=self.state.position.y - ((self.constants.wheelbase / 2.0) * math.sin(self.state.orientation))
         )
-        back_wheel_position = Point(
-            x=back_wheel_position.x + (self.state.velocity * time_resolution * math.cos(self.state.orientation)),
-            y=back_wheel_position.y + (self.state.velocity * time_resolution * math.sin(self.state.orientation))
+        back_wheel_apply_angular_velocity = Point(
+            x=self.state.velocity * time_resolution * math.cos(self.state.orientation),
+            y=self.state.velocity * time_resolution * math.sin(self.state.orientation)
         )
+        back_wheel_position = back_wheel_calculate_position + back_wheel_apply_angular_velocity
 
         self.state.position = Point(
             x=(front_wheel_position.x + back_wheel_position.x) / 2.0,

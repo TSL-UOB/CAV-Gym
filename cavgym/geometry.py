@@ -16,9 +16,7 @@ class Point:
         return math.sqrt(((other.y - self.y) ** 2) + ((other.x - self.x) ** 2))
 
     def translate(self, anchor):
-        translated_x = anchor.x + self.x
-        translated_y = anchor.y + self.y
-        return Point(x=translated_x, y=translated_y)
+        return anchor + self
 
     def rotate(self, angle):  # Rotate point around (0, 0)
         rotated_x = (math.cos(angle) * self.x) - (math.sin(angle) * self.y)
@@ -39,6 +37,9 @@ class Point:
     def __iter__(self):  # massive performance improvement over astuple(self)
         yield self.x
         yield self.y
+
+    def __add__(self, other):
+        return Point(self.x + other.x, self.y + other.y)
 
 
 class Shape:
