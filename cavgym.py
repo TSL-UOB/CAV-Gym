@@ -1,6 +1,7 @@
 import argparse
 import logging
 import sys
+import timeit
 
 import gym
 from gym import wrappers
@@ -106,31 +107,48 @@ def run_simulation(env, agents, episodes=1, max_timesteps=1000, render=True, key
         env.render()  # must render before key_press can be assigned
         env.unwrapped.viewer.window.on_key_press = keyboard_agent.key_press
 
-    for episode in range(episodes):
+    def measure_time(start_time, timesteps):
+        time_ms = (timeit.default_timer() - start_time) * 1000
+        real_time_ratio = (timesteps * env.constants.time_resolution * 1000) / time_ms
+        return time_ms, real_time_ratio
+
+    total_timesteps = 0
+    run_start_time = timeit.default_timer()
+    for i in range(episodes):
+        episode_start_time = timeit.default_timer()
+        episode = i + 1  # range(...) counts from 0
+
         joint_observation = env.reset()
         logger.debug(f"init: observation={joint_observation}")
-        done = False
 
         for agent in agents:
             agent.reset()
 
-        for timestep in range(max_timesteps):
+        for j in range(max_timesteps):
+            timestep = j + 1  # range(...) counts from 0
+
             if render:
                 env.render()
 
-            if done:
-                logging.info(f"episode={episode+1}: terminated after {timestep} timestep(s)")
-                break
-
-            previous_joint_observation = joint_observation
-            joint_action = [agent.choose_action(previous_observation, action_space) for agent, previous_observation, action_space in zip(agents, previous_joint_observation, env.action_space)]
+            joint_action = [agent.choose_action(previous_observation, action_space) for agent, previous_observation, action_space in zip(agents, joint_observation, env.action_space)]
             joint_observation, joint_reward, done, info = env.step(joint_action)
 
-            logger.debug(f"timestep={timestep+1}: action={joint_action} observation={joint_observation} reward={joint_reward} done={done} info={info}")
+            logger.debug(f"timestep={timestep}: action={joint_action} observation={joint_observation} reward={joint_reward} done={done} info={info}")
+
+            if done:
+                total_timesteps += timestep
+                episode_time, episode_ratio = measure_time(episode_start_time, timestep)
+                logging.info(f"episode={episode}: terminated after {timestep} timestep(s) in {round(episode_time, 2)} ms at {round(episode_ratio, 2)}:1 real-time")
+                break
         else:
-            logger.info(f"episode={episode+1}: completed")
+            total_timesteps += timestep
+            episode_time, episode_ratio = measure_time(episode_start_time, timestep)
+            logger.info(f"episode={episode}: completed after {timestep} timestep(s) in {round(episode_time, 2)} ms at {round(episode_ratio, 2)}:1 real-time")
             if record_dir is not None:
                 env.stats_recorder.done = True  # need to manually tell the monitor that the episode is over (not sure why)
+
+    run_time, run_ratio = measure_time(run_start_time, total_timesteps)
+    logger.info(f"completed after {episodes} episode(s) across {total_timesteps} timestep(s) in {round(run_time, 2)} ms at {round(run_ratio, 2)}:1 real-time")
 
     env.close()
 
@@ -138,3 +156,4 @@ def run_simulation(env, agents, episodes=1, max_timesteps=1000, render=True, key
 if __name__ == '__main__':
     arg_scenario, arg_episodes, arg_timesteps, arg_render, arg_keyboard_agent, arg_record_dir, arg_debug, arg_seed = parse_arguments()
     run(arg_scenario, episodes=arg_episodes, max_timesteps=arg_timesteps, render=arg_render, keyboard_agent=KeyboardAgent() if arg_keyboard_agent else None, record_dir=arg_record_dir, debug=arg_debug, seed=arg_seed)
+    # cProfile.run("run(Scenario.PEDESTRIANS, episodes=60, max_timesteps=3600, render=False, keyboard_agent=None, record_dir=None, debug=False, seed=0)", sort="tottime")

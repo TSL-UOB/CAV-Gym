@@ -19,8 +19,10 @@ class Point:
         return anchor + self
 
     def rotate(self, angle):  # Rotate point around (0, 0)
-        rotated_x = (math.cos(angle) * self.x) - (math.sin(angle) * self.y)
-        rotated_y = (math.sin(angle) * self.x) + (math.cos(angle) * self.y)
+        cos_angle = math.cos(angle)
+        sin_angle = math.sin(angle)
+        rotated_x = (cos_angle * self.x) - (sin_angle * self.y)
+        rotated_y = (sin_angle * self.x) + (cos_angle * self.y)
         return Point(x=rotated_x, y=rotated_y)
 
     def enlarge(self, center, scale=100):
