@@ -1,5 +1,4 @@
 import argparse
-import cProfile
 import logging
 import sys
 
@@ -138,5 +137,4 @@ def run_simulation(env, agents, episodes=1, max_timesteps=1000, render=True, key
 
 if __name__ == '__main__':
     arg_scenario, arg_episodes, arg_timesteps, arg_render, arg_keyboard_agent, arg_record_dir, arg_debug, arg_seed = parse_arguments()
-    # run(arg_scenario, episodes=arg_episodes, max_timesteps=arg_timesteps, render=arg_render, keyboard_agent=KeyboardAgent() if arg_keyboard_agent else None, record_dir=arg_record_dir, debug=arg_debug, seed=arg_seed)
-    cProfile.run("run(Scenario.PEDESTRIANS, episodes=10, max_timesteps=1000, render=False, keyboard_agent=None, record_dir=None, debug=False, seed=0)", sort="tottime")
+    run(arg_scenario, episodes=arg_episodes, max_timesteps=arg_timesteps, render=arg_render, keyboard_agent=KeyboardAgent() if arg_keyboard_agent else None, record_dir=arg_record_dir, debug=arg_debug, seed=arg_seed)
