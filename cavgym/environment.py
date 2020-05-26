@@ -98,14 +98,14 @@ class CAVEnv(MarkovGameEnv):
 
         self.viewer = None
 
-    def determine_collidable(self):
-        collidable = [actor for actor in self.actors if isinstance(actor, Occlusion)]
+    def collidable_entities(self):
+        entities = [actor for actor in self.actors if isinstance(actor, Occlusion)]
         for actor in self.actors:
             if isinstance(actor, PelicanCrossing):
-                collidable += [actor.outbound_traffic_light, actor.inbound_traffic_light]
+                entities += [actor.outbound_traffic_light, actor.inbound_traffic_light]
         if self.constants.road_map.obstacle is not None:
-            collidable.append(self.constants.road_map.obstacle)
-        return collidable
+            entities.append(self.constants.road_map.obstacle)
+        return entities
 
     def step(self, joint_action):
         assert self.action_space.contains(joint_action), "%r (%s) invalid" % (joint_action, type(joint_action))
@@ -152,7 +152,8 @@ class CAVEnv(MarkovGameEnv):
             else:
                 joint_observation.append(EmptyObservation.NONE.value)
 
-        joint_reward = [-1 if not isinstance(actor, PelicanCrossing) and any(actor.bounding_box().intersects(other.bounding_box()) for other in self.determine_collidable() if actor is not other) else 0 for actor in self.actors]
+        collidable_entities = self.collidable_entities()
+        joint_reward = [-1 if not isinstance(actor, PelicanCrossing) and any(actor.bounding_box().intersects(entity.bounding_box()) for entity in collidable_entities if actor is not entity) else 0 for actor in self.actors]
 
         return joint_observation, joint_reward, any(reward < 0 for reward in joint_reward), None
 

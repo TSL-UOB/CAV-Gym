@@ -1,7 +1,6 @@
 import math
 from dataclasses import dataclass
 
-from gym.utils import seeding
 from shapely.geometry import Polygon
 
 DEG2RAD = 0.017453292519943295
