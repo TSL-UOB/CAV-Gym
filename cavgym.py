@@ -75,7 +75,7 @@ def run(scenario, episodes=1, max_timesteps=1000, render=True, keyboard_agent=No
     elif scenario is Scenario.CROSSROADS:
         env = gym.make('Crossroads-v0', np_random=np_random)
     elif scenario is Scenario.PEDESTRIANS:
-        env = gym.make('Pedestrians-v0', np_random=np_random)
+        env = gym.make('Pedestrians-v0', num_pedestrians=3, np_random=np_random)
     else:
         raise NotImplementedError
     agent = keyboard_agent if keyboard_agent is not None else RandomVehicleAgent(np_random=np_random)

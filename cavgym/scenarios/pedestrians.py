@@ -37,7 +37,7 @@ spawn_orientations = [road_map.major_road.outbound.orientation, road_map.major_r
 
 
 class PedestriansEnv(CAVEnv):
-    def __init__(self, num_pedestrians=10, np_random=seeding.np_random(None)[0]):
+    def __init__(self, num_pedestrians=3, np_random=seeding.np_random(None)[0]):
         def spawn_pedestrian():
             return SpawnPedestrian(
                 spawn_init_state=SpawnPedestrianState(
