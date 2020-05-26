@@ -156,6 +156,7 @@ class DynamicActor(Actor, Occlusion):
                 self.target_orientation = None
 
     def step_dynamics(self, time_resolution):
+        previous_velocity = self.state.velocity
         self.state.velocity = max(
             self.constants.min_velocity,
             min(
@@ -194,15 +195,25 @@ class DynamicActor(Actor, Occlusion):
             y=(front_wheel_position.y + back_wheel_position.y) / 2.0
         )
 
+        previous_orientation_diff = geometry.normalise_angle(self.target_orientation - self.state.orientation) if self.target_orientation is not None else None
         self.state.orientation = math.atan2(front_wheel_position.y - back_wheel_position.y, front_wheel_position.x - back_wheel_position.x)  # range is [-math.pi, math.pi] (min or max may be exclusive)
         assert -math.pi < self.state.orientation <= math.pi
 
-        if self.target_velocity is not None and abs(self.state.velocity - self.target_velocity) < 2:
+        if self.target_velocity is not None and (
+                (self.state.velocity == self.target_velocity)  # actor has reached target velocity
+                or (previous_velocity < self.target_velocity < self.state.velocity)  # actor has accelerated too far
+                or (previous_velocity > self.target_velocity > self.state.velocity)  # actor has decelerated too far
+        ):
             self.state.velocity = self.target_velocity
             self.target_velocity = None
             self.state.acceleration = 0
 
-        if self.target_orientation is not None and abs(geometry.normalise_angle(self.target_orientation - self.state.orientation)) < (geometry.DEG2RAD * 5):  # experimentally, pedestrians seem to require a +/- 5 degrees error bound
+        current_orientation_diff = geometry.normalise_angle(self.target_orientation - self.state.orientation) if self.target_orientation is not None else None
+        if self.target_orientation is not None and (
+                (self.state.orientation == self.target_orientation)  # actor has reached target orientation
+                or (previous_orientation_diff < 0 < current_orientation_diff)  # actor has turned too far left
+                or (previous_orientation_diff > 0 > current_orientation_diff)  # actor has turned too far right
+        ):
             self.state.orientation = self.target_orientation
             self.target_orientation = None
             self.state.angular_velocity = 0
