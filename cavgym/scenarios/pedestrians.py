@@ -27,9 +27,30 @@ env_constants = CAVEnvConstants(
     road_map=road_map
 )
 
+bounding_box = road_map.major_road.bounding_box()
+spawn_offset = road_map.major_road.constants.lane_width * 0.5
+spawn_position_lines = [
+    geometry.Line(start=geometry.Point(0, spawn_offset).transform(0, bounding_box.rear_left), end=geometry.Point(0, spawn_offset).transform(0, bounding_box.front_left)),
+    geometry.Line(start=geometry.Point(0, -spawn_offset).transform(0, bounding_box.rear_right), end=geometry.Point(0, -spawn_offset).transform(0, bounding_box.front_right))
+]
+spawn_orientations = [road_map.major_road.outbound.orientation, road_map.major_road.inbound.orientation]
+
 
 class PedestriansEnv(CAVEnv):
-    def __init__(self, np_random=seeding.np_random(None)[0]):
+    def __init__(self, num_pedestrians=10, np_random=seeding.np_random(None)[0]):
+        def spawn_pedestrian():
+            return SpawnPedestrian(
+                spawn_init_state=SpawnPedestrianState(
+                    position_lines=spawn_position_lines,
+                    velocity=0.0,
+                    orientations=spawn_orientations,
+                    acceleration=0,
+                    angular_velocity=0.0
+                ),
+                constants=pedestrian_constants,
+                np_random=np_random
+            )
+
         actors = [
             Car(
                 init_state=DynamicActorState(
@@ -40,58 +61,8 @@ class PedestriansEnv(CAVEnv):
                     angular_velocity=0.0
                 ),
                 constants=car_constants
-            ),
-            SpawnPedestrian(
-                spawn_init_state=SpawnPedestrianState(
-                    positions=[
-                        geometry.Point(-road_map.major_road.constants.lane_width, road_map.major_road.constants.lane_width * 0.5).translate(road_map.major_road.bounding_box().left_centre()),
-                        geometry.Point(road_map.major_road.constants.lane_width, road_map.major_road.constants.lane_width * 0.5).translate(road_map.major_road.bounding_box().left_centre())
-                    ],
-                    velocity=0.0,
-                    orientations=[
-                        road_map.major_road.outbound.orientation,
-                        road_map.major_road.inbound.orientation
-                    ],
-                    acceleration=0,
-                    angular_velocity=0.0
-                ),
-                constants=pedestrian_constants,
-                np_random=np_random
-            ),
-            SpawnPedestrian(
-                spawn_init_state=SpawnPedestrianState(
-                    positions=[
-                        geometry.Point(-road_map.major_road.constants.lane_width, -road_map.major_road.constants.lane_width * 0.5).translate(road_map.major_road.bounding_box().split_longitudinally()[0].right_centre()),
-                        geometry.Point(road_map.major_road.constants.lane_width, -road_map.major_road.constants.lane_width * 0.5).translate(road_map.major_road.bounding_box().split_longitudinally()[0].right_centre())
-                    ],
-                    velocity=0.0,
-                    orientations=[
-                        road_map.major_road.outbound.orientation,
-                        road_map.major_road.inbound.orientation
-                    ],
-                    acceleration=0,
-                    angular_velocity=0.0
-                ),
-                constants=pedestrian_constants,
-                np_random=np_random
-            ),
-            SpawnPedestrian(
-                spawn_init_state=SpawnPedestrianState(
-                    positions=[
-                        geometry.Point(-road_map.major_road.constants.lane_width, -road_map.major_road.constants.lane_width * 0.5).translate(road_map.major_road.bounding_box().split_longitudinally()[1].right_centre()),
-                        geometry.Point(road_map.major_road.constants.lane_width, -road_map.major_road.constants.lane_width * 0.5).translate(road_map.major_road.bounding_box().split_longitudinally()[1].right_centre())
-                    ],
-                    velocity=0.0,
-                    orientations=[
-                        road_map.major_road.outbound.orientation,
-                        road_map.major_road.inbound.orientation
-                    ],
-                    acceleration=0,
-                    angular_velocity=0.0
-                ),
-                constants=pedestrian_constants,
-                np_random=np_random
             )
         ]
+        actors += [spawn_pedestrian() for _ in range(num_pedestrians)]
 
         super().__init__(actors=actors, constants=env_constants, np_random=np_random)

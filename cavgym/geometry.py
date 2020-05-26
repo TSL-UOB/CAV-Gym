@@ -1,6 +1,7 @@
 import math
 from dataclasses import dataclass
 
+from gym.utils import seeding
 from shapely.geometry import Polygon
 
 DEG2RAD = 0.017453292519943295
@@ -282,3 +283,10 @@ class Line(Shape):
         delta_x = self.end.x - self.start.x
         delta_y = self.end.y - self.start.y
         return math.atan2(delta_y, delta_x)
+
+    def random_point(self, np_random):
+        deviation = np_random.uniform(0.0, 1.0)
+        inverse_deviation = 1.0 - deviation
+        x = (inverse_deviation * self.start.x) + (deviation * self.end.x)
+        y = (inverse_deviation * self.start.y) + (deviation * self.end.y)
+        return Point(x=x, y=y)

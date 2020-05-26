@@ -138,17 +138,17 @@ def run_simulation(env, agents, episodes=1, max_timesteps=1000, render=True, key
             if done:
                 total_timesteps += timestep
                 episode_time, episode_ratio = measure_time(episode_start_time, timestep)
-                logging.info(f"episode={episode}: terminated after {timestep} timestep(s) in {round(episode_time, 2)} ms at {round(episode_ratio, 2)}:1 real-time")
+                logging.info(f"episode={episode}: terminated after {timestep} timestep(s) taking {round(episode_time, 2):g} ms ({round(episode_ratio, 2):g}:1 real-time)")
                 break
         else:
             total_timesteps += timestep
             episode_time, episode_ratio = measure_time(episode_start_time, timestep)
-            logger.info(f"episode={episode}: completed after {timestep} timestep(s) in {round(episode_time, 2)} ms at {round(episode_ratio, 2)}:1 real-time")
+            logger.info(f"episode={episode}: completed after {timestep} timestep(s) taking {round(episode_time, 2):g} ms ({round(episode_ratio, 2):g}:1 real-time)")
             if record_dir is not None:
                 env.stats_recorder.done = True  # need to manually tell the monitor that the episode is over (not sure why)
 
     run_time, run_ratio = measure_time(run_start_time, total_timesteps)
-    logger.info(f"completed after {episodes} episode(s) across {total_timesteps} timestep(s) in {round(run_time, 2)} ms at {round(run_ratio, 2)}:1 real-time")
+    logger.info(f"completed after {episodes} episode(s) totalling {total_timesteps} timestep(s) taking {round(run_time, 2):g} ms ({round(run_ratio, 2):g}:1 real-time)")
 
     env.close()
 
