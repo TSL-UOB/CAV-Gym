@@ -30,8 +30,8 @@ env_constants = CAVEnvConstants(
 bounding_box = road_map.major_road.bounding_box()
 spawn_offset = road_map.major_road.constants.lane_width * 0.5
 spawn_position_lines = [
-    geometry.Line(start=geometry.Point(0, spawn_offset).transform(0, bounding_box.rear_left), end=geometry.Point(0, spawn_offset).transform(0, bounding_box.front_left)),
-    geometry.Line(start=geometry.Point(0, -spawn_offset).transform(0, bounding_box.rear_right), end=geometry.Point(0, -spawn_offset).transform(0, bounding_box.front_right))
+    geometry.Line(start=geometry.Point(0, spawn_offset).translate(bounding_box.rear_left), end=geometry.Point(0, spawn_offset).translate(bounding_box.front_left)),
+    geometry.Line(start=geometry.Point(0, -spawn_offset).translate(bounding_box.rear_right), end=geometry.Point(0, -spawn_offset).translate(bounding_box.front_right))
 ]
 spawn_orientations = [road_map.major_road.outbound.orientation, road_map.major_road.inbound.orientation]
 

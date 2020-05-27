@@ -19,6 +19,8 @@ class Point:
         return anchor + self
 
     def rotate(self, angle):  # Rotate point around (0, 0)
+        if angle == 0:
+            return self
         cos_angle = math.cos(angle)
         sin_angle = math.sin(angle)
         rotated_x = (cos_angle * self.x) - (sin_angle * self.y)
@@ -31,7 +33,10 @@ class Point:
         return Point(center.x + (dist_x * scale), center.y + (dist_y * scale))
 
     def transform(self, angle, anchor):
-        return self.rotate(angle).translate(anchor)
+        if angle == 0:
+            return self.translate(anchor)
+        else:
+            return self.rotate(angle).translate(anchor)
 
     def __copy__(self):
         return Point(self.x, self.y)
@@ -46,6 +51,9 @@ class Point:
 
 class Shape:
     def __iter__(self):
+        raise NotImplementedError
+
+    def translate(self, position):
         raise NotImplementedError
 
     def transform(self, orientation, position):
@@ -68,13 +76,24 @@ class ConvexQuadrilateral(Shape):
         yield tuple(self.front_right)
         yield tuple(self.rear_right)
 
-    def transform(self, orientation, position):
+    def translate(self, position):
         return ConvexQuadrilateral(
-            rear_left=self.rear_left.transform(orientation, position),
-            front_left=self.front_left.transform(orientation, position),
-            front_right=self.front_right.transform(orientation, position),
-            rear_right=self.rear_right.transform(orientation, position)
+            rear_left=self.rear_left.translate(position),
+            front_left=self.front_left.translate(position),
+            front_right=self.front_right.translate(position),
+            rear_right=self.rear_right.translate(position)
         )
+
+    def transform(self, orientation, position):
+        if orientation == 0:
+            return self.translate(position)
+        else:
+            return ConvexQuadrilateral(
+                rear_left=self.rear_left.transform(orientation, position),
+                front_left=self.front_left.transform(orientation, position),
+                front_right=self.front_right.transform(orientation, position),
+                rear_right=self.rear_right.transform(orientation, position)
+            )
 
     def centre(self):
         return Point((self.front_left.x + self.rear_right.x) * 0.5, (self.front_left.y + self.rear_right.y) * 0.5)
@@ -179,11 +198,20 @@ class CircleSegment(Shape):
         for point in self.arc:
             yield tuple(point)
 
-    def transform(self, orientation, position):
+    def translate(self, position):
         return CircleSegment(
-            rear=self.rear.transform(orientation, position),
-            arc=[point.transform(orientation, position) for point in self.arc]
+            rear=self.rear.translate(position),
+            arc=[point.translate(position) for point in self.arc]
         )
+
+    def transform(self, orientation, position):
+        if orientation == 0:
+            return self.translate(position)
+        else:
+            return CircleSegment(
+                rear=self.rear.transform(orientation, position),
+                arc=[point.transform(orientation, position) for point in self.arc]
+            )
 
 
 def make_circle_segment(radius, angle, anchor=Point(0, 0), angle_left_offset=0.5):
@@ -241,12 +269,22 @@ class Triangle(Shape):
                 front_right=self.front_left
             )
 
-    def transform(self, orientation, position):
+    def translate(self, position):
         return Triangle(
-            rear=self.rear.transform(orientation, position),
-            front_left=self.front_left.transform(orientation, position),
-            front_right=self.front_right.transform(orientation, position)
+            rear=self.rear.translate(position),
+            front_left=self.front_left.translate(position),
+            front_right=self.front_right.translate(position)
         )
+
+    def transform(self, orientation, position):
+        if orientation == 0:
+            return self.translate(orientation)
+        else:
+            return Triangle(
+                rear=self.rear.transform(orientation, position),
+                front_left=self.front_left.transform(orientation, position),
+                front_right=self.front_right.transform(orientation, position)
+            )
 
 
 def normalise_angle(radians):
@@ -266,11 +304,20 @@ class Line(Shape):
         yield tuple(self.start)
         yield tuple(self.end)
 
-    def transform(self, orientation, position):
+    def translate(self, position):
         return Line(
-            start=self.start.transform(orientation, position),
-            end=self.end.transform(orientation, position)
+            start=self.start.translate(position),
+            end=self.end.translate(position)
         )
+
+    def transform(self, orientation, position):
+        if orientation == 0:
+            return self.translate(position)
+        else:
+            return Line(
+                start=self.start.transform(orientation, position),
+                end=self.end.transform(orientation, position)
+            )
 
     def closest_point_from(self, point):  # https://stackoverflow.com/a/47198877
         dx, dy = self.end.x - self.start.x, self.end.y - self.start.y

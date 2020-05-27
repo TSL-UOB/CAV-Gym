@@ -164,4 +164,4 @@ class BusStop:
     def __init__(self, constants):
         self.constants = constants
 
-        self.static_bounding_box = geometry.make_rectangle(self.constants.road_direction.lane_width * 3, self.constants.road_direction.lane_width * 0.75, left_offset=0).transform(0, Point(self.constants.x_position, 0).transform(0, self.constants.road_direction.static_bounding_box.rear_left))
+        self.static_bounding_box = geometry.make_rectangle(self.constants.road_direction.lane_width * 3, self.constants.road_direction.lane_width * 0.75, left_offset=0).translate(Point(self.constants.x_position, 0).translate(self.constants.road_direction.static_bounding_box.rear_left))

@@ -153,7 +153,24 @@ class CAVEnv(MarkovGameEnv):
                 joint_observation.append(EmptyObservation.NONE.value)
 
         collidable_entities = self.collidable_entities()
-        joint_reward = [-1 if not isinstance(actor, PelicanCrossing) and any(actor.bounding_box().intersects(entity.bounding_box()) for entity in collidable_entities if actor is not entity) else 0 for actor in self.actors]
+        collidable_bounding_boxes = [entity.bounding_box() for entity in collidable_entities]  # no need to recompute bounding boxes
+        collided_entities = list()  # record collided entities so that they can be skipped in subsequent iterations
+
+        def collision_detected(entity):
+            if entity in collided_entities:
+                return True
+            entity_bounding_box = collidable_bounding_boxes[collidable_entities.index(entity)]
+            for other, other_bounding_box in zip(collidable_entities, collidable_bounding_boxes):
+                if entity is not other and other not in collided_entities and entity_bounding_box.intersects(other_bounding_box):
+                    collided_entities.append(entity)
+                    collided_entities.append(other)  # other can be skipped in future because we know it has collided with entity
+                    return True
+            else:
+                collidable_entities.remove(entity)
+                collidable_bounding_boxes.remove(entity_bounding_box)  # ensure that this list matches collidable_entities
+                return False
+
+        joint_reward = [-1 if not isinstance(actor, PelicanCrossing) and collision_detected(actor) else 0 for actor in self.actors]
 
         return joint_observation, joint_reward, any(reward < 0 for reward in joint_reward), None
 
