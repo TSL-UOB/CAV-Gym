@@ -38,7 +38,7 @@ def parse_arguments():
     def positive_int(value):
         ivalue = int(value)
         if ivalue < 1:
-            raise argparse.ArgumentTypeError(f"invalid poisitve int value: {value}")
+            raise argparse.ArgumentTypeError(f"invalid positive int value: {value}")
         return ivalue
 
     parser = argparse.ArgumentParser()
@@ -114,42 +114,41 @@ def run_simulation(env, agents, episodes=1, max_timesteps=1000, render=True, key
 
     total_timesteps = 0
     run_start_time = timeit.default_timer()
-    for completed_episodes in range(episodes):  # initially completed_episodes=0
+    for previous_episode in range(episodes):  # initially previous_episode=0
         episode_start_time = timeit.default_timer()
-        episode = completed_episodes + 1
+        episode = previous_episode + 1
 
         joint_observation = env.reset()
         logger.debug(f"init: observation={joint_observation}")
-        done = False
 
         for agent in agents:
             agent.reset()
 
-        for completed_timesteps in range(max_timesteps):  # initially completed_timesteps=0
-            timestep = completed_timesteps + 1
+        for previous_timestep in range(max_timesteps):  # initially previous_timestep=0
+            timestep = previous_timestep + 1
 
             if render:
                 env.render()
-
-            if done:
-                total_timesteps += completed_timesteps
-                episode_time, episode_ratio = measure_time(episode_start_time, completed_timesteps)
-                logging.info(f"episode={episode}: terminated after {completed_timesteps} timestep(s) taking {round(episode_time, 2):g} ms ({round(episode_ratio, 2):g}:1 real-time)")
-                break
 
             joint_action = [agent.choose_action(previous_observation, action_space) for agent, previous_observation, action_space in zip(agents, joint_observation, env.action_space)]
             joint_observation, joint_reward, done, info = env.step(joint_action)
 
             logger.debug(f"timestep={timestep}: action={joint_action} observation={joint_observation} reward={joint_reward} done={done} info={info}")
+
+            if done:
+                total_timesteps += timestep
+                episode_time, episode_ratio = measure_time(episode_start_time, timestep)
+                logging.info(f"episode={episode}: terminated after {timestep} timestep(s) taking {round(episode_time, 2):g} ms ({round(episode_ratio, 2):g}:1 real-time)")
+                break
         else:
-            total_timesteps += completed_timesteps
-            episode_time, episode_ratio = measure_time(episode_start_time, completed_timesteps)
-            logger.info(f"episode={episode}: completed after {completed_timesteps} timestep(s) taking {round(episode_time, 2):g} ms ({round(episode_ratio, 2):g}:1 real-time)")
+            total_timesteps += timestep
+            episode_time, episode_ratio = measure_time(episode_start_time, timestep)
+            logger.info(f"episode={episode}: completed after {timestep} timestep(s) taking {round(episode_time, 2):g} ms ({round(episode_ratio, 2):g}:1 real-time)")
             if record_dir is not None:
                 env.stats_recorder.done = True  # need to manually tell the monitor that the episode is over (not sure why)
-
-    run_time, run_ratio = measure_time(run_start_time, total_timesteps)
-    logger.info(f"completed after {episodes} episode(s) totalling {total_timesteps} timestep(s) taking {round(run_time, 2):g} ms ({round(run_ratio, 2):g}:1 real-time)")
+    else:
+        run_time, run_ratio = measure_time(run_start_time, total_timesteps)
+        logger.info(f"completed after {episode} episode(s) totalling {total_timesteps} timestep(s) taking {round(run_time, 2):g} ms ({round(run_ratio, 2):g}:1 real-time)")
 
     env.close()
 
