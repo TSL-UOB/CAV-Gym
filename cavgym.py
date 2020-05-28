@@ -10,7 +10,7 @@ from gym.utils import seeding
 from cavgym.agents import RandomTrafficLightAgent, RandomVehicleAgent, KeyboardAgent, RandomConstrainedPedestrianAgent
 from cavgym import mods, Scenario
 from cavgym.actors import DynamicActor, TrafficLight, PelicanCrossing, Pedestrian
-
+from cavgym.environment import RenderMode
 
 root = logging.getLogger()
 root.setLevel(logging.INFO)
@@ -66,16 +66,17 @@ def parse_arguments():
 def run(scenario, episodes=1, max_timesteps=1000, render=True, keyboard_agent=None, record_dir=None, debug=False, seed=None):
     if debug:
         root.setLevel(logging.DEBUG)
+    mode = RenderMode.VIDEO if render and record_dir is not None else RenderMode.SCREEN if render else RenderMode.NONE
     np_random, np_seed = seeding.np_random(seed)
     logger.info(f"seed={np_seed}")
     if scenario is Scenario.PELICAN_CROSSING:
-        env = gym.make('PelicanCrossing-v0', np_random=np_random)
+        env = gym.make('PelicanCrossing-v0', mode=mode, np_random=np_random)
     elif scenario is Scenario.BUS_STOP:
-        env = gym.make('BusStop-v0', np_random=np_random)
+        env = gym.make('BusStop-v0', mode=mode, np_random=np_random)
     elif scenario is Scenario.CROSSROADS:
-        env = gym.make('Crossroads-v0', np_random=np_random)
+        env = gym.make('Crossroads-v0', mode=mode, np_random=np_random)
     elif scenario is Scenario.PEDESTRIANS:
-        env = gym.make('Pedestrians-v0', num_pedestrians=3, np_random=np_random)
+        env = gym.make('Pedestrians-v0', num_pedestrians=3, mode=mode, np_random=np_random)
     else:
         raise NotImplementedError
     agent = keyboard_agent if keyboard_agent is not None else RandomVehicleAgent(np_random=np_random)
@@ -83,7 +84,7 @@ def run(scenario, episodes=1, max_timesteps=1000, render=True, keyboard_agent=No
     for actor in env.actors[1:]:
         if isinstance(actor, DynamicActor):
             if isinstance(actor, Pedestrian):
-                agents.append(RandomConstrainedPedestrianAgent(np_random=np_random))
+                agents.append(RandomConstrainedPedestrianAgent(frequency=env.frequency, np_random=np_random))
             else:
                 agents.append(RandomVehicleAgent(np_random=np_random))
         elif isinstance(actor, TrafficLight) or isinstance(actor, PelicanCrossing):
@@ -109,7 +110,7 @@ def run_simulation(env, agents, episodes=1, max_timesteps=1000, render=True, key
 
     def measure_time(start_time, timesteps):
         time_ms = (timeit.default_timer() - start_time) * 1000
-        real_time_ratio = (timesteps * env.constants.time_resolution * 1000) / time_ms
+        real_time_ratio = (timesteps * env.time_resolution * 1000) / time_ms
         return time_ms, real_time_ratio
 
     total_timesteps = 0

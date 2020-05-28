@@ -1,4 +1,6 @@
+import logging
 from dataclasses import dataclass
+from enum import Enum
 
 import gym
 from gym import spaces
@@ -10,6 +12,9 @@ from cavgym.actors import PelicanCrossing, DynamicActor, TrafficLight
 from cavgym.observations import OrientationObservation, EmptyObservation, VelocityObservation, RoadObservation
 from cavgym.rendering import RoadEnvViewer
 from cavgym.assets import RoadMap, Occlusion
+
+
+logger = logging.getLogger(__name__)
 
 
 class MarkovGameEnv(gym.Env):
@@ -48,8 +53,13 @@ class MarkovGameEnv(gym.Env):
 class CAVEnvConstants:
     viewer_width: int
     viewer_height: int
-    time_resolution: float
     road_map: RoadMap
+
+
+class RenderMode(Enum):
+    NONE = 0
+    SCREEN = 1
+    VIDEO = 2
 
 
 class CAVEnv(MarkovGameEnv):
@@ -57,11 +67,16 @@ class CAVEnv(MarkovGameEnv):
         'render.modes': ['human', 'rgb_array']
     }
 
-    def __init__(self, actors, constants, np_random=seeding.np_random(None)[0]):
+    def __init__(self, actors, constants, mode=RenderMode.SCREEN, np_random=seeding.np_random(None)[0]):
         self.actors = actors
         self.constants = constants
-
+        self.mode = mode
         self.np_random = np_random
+
+        self.frequency = 30 if self.mode is RenderMode.VIDEO else 60  # frequency appears to be locked by Gym
+        self.time_resolution = 1.0 / self.frequency
+
+        logger.info(f"frequency={self.frequency}")
 
         def set_np_random(space):
             space.np_random = self.np_random
@@ -114,7 +129,7 @@ class CAVEnv(MarkovGameEnv):
             actor.step_action(joint_action, index)
 
         for actor in self.actors:
-            actor.step_dynamics(self.constants.time_resolution)
+            actor.step_dynamics(self.time_resolution)
 
         joint_observation = list()
         for actor in self.actors:

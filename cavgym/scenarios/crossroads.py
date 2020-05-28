@@ -44,7 +44,6 @@ road_map = RoadMap(
 env_constants = CAVEnvConstants(
     viewer_width=road_map.major_road.constants.length,
     viewer_height=sum(minor_road.constants.length for minor_road in road_map.minor_roads) - major_road.width,
-    time_resolution=1.0 / 60.0,
     road_map=road_map
 )
 

@@ -23,7 +23,6 @@ road_map = RoadMap(
 env_constants = CAVEnvConstants(
     viewer_width=road_map.major_road.constants.length,
     viewer_height=road_map.major_road.width + (road_map.major_road.constants.lane_width * 2),
-    time_resolution=1.0 / 60.0,
     road_map=road_map
 )
 
@@ -37,7 +36,7 @@ spawn_orientations = [road_map.major_road.outbound.orientation, road_map.major_r
 
 
 class PedestriansEnv(CAVEnv):
-    def __init__(self, num_pedestrians=3, np_random=seeding.np_random(None)[0]):
+    def __init__(self, num_pedestrians=3, np_random=seeding.np_random(None)[0], **kwargs):
         def spawn_pedestrian():
             return SpawnPedestrian(
                 spawn_init_state=SpawnPedestrianState(
@@ -65,4 +64,4 @@ class PedestriansEnv(CAVEnv):
         ]
         actors += [spawn_pedestrian() for _ in range(num_pedestrians)]
 
-        super().__init__(actors=actors, constants=env_constants, np_random=np_random)
+        super().__init__(actors=actors, constants=env_constants, np_random=np_random, **kwargs)

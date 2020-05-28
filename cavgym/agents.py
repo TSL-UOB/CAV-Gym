@@ -149,7 +149,9 @@ class RandomPedestrianAgent(RandomAgent):
 
 
 class RandomConstrainedPedestrianAgent(RandomAgent):
-    def __init__(self, epsilon=0.005, **kwargs):
+    def __init__(self, frequency, epsilon=0.005, **kwargs):
+        self.frequency = frequency
+
         super().__init__(epsilon=epsilon, **kwargs)
 
         self.crossing_action = None
@@ -202,7 +204,7 @@ class RandomConstrainedPedestrianAgent(RandomAgent):
             self.entered_road = True
         elif self.crossing_action is not None and self.entered_road and road_observation is not RoadObservation.ON_ROAD:
             self.delay_count += 1
-            if self.delay_count >= 30:
+            if self.delay_count >= self.frequency * 0.5:  # half a second
                 orientation_action = self.reorientate_action[self.crossing_action]
                 self.crossing_action = None
                 self.entered_road = False

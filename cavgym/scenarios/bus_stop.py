@@ -29,7 +29,6 @@ road_map.major_road.outbound.set_bus_stop(
 env_constants = CAVEnvConstants(
     viewer_width=road_map.major_road.constants.length,
     viewer_height=road_map.major_road.constants.lane_width * (road_map.major_road.constants.num_outbound_lanes + road_map.major_road.constants.num_inbound_lanes + 2),
-    time_resolution=1.0 / 60.0,
     road_map=road_map
 )
 
