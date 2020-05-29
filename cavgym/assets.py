@@ -114,6 +114,8 @@ class RoadMap:
         self.major_road = major_road
         self.minor_roads = minor_roads
 
+        self.roads = [self.major_road] + (self.minor_roads if self.minor_roads is not None else list())
+
         if self.minor_roads is not None:
             road_partitions = [minor_road.static_bounding_box.split_longitudinally(rear_percentage=self.major_road.width / minor_road.constants.length) for minor_road in self.minor_roads]
 

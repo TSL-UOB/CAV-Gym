@@ -62,6 +62,14 @@ class Shape:
     def intersects(self, other):
         return Polygon(list(self)).intersects(Polygon(list(other)))
 
+    def contains(self, other):
+        return Polygon(list(self)).contains(Polygon(list(other)))
+
+    def mostly_intersects(self, other):
+        self_polygon = Polygon(list(self))
+        self_polygon_intersection = self_polygon.intersection(Polygon(list(other)))
+        return self_polygon_intersection.area / self_polygon.area > 0.5
+
 
 @dataclass(frozen=True)
 class ConvexQuadrilateral(Shape):

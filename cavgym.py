@@ -4,6 +4,7 @@ import sys
 import timeit
 
 import gym
+import numpy as np
 from gym import wrappers
 from gym.utils import seeding
 
@@ -113,6 +114,13 @@ def run_simulation(env, agents, episodes=1, max_timesteps=1000, render=True, key
         real_time_ratio = (timesteps * env.time_resolution * 1000) / time_ms
         return time_ms, real_time_ratio
 
+    def pretty_float(float_value, decimal_places=2):
+        return f"{round(float_value, decimal_places):g}"
+
+    def pretty_float_list(float_list, **kwargs):
+        content = ", ".join([pretty_float(float_value, **kwargs) for float_value in float_list])
+        return f"[{content}]"
+
     total_timesteps = 0
     run_start_time = timeit.default_timer()
     for previous_episode in range(episodes):  # initially previous_episode=0
@@ -139,17 +147,20 @@ def run_simulation(env, agents, episodes=1, max_timesteps=1000, render=True, key
             if done:
                 total_timesteps += timestep
                 episode_time, episode_ratio = measure_time(episode_start_time, timestep)
-                logging.info(f"episode={episode}: terminated after {timestep} timestep(s) taking {round(episode_time, 2):g} ms ({round(episode_ratio, 2):g}:1 real-time)")
+                logging.info(f"episode={episode}: terminated after {timestep} timestep(s) taking {pretty_float(episode_time)} ms ({pretty_float(episode_ratio)}:1 real-time)")
+                logger.info(f"liveness={pretty_float_list(env.episode_liveness / timestep)}")
                 break
         else:
             total_timesteps += timestep
             episode_time, episode_ratio = measure_time(episode_start_time, timestep)
-            logger.info(f"episode={episode}: completed after {timestep} timestep(s) taking {round(episode_time, 2):g} ms ({round(episode_ratio, 2):g}:1 real-time)")
+            logger.info(f"episode={episode}: completed after {timestep} timestep(s) taking {pretty_float(episode_time)} ms ({pretty_float(episode_ratio)}:1 real-time)")
+            logger.info(f"liveness={pretty_float_list(env.episode_liveness / timestep)}")
             if record_dir is not None:
                 env.stats_recorder.done = True  # need to manually tell the monitor that the episode is over (not sure why)
     else:
         run_time, run_ratio = measure_time(run_start_time, total_timesteps)
-        logger.info(f"completed after {episode} episode(s) totalling {total_timesteps} timestep(s) taking {round(run_time, 2):g} ms ({round(run_ratio, 2):g}:1 real-time)")
+        logger.info(f"completed after {episode} episode(s) totalling {total_timesteps} timestep(s) taking {pretty_float(run_time)} ms ({pretty_float(run_ratio)}:1 real-time)")
+        logger.info(f"liveness={pretty_float_list(env.run_liveness / total_timesteps)}")
 
     env.close()
 

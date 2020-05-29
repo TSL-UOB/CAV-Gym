@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 import gym
+import numpy as np
 from gym import spaces
 from gym.utils import seeding
 
@@ -109,6 +110,9 @@ class CAVEnv(MarkovGameEnv):
         self.observation_space = spaces.Tuple(observation_spaces)
         set_np_random(self.observation_space)
 
+        self.episode_liveness = np.zeros(len(self.actors))
+        self.run_liveness = np.zeros(len(self.actors))
+
         self.ego = self.actors[0]
 
         self.viewer = None
@@ -187,11 +191,17 @@ class CAVEnv(MarkovGameEnv):
 
         joint_reward = [-1 if not isinstance(actor, PelicanCrossing) and collision_detected(actor) else 0 for actor in self.actors]
 
+        for i, actor in enumerate(self.actors):
+            if any(actor.bounding_box().mostly_intersects(road.bounding_box()) for road in self.constants.road_map.roads):
+                self.episode_liveness[i] += 1
+                self.run_liveness[i] += 1
+
         return joint_observation, joint_reward, any(reward < 0 for reward in joint_reward), None
 
     def reset(self):
         for actor in self.actors:
             actor.reset()
+        self.episode_liveness = np.zeros(len(self.actors))
         return list(self.observation_space.sample())
 
     def render(self, mode='human'):
