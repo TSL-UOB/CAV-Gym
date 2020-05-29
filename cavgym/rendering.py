@@ -94,8 +94,8 @@ class VehicleView(DynamicActorView):
 
         self.scale = {
             BulbState.OFF: 0.0,
-            BulbState.DIM: vehicle.constants.width * 0.15,
-            BulbState.FULL: vehicle.constants.width * 0.2
+            BulbState.DIM: vehicle.constants.width * 0.1,
+            BulbState.FULL: vehicle.constants.width * 0.15
         }
 
         indicator_bounding_box = vehicle.indicators()
@@ -158,38 +158,34 @@ class CarView(VehicleView):
         self.roof.v = list(car.roof())
 
 
+def make_head(actor):
+    head = mods.make_circle(*actor.state.position, actor.constants.width * 0.3)
+    head.set_color(0.5, 0.5, 0.5)
+    return head
+
+
 class BicycleView(DynamicActorView):
     def __init__(self, bicycle, ego, road):
         super().__init__(bicycle, ego, road)
 
-        self.head = self.make_head(bicycle)
-
-    def make_head(self, bicycle):
-        head = mods.make_circle(*bicycle.state.position, bicycle.constants.width * 0.3)
-        head.set_color(0.5, 0.5, 0.5)
-        return head
+        self.head = make_head(bicycle)
 
     def update(self, bicycle, ego):
         super().update(bicycle, ego)
 
-        self.head.v = self.make_head(bicycle).v
+        self.head.v = make_head(bicycle).v
 
 
 class PedestrianView(DynamicActorView):
     def __init__(self, pedestrian, ego, road):
         super().__init__(pedestrian, ego, road)
 
-        self.head = self.make_head(pedestrian)
-
-    def make_head(self, pedestrian):
-        head = mods.make_circle(*pedestrian.state.position, pedestrian.constants.length * 0.4)
-        head.set_color(0.5, 0.5, 0.5)
-        return head
+        self.head = make_head(pedestrian)
 
     def update(self, pedestrian, ego):
         super().update(pedestrian, ego)
 
-        self.head.v = self.make_head(pedestrian).v
+        self.head.v = make_head(pedestrian).v
 
 
 class TrafficLightView(ActorView, OcclusionView):

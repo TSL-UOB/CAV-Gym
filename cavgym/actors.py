@@ -41,7 +41,7 @@ class DynamicActorState:
     position: geometry.Point
     velocity: float
     orientation: float
-    acceleration: int
+    acceleration: float
     angular_velocity: float
 
     def __copy__(self):
@@ -50,20 +50,20 @@ class DynamicActorState:
 
 @dataclass(frozen=True)
 class DynamicActorConstants:
-    length: int
-    width: int
-    wheelbase: int
+    length: float
+    width: float
+    wheelbase: float
 
-    min_velocity: int
-    max_velocity: int
+    min_velocity: float
+    max_velocity: float
 
-    acceleration_rate: int
-    deceleration_rate: int
+    acceleration_rate: float
+    deceleration_rate: float
     left_turn_rate: float
     right_turn_rate: float
 
-    target_slow_velocity: int
-    target_fast_velocity: int
+    target_slow_velocity: float
+    target_fast_velocity: float
 
     def __post_init__(self):
         assert self.min_velocity <= self.target_slow_velocity <= self.max_velocity
@@ -229,7 +229,7 @@ class SpawnPedestrianState:
     position_lines: list
     velocity: float
     orientations: list
-    acceleration: int
+    acceleration: float
     angular_velocity: float
 
 

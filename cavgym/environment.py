@@ -195,7 +195,10 @@ class CAVEnv(MarkovGameEnv):
                 self.episode_liveness[i] += 1
                 self.run_liveness[i] += 1
 
-        return joint_observation, joint_reward, any(reward < 0 for reward in joint_reward), None
+        collision_occurred = any(reward < 0 for reward in joint_reward)
+        ego_on_road = any(self.ego.bounding_box().intersects(road.bounding_box()) for road in self.constants.road_map.roads)
+
+        return joint_observation, joint_reward, collision_occurred or not ego_on_road, None
 
     def reset(self):
         for actor in self.actors:

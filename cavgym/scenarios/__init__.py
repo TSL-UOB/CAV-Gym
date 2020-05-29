@@ -1,58 +1,60 @@
 from cavgym import geometry
 from cavgym.actors import DynamicActorConstants
 
+M2PX = 16  # pixels per metre
+
 car_constants = DynamicActorConstants(
-    length=50,
-    width=20,
-    wheelbase=45,
+    length=M2PX * 4.5,
+    width=M2PX * 1.75,
+    wheelbase=M2PX * 4.05,
     min_velocity=0,
-    max_velocity=200,
-    acceleration_rate=60,
-    deceleration_rate=-80,
-    left_turn_rate=geometry.DEG2RAD * 45,
-    right_turn_rate=geometry.DEG2RAD * -45,
-    target_slow_velocity=50,
-    target_fast_velocity=100
+    max_velocity=M2PX * 9,
+    acceleration_rate=M2PX * 9,
+    deceleration_rate=M2PX * -9,
+    left_turn_rate=geometry.DEG2RAD * 30,
+    right_turn_rate=geometry.DEG2RAD * -30,
+    target_slow_velocity=M2PX * 4.5,
+    target_fast_velocity=M2PX * 9
 )
 
 pedestrian_constants = DynamicActorConstants(
-    length=10,
-    width=15,
-    wheelbase=9,
+    length=M2PX * 0.65625,
+    width=M2PX * 0.875,
+    wheelbase=M2PX * 0.328125,
     min_velocity=0,
-    max_velocity=40,
-    acceleration_rate=200,
-    deceleration_rate=-200,
+    max_velocity=M2PX * 1.4,
+    acceleration_rate=M2PX * 1.4,
+    deceleration_rate=M2PX * -1.4,
     left_turn_rate=geometry.DEG2RAD * 90,
     right_turn_rate=geometry.DEG2RAD * -90,
-    target_slow_velocity=20,
-    target_fast_velocity=40
+    target_slow_velocity=M2PX * 0.7,
+    target_fast_velocity=M2PX * 1.4
 )
 
 bus_constants = DynamicActorConstants(
-    length=100,
-    width=25,
-    wheelbase=90,
+    length=M2PX * 12,
+    width=M2PX * 2.55,
+    wheelbase=M2PX * 16.875,
     min_velocity=0,
-    max_velocity=150,
-    acceleration_rate=45,
-    deceleration_rate=-60,
-    left_turn_rate=geometry.DEG2RAD * 45,
-    right_turn_rate=geometry.DEG2RAD * -45,
-    target_slow_velocity=40,
-    target_fast_velocity=80
+    max_velocity=M2PX * 6.75,
+    acceleration_rate=M2PX * 6.75,
+    deceleration_rate=-M2PX * 6.75,
+    left_turn_rate=geometry.DEG2RAD * 30,
+    right_turn_rate=geometry.DEG2RAD * -30,
+    target_slow_velocity=M2PX * 3.375,
+    target_fast_velocity=M2PX * 6.75
 )
 
 bicycle_constants = DynamicActorConstants(
-    length=30,
-    width=10,
-    wheelbase=18,
+    length=M2PX * 2.25,
+    width=M2PX * 0.875,
+    wheelbase=M2PX * 2.025,
     min_velocity=0,
-    max_velocity=100,
-    acceleration_rate=30,
-    deceleration_rate=-40,
+    max_velocity=M2PX * 4.5,
+    acceleration_rate=M2PX * 4.5,
+    deceleration_rate=-M2PX * 4.5,
     left_turn_rate=geometry.DEG2RAD * 90,
     right_turn_rate=geometry.DEG2RAD * -90,
-    target_slow_velocity=30,
-    target_fast_velocity=60
+    target_slow_velocity=M2PX * 2.25,
+    target_fast_velocity=M2PX * 4.5
 )

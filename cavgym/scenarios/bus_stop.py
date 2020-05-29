@@ -2,15 +2,15 @@ from cavgym import geometry
 from cavgym.actors import DynamicActorState, Bus, Car, Bicycle
 from cavgym.environment import CAVEnvConstants, RoadMap, CAVEnv
 from cavgym.assets import Road, RoadConstants, BusStop, BusStopConstants
-from cavgym.scenarios import car_constants, bicycle_constants, bus_constants
+from cavgym.scenarios import car_constants, bicycle_constants, bus_constants, M2PX
 
 road_map = RoadMap(
     major_road=Road(
         constants=RoadConstants(
-            length=1600,
+            length=M2PX * 99,
             num_outbound_lanes=3,
             num_inbound_lanes=0,
-            lane_width=40,
+            lane_width=M2PX * 3.65,
             position=geometry.Point(0.0, 0.0),
             orientation=geometry.DEG2RAD * 0.0
         )
@@ -21,14 +21,15 @@ road_map.major_road.outbound.set_bus_stop(
     BusStop(
         BusStopConstants(
             road_direction=road_map.major_road.outbound,
-            x_position=1200
+            x_position=M2PX * 99 * 0.75,
+            length=bus_constants.length * 1.25
         )
     )
 )
 
 env_constants = CAVEnvConstants(
     viewer_width=road_map.major_road.constants.length,
-    viewer_height=road_map.major_road.constants.lane_width * (road_map.major_road.constants.num_outbound_lanes + road_map.major_road.constants.num_inbound_lanes + 2),
+    viewer_height=road_map.major_road.width + ((M2PX * 3) * 2),
     road_map=road_map
 )
 
@@ -36,9 +37,9 @@ actors = [
     Car(
         init_state=DynamicActorState(
             position=geometry.Point(200, 0).rotate(road_map.major_road.outbound.orientation).translate(road_map.major_road.outbound.lanes[0].spawn),
-            velocity=100.0,
+            velocity=car_constants.target_fast_velocity,
             orientation=road_map.major_road.outbound.orientation,
-            acceleration=0,
+            acceleration=0.0,
             angular_velocity=0.0
         ),
         constants=car_constants
@@ -46,9 +47,9 @@ actors = [
     Bus(
         init_state=DynamicActorState(
             position=geometry.Point(400, 0).rotate(road_map.major_road.outbound.orientation).translate(road_map.major_road.outbound.lanes[0].spawn),
-            velocity=100.0,
+            velocity=bus_constants.target_fast_velocity,
             orientation=road_map.major_road.outbound.orientation,
-            acceleration=0,
+            acceleration=0.0,
             angular_velocity=0.0
         ),
         constants=bus_constants
@@ -56,9 +57,9 @@ actors = [
     Car(
         init_state=DynamicActorState(
             position=road_map.major_road.outbound.lanes[0].spawn,
-            velocity=100.0,
+            velocity=car_constants.target_fast_velocity,
             orientation=road_map.major_road.outbound.orientation,
-            acceleration=0,
+            acceleration=0.0,
             angular_velocity=0.0
         ),
         constants=car_constants
@@ -66,9 +67,9 @@ actors = [
     Car(
         init_state=DynamicActorState(
             position=road_map.major_road.outbound.lanes[1].spawn,
-            velocity=100.0,
+            velocity=car_constants.target_fast_velocity,
             orientation=road_map.major_road.outbound.orientation,
-            acceleration=0,
+            acceleration=0.0,
             angular_velocity=0.0
         ),
         constants=car_constants
@@ -76,9 +77,9 @@ actors = [
     Bicycle(
         init_state=DynamicActorState(
             position=road_map.major_road.outbound.lanes[2].spawn,
-            velocity=100.0,
+            velocity=bicycle_constants.target_fast_velocity,
             orientation=road_map.major_road.outbound.orientation,
-            acceleration=0,
+            acceleration=0.0,
             angular_velocity=0.0
         ),
         constants=bicycle_constants
