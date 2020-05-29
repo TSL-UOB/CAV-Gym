@@ -57,7 +57,7 @@ actors = [
     Car(
         init_state=DynamicActorState(
             position=road_map.major_road.inbound.lanes[0].spawn,
-            velocity=car_constants.target_fast_velocity,
+            velocity=0.0,
             orientation=road_map.major_road.inbound.orientation,
             acceleration=0.0,
             angular_velocity=0.0

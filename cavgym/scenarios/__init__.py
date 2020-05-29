@@ -11,8 +11,8 @@ car_constants = DynamicActorConstants(
     max_velocity=M2PX * 9,
     acceleration_rate=M2PX * 9,
     deceleration_rate=M2PX * -9,
-    left_turn_rate=geometry.DEG2RAD * 30,
-    right_turn_rate=geometry.DEG2RAD * -30,
+    left_turn_rate=geometry.DEG2RAD * 35,
+    right_turn_rate=geometry.DEG2RAD * -35,
     target_slow_velocity=M2PX * 4.5,
     target_fast_velocity=M2PX * 9
 )
