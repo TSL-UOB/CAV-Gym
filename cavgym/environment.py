@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from enum import Enum
 
 import gym
-import numpy as np
 from gym import spaces
 from gym.utils import seeding
 
@@ -110,8 +109,8 @@ class CAVEnv(MarkovGameEnv):
         self.observation_space = spaces.Tuple(observation_spaces)
         set_np_random(self.observation_space)
 
-        self.episode_liveness = np.zeros(len(self.actors))
-        self.run_liveness = np.zeros(len(self.actors))
+        self.episode_liveness = [0 for _ in self.actors]
+        self.run_liveness = [0 for _ in self.actors]
 
         self.ego = self.actors[0]
 
@@ -201,7 +200,7 @@ class CAVEnv(MarkovGameEnv):
     def reset(self):
         for actor in self.actors:
             actor.reset()
-        self.episode_liveness = np.zeros(len(self.actors))
+        self.episode_liveness = [0 for _ in self.actors]
         return list(self.observation_space.sample())
 
     def render(self, mode='human'):
