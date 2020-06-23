@@ -3,13 +3,13 @@ A custom OpenAI Gym environment that supports Markov games (joint actions, joint
 
 ## Scenarios
 
-- Bus stop (seed: 7611184214974169907)
+- Bus stop (seed: 17359833141626636985)
 ![](demos/bus-stop.gif)
-- Crossroads (seed: 4601707189188752413)
+- Crossroads (seed: 8929925869146571446)
 ![](demos/crossroads.gif)
-- Pedestrians (seed: 17639050841746495288)
+- Pedestrians (seed: 3501740327069189902)
 ![](demos/pedestrians.gif)
-- Pelican crossing (seed: 5097019075164056626)
+- Pelican crossing (seed: 18444432827211628117)
 ![](demos/pelican-crossing.gif)
 
 ## Usage

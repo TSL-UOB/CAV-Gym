@@ -53,6 +53,7 @@ class DynamicActorConstants:
     length: float
     width: float
     wheelbase: float
+    track: float
 
     min_velocity: float
     max_velocity: float
@@ -79,6 +80,8 @@ class DynamicActor(Actor, Occlusion):
         self.wheelbase_offset_front = self.constants.wheelbase / 2.0
         self.wheelbase_offset_rear = self.constants.wheelbase / 2.0
 
+        self.wheels = geometry.make_rectangle(self.constants.wheelbase, self.constants.track)
+
         self.target_velocity = None
         self.target_orientation = None
 
@@ -91,11 +94,66 @@ class DynamicActor(Actor, Occlusion):
     def bounding_box(self):
         return self.shape.transform(self.state.orientation, self.state.position)
 
+    def wheel_positions(self):
+        return self.wheels.transform(self.state.orientation, self.state.position)
+
     def stopping_zones(self):
         braking_distance = (self.state.velocity ** 2) / (2 * -self.constants.deceleration_rate)
         reaction_distance = self.state.velocity * REACTION_TIME
-        braking_zone = geometry.make_rectangle(braking_distance, self.constants.width, rear_offset=0).transform(self.state.orientation, Point(self.constants.length * 0.5, 0).transform(self.state.orientation, self.state.position))
-        reaction_zone = geometry.make_rectangle(reaction_distance, self.constants.width, rear_offset=0).transform(self.state.orientation, Point((self.constants.length * 0.5) + braking_distance, 0).transform(self.state.orientation, self.state.position))
+
+        front_remaining_length = (self.constants.length - self.constants.wheelbase) / 2.0
+
+        if self.state.angular_velocity == 0:
+            braking_zone = geometry.make_rectangle(braking_distance, self.constants.width, rear_offset=0).transform(self.state.orientation, Point(self.constants.length * 0.5, 0).transform(self.state.orientation, self.state.position))
+            reaction_zone = geometry.make_rectangle(reaction_distance, self.constants.width, rear_offset=0).transform(self.state.orientation, Point((self.constants.length * 0.5) + braking_distance, 0).transform(self.state.orientation, self.state.position))
+            return braking_zone, reaction_zone
+
+        def find_radius(angle, opposite):
+            opposite_to_adjacent_ratio = abs(math.tan(angle))
+            adjacent = opposite / opposite_to_adjacent_ratio
+            return adjacent
+
+        radius = find_radius(self.state.angular_velocity, self.constants.wheelbase)  # distance from centre of rotation to centre of rear axle
+
+        left_turn = self.state.angular_velocity > 0
+
+        rear_axle_centre_point = self.wheel_positions().rear_centre()
+        relative_rotation_angle = self.state.orientation + (math.pi / 2.0) if left_turn else self.state.orientation - (math.pi / 2.0)
+        rotation_point = Point(radius, 0).transform(relative_rotation_angle, rear_axle_centre_point)
+
+        circle_motion = geometry.Circle(centre=rotation_point, radius=radius)
+
+        arc_start_angle = self.state.orientation - (math.pi / 2.0) if left_turn else self.state.orientation + (math.pi / 2.0)
+
+        angle_braking = circle_motion.arc_from_length(arc_start_angle, braking_distance if left_turn else -braking_distance).arc_angle
+        angle_reaction = circle_motion.arc_from_length(arc_start_angle, reaction_distance if left_turn else -reaction_distance).arc_angle
+
+        radius_min = radius - (self.constants.width / 2.0)
+        radius_mid = math.sqrt((radius_min ** 2) + ((self.constants.wheelbase + front_remaining_length) ** 2))
+        radius_max = math.sqrt(((radius_min + self.constants.width) ** 2) + ((self.constants.wheelbase + front_remaining_length) ** 2))
+
+        circle_min = geometry.Circle(centre=rotation_point, radius=radius_min)
+        circle_mid = geometry.Circle(centre=rotation_point, radius=radius_mid)
+        circle_max = geometry.Circle(centre=rotation_point, radius=radius_max)
+
+        mid_corner = self.bounding_box().front_left if left_turn else self.bounding_box().front_right
+        max_corner = self.bounding_box().front_right if left_turn else self.bounding_box().front_left
+
+        angle_mid = geometry.Triangle(rear=rotation_point, front_left=mid_corner, front_right=rear_axle_centre_point).angle()
+        angle_max = geometry.Triangle(rear=rotation_point, front_left=max_corner, front_right=rear_axle_centre_point).angle()
+
+        braking_min_arc = circle_min.arc_from_angle(arc_start_angle, angle_braking)
+        braking_mid_arc = circle_mid.arc_from_angle(arc_start_angle + angle_mid, angle_braking)
+        braking_max_arc = circle_max.arc_from_angle(arc_start_angle + angle_max, angle_braking)
+
+        braking_zone = geometry.Arrow(left_arc=braking_min_arc, centre_arc=braking_mid_arc, right_arc=braking_max_arc)
+
+        reaction_min_arc = circle_min.arc_from_angle(arc_start_angle + braking_min_arc.arc_angle, angle_reaction)
+        reaction_mid_arc = circle_mid.arc_from_angle(arc_start_angle + braking_mid_arc.arc_angle + angle_mid, angle_reaction)
+        reaction_max_arc = circle_max.arc_from_angle(arc_start_angle + braking_max_arc.arc_angle + angle_max, angle_reaction)
+
+        reaction_zone = geometry.Arrow(left_arc=reaction_min_arc, centre_arc=reaction_mid_arc, right_arc=reaction_max_arc)
+
         return braking_zone, reaction_zone
 
     def line_anchor(self, road):

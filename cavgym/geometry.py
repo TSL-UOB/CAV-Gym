@@ -344,3 +344,86 @@ class Line(Shape):
         x = (inverse_deviation * self.start.x) + (deviation * self.end.x)
         y = (inverse_deviation * self.start.y) + (deviation * self.end.y)
         return Point(x=x, y=y)
+
+
+@dataclass(frozen=True)
+class Circle(Shape):
+    centre: Point
+    radius: float
+
+    def __iter__(self, resolution=30):
+        for i in range(resolution):
+            angle = 2 * math.pi * (i / resolution)
+            yield tuple(self.circumference_point(angle))
+        yield tuple(self.circumference_point(0))
+
+    def translate(self, position):
+        return Circle(
+            centre=self.centre.translate(position),
+            radius=self.radius
+        )
+
+    def transform(self, orientation, position):
+        return self.translate(position)
+
+    def circumference(self):
+        return 2 * math.pi * self.radius
+
+    def circumference_point(self, angle):
+        x = self.radius * math.cos(angle) + self.centre.x
+        y = self.radius * math.sin(angle) + self.centre.y
+        return Point(x, y)
+
+    def arc_from_length(self, start_angle, arc_length):
+        arc_angle = (arc_length / self.circumference()) * (2 * math.pi)
+        return self.arc_from_angle(start_angle, arc_angle)
+
+    def arc_from_angle(self, start_angle, arc_angle):
+        return Arc(circle=self, start_angle=start_angle, arc_angle=arc_angle)
+
+
+@dataclass(frozen=True)
+class Arc(Shape):
+    circle: Circle
+    start_angle: float
+    arc_angle: float
+
+    def __iter__(self, resolution=30):
+        for i in range(resolution):
+            angle = self.arc_angle * (i / resolution)
+            yield tuple(self.circle.circumference_point(self.start_angle + angle))
+        yield tuple(self.circle.circumference_point(self.start_angle + self.arc_angle))
+
+    def translate(self, position):
+        return Arc(circle=self.circle.translate(position), start_angle=self.start_angle, arc_angle=self.arc_angle)
+
+    def transform(self, orientation, position):
+        if orientation == 0:
+            return self.translate(position)
+        else:
+            return Arc(circle=self.circle.translate(position), start_angle=self.start_angle + orientation, arc_angle=self.arc_angle)
+
+
+@dataclass(frozen=True)
+class Arrow(Shape):
+    left_arc: Arc
+    centre_arc: Arc
+    right_arc: Arc
+
+    def __iter__(self, resolution=30):
+        for point in reversed(list(self.right_arc)):
+            yield tuple(point)
+        centre_points = list(self.centre_arc)
+        yield tuple(centre_points[0])
+        for point in self.left_arc:
+            yield tuple(point)
+        yield tuple(centre_points[-1])
+
+    def translate(self, position):
+        return Arrow(left_arc=self.left_arc.translate(position), centre_arc=self.centre_arc.translate(position), right_arc=self.right_arc.translate(position))
+
+    def transform(self, orientation, position):
+        if orientation == 0:
+            return self.translate(position)
+        else:
+            return Arrow(left_arc=self.left_arc.transform(orientation, position), centre_arc=self.centre_arc.transform(orientation, position), right_arc=self.right_arc.transform(orientation, position))

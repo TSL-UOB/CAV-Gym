@@ -55,12 +55,6 @@ class DynamicActorView(ActorView, OcclusionView):
         if dynamic_actor is ego:
             self.body.set_color(*RGB.RED.value)
 
-        braking_relative_bounding_box, reaction_relative_bounding_box = dynamic_actor.stopping_zones()
-        self.braking = rendering.make_polygon(list(braking_relative_bounding_box), filled=False)
-        self.braking.set_color(*RGB.GREEN.value)
-        self.reaction = rendering.make_polygon(list(reaction_relative_bounding_box), filled=False)
-        self.reaction.set_color(*RGB.BLUE.value)
-
         self.focal_road = road
         if dynamic_actor.bounding_box().intersects(self.focal_road.bounding_box()):
             self.road_angle = rendering.make_polyline(list())
@@ -71,10 +65,6 @@ class DynamicActorView(ActorView, OcclusionView):
     def update(self, dynamic_actor, ego):
         self.body.v = list(dynamic_actor.bounding_box())
 
-        braking_relative_bounding_box, reaction_relative_bounding_box = dynamic_actor.stopping_zones()
-        self.braking.v = list(braking_relative_bounding_box)
-        self.reaction.v = list(reaction_relative_bounding_box)
-
         self.update_occlusion_zone(dynamic_actor, ego)
 
         if dynamic_actor.bounding_box().intersects(self.focal_road.bounding_box()):
@@ -83,7 +73,7 @@ class DynamicActorView(ActorView, OcclusionView):
             self.road_angle.v = list(dynamic_actor.line_anchor(self.focal_road))
 
     def geoms(self):
-        yield from [self.body, self.braking, self.reaction, self.road_angle]
+        yield from [self.body, self.road_angle]
         if self.occlusion_zone is not None:
             yield self.occlusion_zone
 
@@ -91,6 +81,12 @@ class DynamicActorView(ActorView, OcclusionView):
 class VehicleView(DynamicActorView):
     def __init__(self, vehicle, ego, road):
         super().__init__(vehicle, ego, road)
+
+        braking_zone, reaction_zone = vehicle.stopping_zones()
+        self.braking = rendering.make_polygon(list(braking_zone), filled=False)
+        self.braking.set_color(*RGB.GREEN.value)
+        self.reaction = rendering.make_polygon(list(reaction_zone), filled=False)
+        self.reaction.set_color(*RGB.BLUE.value)
 
         self.scale = {
             BulbState.OFF: 0.0,
@@ -119,6 +115,10 @@ class VehicleView(DynamicActorView):
     def update(self, vehicle, ego):
         super().update(vehicle, ego)
 
+        braking_zone, reaction_zone = vehicle.stopping_zones()
+        self.braking.v = list(braking_zone)
+        self.reaction.v = list(reaction_zone)
+
         left_indicator_state = BulbState.OFF
         right_indicator_state = BulbState.OFF
         if vehicle.state.angular_velocity > 0:
@@ -140,6 +140,10 @@ class VehicleView(DynamicActorView):
         longitudinal_bounding_box = vehicle.longitudinal_lights()
         self.brake_lights.gs = self.make_lights(longitudinal_bounding_box.rear_left, longitudinal_bounding_box.rear_right, brake_lights_state).gs
         self.headlights.gs = self.make_lights(longitudinal_bounding_box.front_left, longitudinal_bounding_box.front_right, headlights_state).gs
+
+    def geoms(self):
+        yield from [self.braking, self.reaction]
+        yield from super().geoms()
 
 
 class CarView(VehicleView):
