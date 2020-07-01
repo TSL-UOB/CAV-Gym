@@ -142,7 +142,7 @@ class VehicleView(DynamicActorView):
         self.headlights.gs = self.make_lights(longitudinal_bounding_box.front_left, longitudinal_bounding_box.front_right, headlights_state).gs
 
     def geoms(self):
-        yield from [self.braking, self.reaction]
+        yield from [self.reaction, self.braking]
         yield from super().geoms()
 
 
@@ -350,7 +350,7 @@ class RoadMapView:
 
 class RoadEnvViewer(rendering.Viewer):
     def __init__(self, width, height, road_map, actors, ego):
-        super().__init__(width, height)
+        super().__init__(int(width), int(height))  # width and height must be integers
         self.road_map = road_map
 
         self.transform.set_translation(0.0, self.height / 2.0)  # Specify that (0, 0) should be centre-left of viewer (default is bottom-left)

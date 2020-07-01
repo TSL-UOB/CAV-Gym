@@ -403,6 +403,15 @@ class Arc(Shape):
         else:
             return Arc(circle=self.circle.translate(position), start_angle=self.start_angle + orientation, arc_angle=self.arc_angle)
 
+    def arc_length(self):
+        return abs(self.circle.radius * self.arc_angle)
+
+    def start_point(self):
+        return self.circle.circumference_point(self.start_angle)
+
+    def end_point(self):
+        return self.circle.circumference_point(self.start_angle + self.arc_angle)
+
 
 @dataclass(frozen=True)
 class Arrow(Shape):
@@ -427,3 +436,31 @@ class Arrow(Shape):
             return self.translate(position)
         else:
             return Arrow(left_arc=self.left_arc.transform(orientation, position), centre_arc=self.centre_arc.transform(orientation, position), right_arc=self.right_arc.transform(orientation, position))
+
+
+@dataclass(frozen=True)
+class Zone(Shape):
+    curve: Arrow
+    straight: ConvexQuadrilateral
+
+    def __iter__(self):
+        if self.straight is None:
+            yield from self.curve
+        else:
+            for point in self.curve.right_arc:
+                yield tuple(point)
+            yield tuple(self.straight.front_right)
+            yield tuple(self.straight.front_left)
+            for point in reversed(list(self.curve.left_arc)):
+                yield tuple(point)
+            centre_points = list(self.curve.centre_arc)
+            yield tuple(centre_points[0])
+
+    def translate(self, position):
+        return Zone(curve=self.curve.translate(position), straight=self.straight.translate(position))
+
+    def transform(self, orientation, position):
+        if orientation == 0:
+            return self.translate(position)
+        else:
+            return Zone(curve=self.curve.transform(orientation, position), straight=self.straight.transform(orientation, position))
