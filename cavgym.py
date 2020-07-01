@@ -42,28 +42,37 @@ def parse_arguments():
         return ivalue
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("scenario", type=Scenario, choices=[value for value in Scenario], help="choose scenario to run")
-    parser.add_argument("-d", "--debug", help="print debug information", action="store_true")
-    parser.add_argument("-e", "--episodes", type=positive_int, default=1, metavar="N", help="number of episodes (default: %(default)s)")
-    parser.add_argument("-s", "--seed", type=non_negative_int, metavar="N", help="enable fixed random seed")
-    parser.add_argument("-t", "--timesteps", type=positive_int, default=1000, metavar="N", help="max number of timesteps per episode (default: %(default)s)")
+    parser.add_argument("-d", "--debug", help="enable debug mode", action="store_true")
+    parser.add_argument("-e", "--episodes", type=positive_int, default=1, metavar="N", help="set number of episodes as %(metavar)s (default: %(metavar)s=%(default)s)")
+    parser.add_argument("-s", "--seed", type=non_negative_int, metavar="N", help="set random seed as %(metavar)s")
+    parser.add_argument("-t", "--timesteps", type=positive_int, default=1000, metavar="N", help="set max timesteps per episode as %(metavar)s (default: %(metavar)s=%(default)s)")
     parser.add_argument("-v", "--version", action="version", version="%(prog)s 0.1")
 
-    parser.set_defaults(keyboard_agent=False, record=None)
+    parser.set_defaults(keyboard_agent=False, record=None, pedestrians=None)
 
-    subparsers = parser.add_subparsers(dest="mode", required=True, help="choose mode to run scenario")
+    scenario_subparsers = parser.add_subparsers(dest="scenario", required=True, metavar="scenario")
 
-    subparsers.add_parser("headless")  # headless mode has no additional options
+    scenario_subparsers.add_parser(Scenario.BUS_STOP.value, help="three-lane one-way major road with three cars, a cyclist, a bus, and a bus stop")
+    scenario_subparsers.add_parser(Scenario.CROSSROADS.value, help="two-lane two-way crossroads road with two cars and a pedestrian")
+    pedestrians_subparser = scenario_subparsers.add_parser(Scenario.PEDESTRIANS.value, help="two-lane one-way major road with a car and a variable number of pedestrians")
+    scenario_subparsers.add_parser(Scenario.PELICAN_CROSSING.value, help="two-lane two-way major road with two cars, two pedestrians, and a pelican crossing")
 
-    render_parser = subparsers.add_parser("render")
-    render_parser.add_argument("-k", "--keyboard-agent", help="enable keyboard-controlled agent", action="store_true")
-    render_parser.add_argument("-r", "--record", metavar="DIR", help="save video of run to directory")
+    pedestrians_subparser.add_argument("-p", "--pedestrians", type=positive_int, default=3, metavar="N", help="set number of pedestrians as %(metavar)s (default: %(metavar)s=%(default)s)")
+
+    for scenario, scenario_subparser in scenario_subparsers.choices.items():
+        mode_subparsers = scenario_subparser.add_subparsers(dest="mode", required=True, metavar="mode")
+
+        mode_subparsers.add_parser("headless", help="run without rendering")  # headless mode has no additional options
+
+        render_subparser = mode_subparsers.add_parser("render", help="run while rendering to screen")
+        render_subparser.add_argument("-k", "--keyboard-agent", help="enable keyboard-control of ego actor", action="store_true")
+        render_subparser.add_argument("-r", "--record", metavar="DIR", help="enable video recording of run to %(metavar)s")
 
     args = parser.parse_args()
-    return args.scenario, args.episodes, args.timesteps, True if args.mode == "render" else False, args.keyboard_agent, args.record, args.debug, args.seed
+    return Scenario(args.scenario), args.pedestrians, args.episodes, args.timesteps, True if args.mode == "render" else False, args.keyboard_agent, args.record, args.debug, args.seed
 
 
-def run(scenario, episodes=1, max_timesteps=1000, render=True, keyboard_agent=None, record_dir=None, debug=False, seed=None):
+def run(scenario, pedestrians=3, episodes=1, max_timesteps=1000, render=True, keyboard_agent=None, record_dir=None, debug=False, seed=None):
     if debug:
         root.setLevel(logging.DEBUG)
     mode = RenderMode.VIDEO if render and record_dir is not None else RenderMode.SCREEN if render else RenderMode.NONE
@@ -76,8 +85,9 @@ def run(scenario, episodes=1, max_timesteps=1000, render=True, keyboard_agent=No
     elif scenario is Scenario.CROSSROADS:
         env = gym.make('Crossroads-v0', mode=mode, np_random=np_random)
     elif scenario is Scenario.PEDESTRIANS:
-        env = gym.make('Pedestrians-v0', num_pedestrians=3, mode=mode, np_random=np_random)
+        env = gym.make('Pedestrians-v0', num_pedestrians=pedestrians, mode=mode, np_random=np_random)
     else:
+        print(scenario)
         raise NotImplementedError
     agent = keyboard_agent if keyboard_agent is not None else RandomVehicleAgent(np_random=np_random)
     agents = [agent]
@@ -162,6 +172,6 @@ def run_simulation(env, agents, episodes=1, max_timesteps=1000, render=True, key
 
 
 if __name__ == '__main__':
-    arg_scenario, arg_episodes, arg_timesteps, arg_render, arg_keyboard_agent, arg_record_dir, arg_debug, arg_seed = parse_arguments()
-    run(arg_scenario, episodes=arg_episodes, max_timesteps=arg_timesteps, render=arg_render, keyboard_agent=KeyboardAgent() if arg_keyboard_agent else None, record_dir=arg_record_dir, debug=arg_debug, seed=arg_seed)
+    arg_scenario, arg_pedestrians, arg_episodes, arg_timesteps, arg_render, arg_keyboard_agent, arg_record_dir, arg_debug, arg_seed = parse_arguments()
+    run(arg_scenario, pedestrians=arg_pedestrians, episodes=arg_episodes, max_timesteps=arg_timesteps, render=arg_render, keyboard_agent=KeyboardAgent() if arg_keyboard_agent else None, record_dir=arg_record_dir, debug=arg_debug, seed=arg_seed)
     # cProfile.run("run(Scenario.PEDESTRIANS, episodes=60, max_timesteps=3600, render=False, keyboard_agent=None, record_dir=None, debug=False, seed=0)", sort="tottime")  # reminder: there is a significant performance hit when using cProfile
