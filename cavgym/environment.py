@@ -220,7 +220,7 @@ class CAVEnv(MarkovGameEnv):
         if not terminate and self.terminate_zone:
             # pedestrian_in_reaction_zone = any(actor.bounding_box().intersects(self.ego.stopping_zones()[1]) for actor in self.actors if actor is not self.ego and isinstance(actor, Pedestrian))
             pedestrian_in_reaction_zone = successful_test_pedestrian()
-            terminate = pedestrian_in_reaction_zone
+            terminate = pedestrian_in_reaction_zone is not None
 
         if terminate:
             info = {'pedestrian': pedestrian_in_reaction_zone}

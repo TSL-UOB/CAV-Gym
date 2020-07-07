@@ -4,6 +4,7 @@ import pathlib
 import sys
 import timeit
 from dataclasses import dataclass
+from enum import Enum
 
 import gym
 from gym import wrappers
@@ -17,7 +18,14 @@ from cavgym.actors import DynamicActor, TrafficLight, PelicanCrossing, Pedestria
 from cavgym.environment import RenderMode
 
 
-console_formatter = logging.Formatter("%(levelname)s:%(relativeCreated)d - %(filename)s:%(funcName)s:%(lineno)d - %(message)s")
+class CustomLogRecord(logging.LogRecord):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.code = f"{self.filename}:{self.funcName}"  # new variable used to align existing variables as group
+
+
+logging.setLogRecordFactory(CustomLogRecord)
+console_formatter = logging.Formatter("%(levelname)-7s %(relativeCreated)-7d %(code)-27s %(message)s")
 file_formatter = logging.Formatter("%(message)s")
 
 
@@ -29,7 +37,6 @@ def set_console_logger(logger, destination, event_filter):
 
 
 console_logger = logging.getLogger("cavgym.console")
-console_logger.setLevel(logging.INFO)  # only track INFO events and above for console by default (due to computational cost)
 
 set_console_logger(console_logger, sys.stdout, lambda record: record.levelno <= logging.INFO)  # redirect INFO events and below to stdout (to avoid duplicate events)
 set_console_logger(console_logger, sys.stderr, lambda record: record.levelno > logging.INFO)  # redirect WARNING events and above to stderr (to avoid duplicate events)
@@ -49,6 +56,20 @@ file_episodes_logger = None
 file_run_logger = None
 
 
+class Verbosity(Enum):
+    INFO = "info"
+    DEBUG = "debug"
+    SILENT = "silent"
+
+    def logging_level(self):
+        if self is Verbosity.DEBUG:
+            return logging.DEBUG
+        elif self is Verbosity.SILENT:
+            return logging.WARNING
+        else:
+            return logging.INFO
+
+
 @dataclass(frozen=True)
 class CoreConfig:
     episodes: int = 1
@@ -57,6 +78,7 @@ class CoreConfig:
     keyboard_agent: KeyboardAgent = None
     logging_dir: str = None
     record_dir: str = None
+    verbosity: Verbosity = Verbosity.INFO
 
 
 @dataclass(frozen=True)
@@ -89,13 +111,12 @@ class ConfigParser(argparse.ArgumentParser):
             return ivalue
 
         self.add_argument("-c", "--collisions", help="terminate when any collision occurs", action="store_true")
-        self.add_argument("-d", "--debug", help="enable debug mode", action="store_true")
-        self.add_argument("-e", "--episodes", type=positive_int, default=1, metavar="N", help="set number of episodes as %(metavar)s (default: %(default)s)")
+        self.add_argument("-e", "--episodes", type=positive_int, default=CoreConfig.episodes, metavar="N", help="set number of episodes as %(metavar)s (default: %(default)s)")
         self.add_argument("-l", "--log", metavar="DIR", help="enable logging of run to %(metavar)s")
         self.add_argument("-o", "--offroad", help="terminate when ego does not intersect road", action="store_true")
         self.add_argument("-s", "--seed", type=non_negative_int, metavar="N", help="set random seed as %(metavar)s")
-        self.add_argument("-t", "--timesteps", type=positive_int, default=1000, metavar="N", help="set max timesteps per episode as %(metavar)s (default: %(default)s)")
-        self.add_argument("-v", "--version", action="version", version="%(prog)s 0.1")
+        self.add_argument("-t", "--timesteps", type=positive_int, default=CoreConfig.max_timesteps, metavar="N", help="set max timesteps per episode as %(metavar)s (default: %(default)s)")
+        self.add_argument("-v", "--verbosity", type=Verbosity, choices=[choice for choice in Verbosity], default=CoreConfig.verbosity, metavar="LEVEL", help=f"set verbosity as %(metavar)s (choices: {utilities.pretty_str_set([choice.value for choice in Verbosity])}, default: {CoreConfig.verbosity.value})")
 
         self.set_defaults(keyboard_agent=False, record=None, pedestrians=None, agent_type=None, zone=False)
 
@@ -106,8 +127,8 @@ class ConfigParser(argparse.ArgumentParser):
         pedestrians_subparser = scenario_subparsers.add_parser(Scenario.PEDESTRIANS.value, help="two-lane one-way major road with a car and a variable number of pedestrians")
         scenario_subparsers.add_parser(Scenario.PELICAN_CROSSING.value, help="two-lane two-way major road with two cars, two pedestrians, and a pelican crossing")
 
-        pedestrians_subparser.add_argument("-a", "--agent", type=AgentType, choices=[choice for choice in AgentType], default=AgentType.RANDOM, metavar="TYPE", help=f"set agent type as %(metavar)s (choices: {utilities.pretty_str_set([choice.value for choice in AgentType])}, default: {AgentType.RANDOM.value})")
-        pedestrians_subparser.add_argument("-n", "--number", type=positive_int, default=3, metavar="N", help="set number of actors as %(metavar)s (default: %(default)s)")
+        pedestrians_subparser.add_argument("-a", "--agent", type=AgentType, choices=[choice for choice in AgentType], default=Config.agent_type, metavar="TYPE", help=f"set agent type as %(metavar)s (choices: {utilities.pretty_str_set([choice.value for choice in AgentType])}, default: {Config.agent_type.value})")
+        pedestrians_subparser.add_argument("-n", "--number", type=positive_int, default=Config.actors, metavar="N", help="set number of actors as %(metavar)s (default: %(default)s)")
         pedestrians_subparser.add_argument("-z", "--zone", help="terminate when pedestrian intersects assertion zone", action="store_true")
 
         for scenario, scenario_subparser in scenario_subparsers.choices.items():
@@ -128,7 +149,8 @@ class ConfigParser(argparse.ArgumentParser):
                 render=True if args.mode == "render" else False,
                 keyboard_agent=KeyboardAgent() if args.keyboard_agent else None,
                 logging_dir=args.log,
-                record_dir=args.record
+                record_dir=args.record,
+                verbosity=args.verbosity
             ),
             scenario=Scenario(args.scenario),
             actors=args.number,
@@ -136,17 +158,19 @@ class ConfigParser(argparse.ArgumentParser):
             terminate_collision=args.collisions,
             terminate_offroad=args.offroad,
             terminate_zone=args.zone,
-            debug=args.debug,
+            debug=args.verbosity is Verbosity.DEBUG,
             seed=args.seed
         )
 
 
-def setup_run(config=Config()):
-    if config.debug:
-        console_logger.setLevel(logging.DEBUG)
+def setup(config=Config()):
+    console_logger.setLevel(config.core.verbosity.logging_level())
+
     mode = RenderMode.VIDEO if config.core.render and config.core.record_dir is not None else RenderMode.SCREEN if config.core.render else RenderMode.NONE
+
     np_random, np_seed = seeding.np_random(config.seed)
     console_logger.info(f"seed={np_seed}")
+
     if config.scenario is Scenario.PELICAN_CROSSING:
         env = gym.make('PelicanCrossing-v0', mode=mode, terminate_collision=config.terminate_collision, terminate_offroad=config.terminate_offroad, terminate_zone=config.terminate_zone, np_random=np_random)
     elif config.scenario is Scenario.BUS_STOP:
@@ -157,6 +181,7 @@ def setup_run(config=Config()):
         env = gym.make('Pedestrians-v0', num_pedestrians=config.actors, mode=mode, terminate_collision=config.terminate_collision, terminate_offroad=config.terminate_offroad, terminate_zone=config.terminate_zone, np_random=np_random)
     else:
         raise NotImplementedError
+
     agent = config.core.keyboard_agent if config.core.keyboard_agent is not None else NoopVehicleAgent()
     agents = [agent]
     for actor in env.actors[1:]:
@@ -172,10 +197,13 @@ def setup_run(config=Config()):
                 agents.append(RandomVehicleAgent(np_random=np_random))
         elif isinstance(actor, TrafficLight) or isinstance(actor, PelicanCrossing):
             agents.append(RandomTrafficLightAgent(np_random=np_random))
+
     return env, agents, config.core
 
 
-def run_simulation(env, agents, core_config=CoreConfig()):
+def run(env, agents, core_config=CoreConfig()):
+    console_logger.setLevel(core_config.verbosity.logging_level())
+
     assert len(env.actors) == len(agents), "each actor must be assigned an agent and vice versa"
 
     console_logger.info(f"actors={utilities.pretty_str_list(actor.__class__.__name__ for actor in env.actors)}")
@@ -217,8 +245,9 @@ def run_simulation(env, agents, core_config=CoreConfig()):
         return runtime, simulation_speed, completed, successful, score
 
     def report_episode(index, timesteps, runtime, simulation_speed, completed, successful, score):
-        status = "completed" if completed else "terminated"
-        console_logger.info(f"episode={index}: {status} after {timesteps} timestep(s) taking {utilities.pretty_float(runtime)} ms ({utilities.pretty_float(simulation_speed)}:1 real-time), successful={successful}, score={score}")
+        episode_status = "completed" if completed else "terminated"
+        test_status = f"successful test with score {score}" if successful else "unsuccessful test"
+        console_logger.info(f"episode {index} {episode_status} after {timesteps} timestep(s) in {utilities.pretty_float(runtime, decimal_places=0)} ms ({utilities.pretty_float(simulation_speed)}:1 real-time), {test_status}")
         if file_episodes_logger is not None:
             file_episodes_logger.info(f"{episode},{timesteps},{runtime},{1 if successful else 0},{score}")
 
@@ -261,10 +290,11 @@ def run_simulation(env, agents, core_config=CoreConfig()):
 
         return timesteps, runtime, simulation_speed, successful_tests, successful_tests_timesteps_ci, successful_tests_runtime_ci, successful_tests_score_ci
 
-    def report_run(timesteps, runtime, simulation_speed, successful_tests, successful_tests_timesteps_mean, successful_tests_runtime_mean, successful_tests_score_mean):
-        console_logger.info(f"completed after {core_config.episodes} episode(s) totalling {timesteps} timestep(s) taking {utilities.pretty_float(runtime)} ms ({utilities.pretty_float(simulation_speed)}:1 real-time), #successful={successful_tests}, score={successful_tests_score_mean}")
+    def report_run(timesteps, runtime, simulation_speed, successful_tests, successful_tests_timesteps_ci, successful_tests_runtime_ci, successful_tests_score_ci):
+        test_status = f"{successful_tests} successful test(s) with timestep confidence {utilities.pretty_float_tuple(successful_tests_timesteps_ci, decimal_places=0)}, runtime confidence {utilities.pretty_float_tuple(successful_tests_runtime_ci, decimal_places=0)}, and score confidence {utilities.pretty_float_tuple(successful_tests_score_ci, decimal_places=0)}" if successful_tests > 0 else "no successful test(s)"
+        console_logger.info(f"run completed after {core_config.episodes} episode(s) and {timesteps} timestep(s) in {utilities.pretty_float(runtime, decimal_places=0)} ms ({utilities.pretty_float(simulation_speed)}:1 real-time), {test_status}")
         if file_run_logger is not None:
-            file_run_logger.info(f"{core_config.episodes},{timesteps},{runtime},{successful_tests},{successful_tests_timesteps_mean},{successful_tests_runtime_mean},{successful_tests_score_mean}")
+            file_run_logger.info(f"{core_config.episodes},{timesteps},{runtime},{successful_tests},{successful_tests_timesteps_ci},{successful_tests_runtime_ci},{successful_tests_score_ci}")
 
     run_start_time = timeit.default_timer()
     episode = None
@@ -274,7 +304,7 @@ def run_simulation(env, agents, core_config=CoreConfig()):
 
         joint_observation = env.reset()
         info = None
-        console_logger.debug(f"init: observation={joint_observation}")
+        console_logger.debug(f"observation={joint_observation}")
 
         for agent in agents:
             agent.reset()
@@ -289,7 +319,12 @@ def run_simulation(env, agents, core_config=CoreConfig()):
             joint_action = [agent.choose_action(previous_observation, action_space) for agent, previous_observation, action_space in zip(agents, joint_observation, env.action_space)]
             joint_observation, joint_reward, done, info = env.step(joint_action)
 
-            console_logger.debug(f"timestep={timestep}: action={joint_action} observation={joint_observation} reward={joint_reward} done={done} info={info}")
+            console_logger.debug(f"timestep={timestep}")
+            console_logger.debug(f"action={joint_action}")
+            console_logger.debug(f"observation={joint_observation}")
+            console_logger.debug(f"reward={joint_reward}")
+            console_logger.debug(f"done={done}")
+            console_logger.debug(f"info={info}")
 
             if done:
                 break
@@ -301,8 +336,8 @@ def run_simulation(env, agents, core_config=CoreConfig()):
         episode_data.append((episode, timestep, episode_runtime, episode_successful, episode_score))
         report_episode(episode, timestep, episode_runtime, episode_simulation_speed, episode_completed, episode_successful, episode_score)
     else:
-        run_timesteps, run_runtime, run_simulation_speed, run_successful_tests, run_successful_tests_timesteps_mean, run_successful_tests_runtime_mean, run_successful_tests_score_mean = analyse_run(run_start_time)
-        report_run(run_timesteps, run_runtime, run_simulation_speed, run_successful_tests, run_successful_tests_timesteps_mean, run_successful_tests_runtime_mean, run_successful_tests_score_mean)
+        run_results = analyse_run(run_start_time)
+        report_run(*run_results)
 
     env.close()
 
@@ -310,7 +345,7 @@ def run_simulation(env, agents, core_config=CoreConfig()):
 if __name__ == '__main__':
     cli_args = ConfigParser()
     cli_config = cli_args.parse_config()
-    cli_env, cli_agents, cli_core_config = setup_run(cli_config)
-    run_simulation(cli_env, cli_agents, core_config=cli_core_config)
+    cli_env, cli_agents, cli_core_config = setup(cli_config)
+    run(cli_env, cli_agents, core_config=cli_core_config)
     # import cProfile
     # cProfile.run("run_simulation(cli_env, cli_agents, core_config=cli_core_config)", sort="tottime")  # reminder: there is a significant performance hit when using cProfile
