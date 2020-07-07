@@ -242,7 +242,7 @@ def run_simulation(env, agents, core_config=CoreConfig()):
 
         def confidence_interval(data, alpha=0.05):  # 95% confidence interval
             data_length = len(data)
-            if data_length == 0:
+            if data_length <= 1:  # variance (and thus data_sem) requires at least 2 data points
                 nan = float("nan")
                 return nan, nan
             else:
