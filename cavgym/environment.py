@@ -8,13 +8,13 @@ from gym.utils import seeding
 
 from cavgym import geometry
 from cavgym.actions import TrafficLightAction, OrientationAction, VelocityAction
-from cavgym.actors import PelicanCrossing, DynamicActor, TrafficLight
+from cavgym.actors import PelicanCrossing, DynamicActor, TrafficLight, Pedestrian
 from cavgym.observations import OrientationObservation, EmptyObservation, VelocityObservation, RoadObservation
 from cavgym.rendering import RoadEnvViewer
 from cavgym.assets import RoadMap, Occlusion
 
 
-logger = logging.getLogger(__name__)
+console_logger = logging.getLogger("cavgym.console.environment")
 
 
 class MarkovGameEnv(gym.Env):
@@ -67,16 +67,19 @@ class CAVEnv(MarkovGameEnv):
         'render.modes': ['human', 'rgb_array']
     }
 
-    def __init__(self, actors, constants, mode=RenderMode.SCREEN, np_random=seeding.np_random(None)[0]):
+    def __init__(self, actors, constants, mode=RenderMode.SCREEN, terminate_collision=False, terminate_offroad=False, terminate_zone=False, np_random=seeding.np_random(None)[0]):
         self.actors = actors
         self.constants = constants
         self.mode = mode
+        self.terminate_collision = terminate_collision
+        self.terminate_offroad = terminate_offroad
+        self.terminate_zone = terminate_zone
         self.np_random = np_random
 
         self.frequency = 30 if self.mode is RenderMode.VIDEO else 60  # frequency appears to be locked by Gym
         self.time_resolution = 1.0 / self.frequency
 
-        logger.info(f"frequency={self.frequency}")
+        console_logger.info(f"frequency={self.frequency}")
 
         def set_np_random(space):
             space.np_random = self.np_random
@@ -170,38 +173,59 @@ class CAVEnv(MarkovGameEnv):
             else:
                 joint_observation.append(EmptyObservation.NONE.value)
 
-        collidable_entities = self.collidable_entities()
-        collidable_bounding_boxes = [entity.bounding_box() for entity in collidable_entities]  # no need to recompute bounding boxes
-        collided_entities = list()  # record collided entities so that they can be skipped in subsequent iterations
-
-        def collision_detected(entity):
-            if entity in collided_entities:
-                return True
-            entity_bounding_box = collidable_bounding_boxes[collidable_entities.index(entity)]
-            for other, other_bounding_box in zip(collidable_entities, collidable_bounding_boxes):
-                if entity is not other and other not in collided_entities and entity_bounding_box.intersects(other_bounding_box):
-                    collided_entities.append(entity)
-                    collided_entities.append(other)  # other can be skipped in future because we know it has collided with entity
-                    return True
-            else:
-                collidable_entities.remove(entity)
-                collidable_bounding_boxes.remove(entity_bounding_box)  # ensure that this list matches collidable_entities
-                return False
-
-        joint_reward = [-1 if not isinstance(actor, PelicanCrossing) and collision_detected(actor) else 0 for actor in self.actors]
-
         for i, actor in enumerate(self.actors):
             if any(actor.bounding_box().mostly_intersects(road.bounding_box()) for road in self.constants.road_map.roads):
                 self.episode_liveness[i] += 1
                 self.run_liveness[i] += 1
 
-        collision_occurred = any(reward < 0 for reward in joint_reward)
-        # ego_on_road = any(self.ego.bounding_box().intersects(road.bounding_box()) for road in self.constants.road_map.roads)
-        # pedestrian_in_reaction_zone = any(actor.bounding_box().intersects(self.ego.stopping_zones()[1]) for actor in self.actors if actor is not self.ego and isinstance(actor, Pedestrian))
+        joint_reward = [0 for actor in self.actors]
 
-        # return joint_observation, joint_reward, collision_occurred or not ego_on_road, None
+        terminate = False
+        info = None
 
-        return joint_observation, joint_reward, collision_occurred, None
+        if self.terminate_collision:
+            collidable_entities = self.collidable_entities()
+            collidable_bounding_boxes = [entity.bounding_box() for entity in collidable_entities]  # no need to recompute bounding boxes
+            collided_entities = list()  # record collided entities so that they can be skipped in subsequent iterations
+
+            def collision_detected(entity):
+                if entity in collided_entities:
+                    return True
+                entity_bounding_box = collidable_bounding_boxes[collidable_entities.index(entity)]
+                for other, other_bounding_box in zip(collidable_entities, collidable_bounding_boxes):
+                    if entity is not other and other not in collided_entities and entity_bounding_box.intersects(other_bounding_box):
+                        collided_entities.append(entity)
+                        collided_entities.append(other)  # other can be skipped in future because we know it has collided with entity
+                        return True
+                else:
+                    collidable_entities.remove(entity)
+                    collidable_bounding_boxes.remove(entity_bounding_box)  # ensure that this list matches collidable_entities
+                    return False
+
+            collision_detections = [not isinstance(actor, PelicanCrossing) and collision_detected(actor) for actor in self.actors]
+            collision_occurred = any(collision_detections)
+            terminate = collision_occurred
+
+        if not terminate and self.terminate_offroad:
+            ego_on_road = any(self.ego.bounding_box().intersects(road.bounding_box()) for road in self.constants.road_map.roads)
+            terminate = not ego_on_road
+
+        def successful_test_pedestrian():
+            for other_actor_index, other_actor in enumerate(self.actors):
+                if other_actor is not self.ego and isinstance(other_actor, Pedestrian) and other_actor.bounding_box().intersects(self.ego.stopping_zones()[1]):
+                    return other_actor_index
+            return None
+
+        pedestrian_in_reaction_zone = None
+        if not terminate and self.terminate_zone:
+            # pedestrian_in_reaction_zone = any(actor.bounding_box().intersects(self.ego.stopping_zones()[1]) for actor in self.actors if actor is not self.ego and isinstance(actor, Pedestrian))
+            pedestrian_in_reaction_zone = successful_test_pedestrian()
+            terminate = pedestrian_in_reaction_zone
+
+        if terminate:
+            info = {'pedestrian': pedestrian_in_reaction_zone}
+
+        return joint_observation, joint_reward, terminate, info
 
     def reset(self):
         for actor in self.actors:

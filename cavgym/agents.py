@@ -92,6 +92,17 @@ class RandomAgent(Agent):
         raise NotImplementedError
 
 
+class NoopVehicleAgent(Agent):
+    def reset(self):
+        pass
+
+    def choose_action(self, observation, action_space):
+        return VelocityAction.NOOP.value, OrientationAction.NOOP.value
+
+    def process_feedback(self, previous_observation, action, observation, reward):
+        pass
+
+
 class RandomVehicleAgent(RandomAgent):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

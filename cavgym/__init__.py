@@ -33,3 +33,8 @@ class Scenario(Enum):
 
     def __str__(self):
         return self.value
+
+
+class AgentType(Enum):
+    RANDOM = "random"
+    RANDOM_CONSTRAINED = "random-constrained"
