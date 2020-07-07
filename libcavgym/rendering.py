@@ -2,9 +2,9 @@ from enum import Enum
 
 from gym.envs.classic_control import rendering
 
-from cavgym import mods
-from cavgym.actors import TrafficLightState, Car, Bus, Bicycle, Pedestrian, PelicanCrossing
-from cavgym.geometry import Point
+from libcavgym import mods
+from libcavgym.actors import TrafficLightState, Car, Bus, Bicycle, Pedestrian, PelicanCrossing
+from libcavgym.geometry import Point
 
 
 class RGB(Enum):

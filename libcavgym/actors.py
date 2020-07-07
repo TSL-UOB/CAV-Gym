@@ -5,10 +5,10 @@ from enum import Enum
 
 from gym.utils import seeding
 
-from cavgym import geometry
-from cavgym.actions import TrafficLightAction, OrientationAction, VelocityAction
-from cavgym.assets import Road, Occlusion
-from cavgym.geometry import Point
+from libcavgym import geometry
+from libcavgym.actions import TrafficLightAction, OrientationAction, VelocityAction
+from libcavgym.assets import Road, Occlusion
+from libcavgym.geometry import Point
 
 
 REACTION_TIME = 0.675

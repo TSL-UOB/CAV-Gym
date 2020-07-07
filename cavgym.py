@@ -11,11 +11,13 @@ from gym import wrappers
 from gym.utils import seeding
 from scipy import stats
 
-from cavgym.agents import RandomTrafficLightAgent, RandomVehicleAgent, KeyboardAgent, RandomConstrainedPedestrianAgent, \
+import example  # noqa
+from example.agents import RandomTrafficLightAgent, RandomVehicleAgent, KeyboardAgent, RandomConstrainedPedestrianAgent, \
     NoopVehicleAgent, RandomPedestrianAgent
-from cavgym import mods, Scenario, AgentType, utilities
-from cavgym.actors import DynamicActor, TrafficLight, PelicanCrossing, Pedestrian
-from cavgym.environment import RenderMode
+from libcavgym import mods
+import utilities
+from libcavgym.actors import DynamicActor, TrafficLight, PelicanCrossing, Pedestrian
+from libcavgym.environment import RenderMode
 
 
 class CustomLogRecord(logging.LogRecord):
@@ -36,7 +38,7 @@ def set_console_logger(logger, destination, event_filter):
     logger.addHandler(handler)
 
 
-console_logger = logging.getLogger("cavgym.console")
+console_logger = logging.getLogger("libcavgym.console")
 
 set_console_logger(console_logger, sys.stdout, lambda record: record.levelno <= logging.INFO)  # redirect INFO events and below to stdout (to avoid duplicate events)
 set_console_logger(console_logger, sys.stderr, lambda record: record.levelno > logging.INFO)  # redirect WARNING events and above to stderr (to avoid duplicate events)
@@ -56,10 +58,31 @@ file_episodes_logger = None
 file_run_logger = None
 
 
+class Scenario(Enum):
+    BUS_STOP = "bus-stop"
+    CROSSROADS = "crossroads"
+    PEDESTRIANS = "pedestrians"
+    PELICAN_CROSSING = "pelican-crossing"
+
+    def __str__(self):
+        return self.value
+
+
+class AgentType(Enum):
+    RANDOM = "random"
+    RANDOM_CONSTRAINED = "random-constrained"
+
+    def __str__(self):
+        return self.value
+
+
 class Verbosity(Enum):
     INFO = "info"
     DEBUG = "debug"
     SILENT = "silent"
+
+    def __str__(self):
+        return self.value
 
     def logging_level(self):
         if self is Verbosity.DEBUG:
@@ -116,7 +139,7 @@ class ConfigParser(argparse.ArgumentParser):
         self.add_argument("-o", "--offroad", help="terminate when ego does not intersect road", action="store_true")
         self.add_argument("-s", "--seed", type=non_negative_int, metavar="N", help="set random seed as %(metavar)s")
         self.add_argument("-t", "--timesteps", type=positive_int, default=CoreConfig.max_timesteps, metavar="N", help="set max timesteps per episode as %(metavar)s (default: %(default)s)")
-        self.add_argument("-v", "--verbosity", type=Verbosity, choices=[choice for choice in Verbosity], default=CoreConfig.verbosity, metavar="LEVEL", help=f"set verbosity as %(metavar)s (choices: {utilities.pretty_str_set([choice.value for choice in Verbosity])}, default: {CoreConfig.verbosity.value})")
+        self.add_argument("-v", "--verbosity", type=Verbosity, choices=[choice for choice in Verbosity], default=CoreConfig.verbosity, metavar="LEVEL", help=f"set verbosity as %(metavar)s (choices: {utilities.pretty_str_set([choice for choice in Verbosity])}, default: {CoreConfig.verbosity})")
 
         self.set_defaults(keyboard_agent=False, record=None, pedestrians=None, agent_type=None, zone=False)
 
@@ -127,7 +150,7 @@ class ConfigParser(argparse.ArgumentParser):
         pedestrians_subparser = scenario_subparsers.add_parser(Scenario.PEDESTRIANS.value, help="two-lane one-way major road with a car and a variable number of pedestrians")
         scenario_subparsers.add_parser(Scenario.PELICAN_CROSSING.value, help="two-lane two-way major road with two cars, two pedestrians, and a pelican crossing")
 
-        pedestrians_subparser.add_argument("-a", "--agent", type=AgentType, choices=[choice for choice in AgentType], default=Config.agent_type, metavar="TYPE", help=f"set agent type as %(metavar)s (choices: {utilities.pretty_str_set([choice.value for choice in AgentType])}, default: {Config.agent_type.value})")
+        pedestrians_subparser.add_argument("-a", "--agent", type=AgentType, choices=[choice for choice in AgentType], default=Config.agent_type, metavar="TYPE", help=f"set agent type as %(metavar)s (choices: {utilities.pretty_str_set([choice for choice in AgentType])}, default: {Config.agent_type})")
         pedestrians_subparser.add_argument("-n", "--number", type=positive_int, default=Config.actors, metavar="N", help="set number of actors as %(metavar)s (default: %(default)s)")
         pedestrians_subparser.add_argument("-z", "--zone", help="terminate when pedestrian intersects assertion zone", action="store_true")
 
@@ -216,8 +239,8 @@ def run(env, agents, core_config=CoreConfig()):
     if core_config.logging_dir is not None:
         global file_episodes_logger
         global file_run_logger
-        file_episodes_logger = setup_file_logger_output("cavgym.file.episodes", core_config.logging_dir, "episodes.log")
-        file_run_logger = setup_file_logger_output("cavgym.file.run", core_config.logging_dir, "run.log")
+        file_episodes_logger = setup_file_logger_output("libcavgym.file.episodes", core_config.logging_dir, "episodes.log")
+        file_run_logger = setup_file_logger_output("libcavgym.file.run", core_config.logging_dir, "run.log")
 
     if core_config.record_dir is not None:
         env = wrappers.Monitor(env, core_config.record_dir, video_callable=lambda episode_id: True, force=True)  # save all episodes instead of default behaviour (episodes 1, 8, 27, 64, ...)

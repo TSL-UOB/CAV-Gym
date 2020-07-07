@@ -6,15 +6,15 @@ import gym
 from gym import spaces
 from gym.utils import seeding
 
-from cavgym import geometry
-from cavgym.actions import TrafficLightAction, OrientationAction, VelocityAction
-from cavgym.actors import PelicanCrossing, DynamicActor, TrafficLight, Pedestrian
-from cavgym.observations import OrientationObservation, EmptyObservation, VelocityObservation, RoadObservation
-from cavgym.rendering import RoadEnvViewer
-from cavgym.assets import RoadMap, Occlusion
+from libcavgym import geometry
+from libcavgym.actions import TrafficLightAction, OrientationAction, VelocityAction
+from libcavgym.actors import PelicanCrossing, DynamicActor, TrafficLight, Pedestrian
+from libcavgym.observations import OrientationObservation, EmptyObservation, VelocityObservation, RoadObservation
+from libcavgym.rendering import RoadEnvViewer
+from libcavgym.assets import RoadMap, Occlusion
 
 
-console_logger = logging.getLogger("cavgym.console.environment")
+console_logger = logging.getLogger("libcavgym.console.environment")
 
 
 class MarkovGameEnv(gym.Env):
