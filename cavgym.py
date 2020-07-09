@@ -14,7 +14,6 @@ from scipy import stats
 import scenarios  # noqa
 from scenarios.agents import RandomTrafficLightAgent, RandomVehicleAgent, KeyboardAgent, RandomConstrainedPedestrianAgent, \
     NoopVehicleAgent, RandomPedestrianAgent, ProximityPedestrianAgent, ElectionPedestrianAgent
-from library import mods
 import utilities
 from library.actions import OrientationAction
 from library.actors import DynamicActor, TrafficLight, PelicanCrossing, Pedestrian
@@ -265,6 +264,7 @@ def run(env, agents, run_config=RunConfig()):
         file_run_logger = setup_file_logger_output("library.file.run", run_config.logging_dir, "run.log")
 
     if run_config.record_dir is not None:
+        from library import mods  # lazy import of pyglet to allow headless mode on headless machines
         env = wrappers.Monitor(env, run_config.record_dir, video_callable=lambda episode_id: True, force=True)  # save all episodes instead of default behaviour (episodes 1, 8, 27, 64, ...)
         env.stats_recorder = mods.make_joint_stats_recorder(env, len(agents))  # workaround to avoid bugs due to existence of joint rewards
 

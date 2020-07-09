@@ -11,7 +11,6 @@ from library.actions import TrafficLightAction, OrientationAction, VelocityActio
 from library.actors import PelicanCrossing, DynamicActor, TrafficLight, Pedestrian
 from library.observations import OrientationObservation, EmptyObservation, VelocityObservation, RoadObservation, \
     DistanceObservation
-from library.rendering import RoadEnvViewer
 from library.assets import RoadMap, Occlusion
 
 
@@ -239,6 +238,7 @@ class CAVEnv(MarkovGameEnv):
         return self.observe()
 
     def render(self, mode='human'):
+        from library.rendering import RoadEnvViewer  # lazy import of pyglet to allow headless mode on headless machines
         if not self.viewer:
             self.viewer = RoadEnvViewer(self.constants.viewer_width, self.constants.viewer_height, self.constants.road_map, self.actors, self.ego)
         else:
