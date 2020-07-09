@@ -5,17 +5,17 @@ import gym
 from gym import spaces
 from gym.utils import seeding
 
-from example.constants import M2PX
-from libcavgym import geometry
-from libcavgym.actions import TrafficLightAction, OrientationAction, VelocityAction
-from libcavgym.actors import PelicanCrossing, DynamicActor, TrafficLight, Pedestrian
-from libcavgym.observations import OrientationObservation, EmptyObservation, VelocityObservation, RoadObservation, \
+from scenarios.constants import M2PX
+from library import geometry
+from library.actions import TrafficLightAction, OrientationAction, VelocityAction
+from library.actors import PelicanCrossing, DynamicActor, TrafficLight, Pedestrian
+from library.observations import OrientationObservation, EmptyObservation, VelocityObservation, RoadObservation, \
     DistanceObservation
-from libcavgym.rendering import RoadEnvViewer
-from libcavgym.assets import RoadMap, Occlusion
+from library.rendering import RoadEnvViewer
+from library.assets import RoadMap, Occlusion
 
 
-console_logger = logging.getLogger("libcavgym.console.environment")
+console_logger = logging.getLogger("library.console.environment")
 
 
 class MarkovGameEnv(gym.Env):

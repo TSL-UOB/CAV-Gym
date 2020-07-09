@@ -1,8 +1,8 @@
 import itertools
 from dataclasses import dataclass
 
-from libcavgym import geometry
-from libcavgym.geometry import Point
+from library import geometry
+from library.geometry import Point
 
 
 class Occlusion:

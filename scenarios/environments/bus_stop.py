@@ -1,8 +1,8 @@
-from libcavgym import geometry
-from libcavgym.actors import DynamicActorState, Bus, Car, Bicycle
-from libcavgym.environment import CAVEnvConstants, RoadMap, CAVEnv
-from libcavgym.assets import Road, RoadConstants, BusStop, BusStopConstants
-from example.constants import car_constants, bicycle_constants, bus_constants, M2PX
+from library import geometry
+from library.actors import DynamicActorState, Bus, Car, Bicycle
+from library.environment import CAVEnvConstants, RoadMap, CAVEnv
+from library.assets import Road, RoadConstants, BusStop, BusStopConstants
+from scenarios.constants import car_constants, bicycle_constants, bus_constants, M2PX
 
 road_map = RoadMap(
     major_road=Road(

@@ -11,15 +11,15 @@ from gym import wrappers
 from gym.utils import seeding
 from scipy import stats
 
-import example  # noqa
-from example.agents import RandomTrafficLightAgent, RandomVehicleAgent, KeyboardAgent, RandomConstrainedPedestrianAgent, \
+import scenarios  # noqa
+from scenarios.agents import RandomTrafficLightAgent, RandomVehicleAgent, KeyboardAgent, RandomConstrainedPedestrianAgent, \
     NoopVehicleAgent, RandomPedestrianAgent, ProximityPedestrianAgent, ElectionPedestrianAgent
-from libcavgym import mods
+from library import mods
 import utilities
-from libcavgym.actions import OrientationAction
-from libcavgym.actors import DynamicActor, TrafficLight, PelicanCrossing, Pedestrian
-from libcavgym.environment import EnvConfig
-from libcavgym.observations import OrientationObservation
+from library.actions import OrientationAction
+from library.actors import DynamicActor, TrafficLight, PelicanCrossing, Pedestrian
+from library.environment import EnvConfig
+from library.observations import OrientationObservation
 
 
 class CustomLogRecord(logging.LogRecord):
@@ -40,7 +40,7 @@ def set_console_logger(logger, destination, event_filter):
     logger.addHandler(handler)
 
 
-console_logger = logging.getLogger("libcavgym.console")
+console_logger = logging.getLogger("library.console")
 
 set_console_logger(console_logger, sys.stdout, lambda record: record.levelno <= logging.INFO)  # redirect INFO events and below to stdout (to avoid duplicate events)
 set_console_logger(console_logger, sys.stderr, lambda record: record.levelno > logging.INFO)  # redirect WARNING events and above to stderr (to avoid duplicate events)
@@ -261,8 +261,8 @@ def run(env, agents, run_config=RunConfig()):
     if run_config.logging_dir is not None:
         global file_episodes_logger
         global file_run_logger
-        file_episodes_logger = setup_file_logger_output("libcavgym.file.episodes", run_config.logging_dir, "episodes.log")
-        file_run_logger = setup_file_logger_output("libcavgym.file.run", run_config.logging_dir, "run.log")
+        file_episodes_logger = setup_file_logger_output("library.file.episodes", run_config.logging_dir, "episodes.log")
+        file_run_logger = setup_file_logger_output("library.file.run", run_config.logging_dir, "run.log")
 
     if run_config.record_dir is not None:
         env = wrappers.Monitor(env, run_config.record_dir, video_callable=lambda episode_id: True, force=True)  # save all episodes instead of default behaviour (episodes 1, 8, 27, 64, ...)

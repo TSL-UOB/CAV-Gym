@@ -1,10 +1,10 @@
 from gym.utils import seeding
 
-from libcavgym import geometry
-from libcavgym.actors import DynamicActorState, Car, SpawnPedestrian, SpawnPedestrianState
-from libcavgym.environment import CAVEnvConstants, RoadMap, CAVEnv
-from libcavgym.assets import Road, RoadConstants
-from example.constants import car_constants, pedestrian_constants, M2PX
+from library import geometry
+from library.actors import DynamicActorState, Car, SpawnPedestrian, SpawnPedestrianState
+from library.environment import CAVEnvConstants, RoadMap, CAVEnv
+from library.assets import Road, RoadConstants
+from scenarios.constants import car_constants, pedestrian_constants, M2PX
 
 road_map = RoadMap(
     major_road=Road(

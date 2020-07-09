@@ -1,5 +1,5 @@
-from libcavgym import geometry
-from libcavgym.actors import DynamicActorConstants
+from library import geometry
+from library.actors import DynamicActorConstants
 
 M2PX = 16  # pixels per metre
 

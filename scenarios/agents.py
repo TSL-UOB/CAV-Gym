@@ -1,8 +1,8 @@
 from gym.utils import seeding
 
-from libcavgym.actions import OrientationAction, VelocityAction
-from libcavgym.environment import TrafficLightAction
-from libcavgym.observations import OrientationObservation, VelocityObservation, RoadObservation, DistanceObservation
+from library.actions import OrientationAction, VelocityAction
+from library.environment import TrafficLightAction
+from library.observations import OrientationObservation, VelocityObservation, RoadObservation, DistanceObservation
 
 
 class Agent:
