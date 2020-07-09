@@ -1,15 +1,16 @@
 import logging
 from dataclasses import dataclass
-from enum import Enum
 
 import gym
 from gym import spaces
 from gym.utils import seeding
 
+from example.constants import M2PX
 from libcavgym import geometry
 from libcavgym.actions import TrafficLightAction, OrientationAction, VelocityAction
 from libcavgym.actors import PelicanCrossing, DynamicActor, TrafficLight, Pedestrian
-from libcavgym.observations import OrientationObservation, EmptyObservation, VelocityObservation, RoadObservation
+from libcavgym.observations import OrientationObservation, EmptyObservation, VelocityObservation, RoadObservation, \
+    DistanceObservation
 from libcavgym.rendering import RoadEnvViewer
 from libcavgym.assets import RoadMap, Occlusion
 
@@ -56,10 +57,13 @@ class CAVEnvConstants:
     road_map: RoadMap
 
 
-class RenderMode(Enum):
-    NONE = 0
-    SCREEN = 1
-    VIDEO = 2
+@dataclass(frozen=True)
+class EnvConfig:
+    frequency: int = 60
+    terminate_collision: bool = False
+    terminate_offroad: bool = False
+    terminate_zone: bool = False
+    distance_threshold: float = M2PX * 22.5
 
 
 class CAVEnv(MarkovGameEnv):
@@ -67,19 +71,15 @@ class CAVEnv(MarkovGameEnv):
         'render.modes': ['human', 'rgb_array']
     }
 
-    def __init__(self, actors, constants, mode=RenderMode.SCREEN, terminate_collision=False, terminate_offroad=False, terminate_zone=False, np_random=seeding.np_random(None)[0]):
+    def __init__(self, actors, constants, env_config=EnvConfig(), np_random=seeding.np_random(None)[0]):
         self.actors = actors
         self.constants = constants
-        self.mode = mode
-        self.terminate_collision = terminate_collision
-        self.terminate_offroad = terminate_offroad
-        self.terminate_zone = terminate_zone
+        self.env_config = env_config
         self.np_random = np_random
 
-        self.frequency = 30 if self.mode is RenderMode.VIDEO else 60  # frequency appears to be locked by Gym
-        self.time_resolution = 1.0 / self.frequency
+        self.time_resolution = 1.0 / self.env_config.frequency
 
-        console_logger.info(f"frequency={self.frequency}")
+        console_logger.info(f"frequency={self.env_config.frequency}")
 
         def set_np_random(space):
             space.np_random = self.np_random
@@ -89,6 +89,7 @@ class CAVEnv(MarkovGameEnv):
 
         actor_spaces = list()
         for actor in self.actors:
+            actor_space = None
             if isinstance(actor, DynamicActor):
                 velocity_action_space = spaces.Discrete(VelocityAction.__len__())
                 orientation_action_space = spaces.Discrete(OrientationAction.__len__())
@@ -105,7 +106,8 @@ class CAVEnv(MarkovGameEnv):
                 velocity_observation_space = spaces.Discrete(VelocityObservation.__len__())
                 orientation_observation_space = spaces.Discrete(OrientationObservation.__len__())
                 road_observation_space = spaces.Discrete(RoadObservation.__len__())
-                observation_space = spaces.Tuple([velocity_observation_space, orientation_observation_space, road_observation_space])
+                distance_observation_space = spaces.Discrete(DistanceObservation.__len__())
+                observation_space = spaces.Tuple([velocity_observation_space, orientation_observation_space, road_observation_space, distance_observation_space])
             else:
                 observation_space = spaces.Discrete(EmptyObservation.__len__())
             observation_spaces.append(observation_space)
@@ -128,15 +130,7 @@ class CAVEnv(MarkovGameEnv):
             entities.append(self.constants.road_map.obstacle)
         return entities
 
-    def step(self, joint_action):
-        assert self.action_space.contains(joint_action), "%r (%s) invalid" % (joint_action, type(joint_action))
-
-        for index, actor in enumerate(self.actors):
-            actor.step_action(joint_action, index)
-
-        for actor in self.actors:
-            actor.step_dynamics(self.time_resolution)
-
+    def observe(self):
         joint_observation = list()
         for actor in self.actors:
             if isinstance(actor, DynamicActor):
@@ -169,21 +163,34 @@ class CAVEnv(MarkovGameEnv):
                             raise Exception("relative angle is not in the interval (-math.pi, math.pi]")
 
                 road_observation = find_road_observation(self.constants.road_map.major_road)
-                joint_observation.append(tuple([velocity_observation.value, orientation_observation.value, road_observation.value]))
+                distance_observation = DistanceObservation.SATISFIED if actor is not self.ego and actor.state.position.distance(self.ego.state.position) < self.env_config.distance_threshold else DistanceObservation.UNSATISFIED
+                joint_observation.append(tuple([velocity_observation.value, orientation_observation.value, road_observation.value, distance_observation.value]))
             else:
                 joint_observation.append(EmptyObservation.NONE.value)
+
+        return joint_observation
+
+    def step(self, joint_action):
+        assert self.action_space.contains(joint_action), f"{joint_action} ({type(joint_action)}) invalid"
+
+        for index, actor in enumerate(self.actors):
+            actor.step_action(joint_action, index)
+
+        for actor in self.actors:
+            actor.step_dynamics(self.time_resolution)
+
+        joint_observation = self.observe()
 
         for i, actor in enumerate(self.actors):
             if any(actor.bounding_box().mostly_intersects(road.bounding_box()) for road in self.constants.road_map.roads):
                 self.episode_liveness[i] += 1
                 self.run_liveness[i] += 1
 
-        joint_reward = [0 for actor in self.actors]
+        joint_reward = [0 for _ in self.actors]
 
         terminate = False
-        info = None
 
-        if self.terminate_collision:
+        if self.env_config.terminate_collision:
             collidable_entities = self.collidable_entities()
             collidable_bounding_boxes = [entity.bounding_box() for entity in collidable_entities]  # no need to recompute bounding boxes
             collided_entities = list()  # record collided entities so that they can be skipped in subsequent iterations
@@ -206,7 +213,7 @@ class CAVEnv(MarkovGameEnv):
             collision_occurred = any(collision_detections)
             terminate = collision_occurred
 
-        if not terminate and self.terminate_offroad:
+        if not terminate and self.env_config.terminate_offroad:
             ego_on_road = any(self.ego.bounding_box().intersects(road.bounding_box()) for road in self.constants.road_map.roads)
             terminate = not ego_on_road
 
@@ -217,13 +224,11 @@ class CAVEnv(MarkovGameEnv):
             return None
 
         pedestrian_in_reaction_zone = None
-        if not terminate and self.terminate_zone:
-            # pedestrian_in_reaction_zone = any(actor.bounding_box().intersects(self.ego.stopping_zones()[1]) for actor in self.actors if actor is not self.ego and isinstance(actor, Pedestrian))
+        if not terminate and self.env_config.terminate_zone:
             pedestrian_in_reaction_zone = successful_test_pedestrian()
             terminate = pedestrian_in_reaction_zone is not None
 
-        if terminate:
-            info = {'pedestrian': pedestrian_in_reaction_zone}
+        info = {'pedestrian': pedestrian_in_reaction_zone}
 
         return joint_observation, joint_reward, terminate, info
 
@@ -231,7 +236,7 @@ class CAVEnv(MarkovGameEnv):
         for actor in self.actors:
             actor.reset()
         self.episode_liveness = [0 for _ in self.actors]
-        return list(self.observation_space.sample())
+        return self.observe()
 
     def render(self, mode='human'):
         if not self.viewer:

@@ -30,3 +30,8 @@ class RoadObservation(Observation):
     ROAD_REAR_RIGHT = 6
     ROAD_RIGHT = 7
     ROAD_FRONT_RIGHT = 8
+
+
+class DistanceObservation(Observation):
+    UNSATISFIED = 0
+    SATISFIED = 1
