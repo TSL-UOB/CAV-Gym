@@ -1,7 +1,4 @@
 import argparse
-import logging
-import pathlib
-import sys
 import timeit
 from dataclasses import dataclass
 from enum import Enum
@@ -9,8 +6,8 @@ from enum import Enum
 import gym
 from gym import wrappers
 from gym.utils import seeding
-from scipy import stats
 
+import reporting
 import scenarios  # noqa
 from scenarios.agents import RandomTrafficLightAgent, RandomVehicleAgent, KeyboardAgent, RandomConstrainedPedestrianAgent, \
     NoopVehicleAgent, RandomPedestrianAgent, ProximityPedestrianAgent, ElectionPedestrianAgent
@@ -19,44 +16,6 @@ from library.actions import OrientationAction
 from library.actors import DynamicActor, TrafficLight, PelicanCrossing, Pedestrian
 from library.environment import EnvConfig
 from library.observations import OrientationObservation
-
-
-class CustomLogRecord(logging.LogRecord):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.code = f"{self.filename}:{self.funcName}"  # new variable used to align existing variables as group
-
-
-logging.setLogRecordFactory(CustomLogRecord)
-console_formatter = logging.Formatter("%(levelname)-7s %(relativeCreated)-7d %(code)-27s %(message)s")
-file_formatter = logging.Formatter("%(message)s")
-
-
-def set_console_logger(logger, destination, event_filter):
-    handler = logging.StreamHandler(destination)
-    handler.addFilter(event_filter)
-    handler.setFormatter(console_formatter)
-    logger.addHandler(handler)
-
-
-console_logger = logging.getLogger("library.console")
-
-set_console_logger(console_logger, sys.stdout, lambda record: record.levelno <= logging.INFO)  # redirect INFO events and below to stdout (to avoid duplicate events)
-set_console_logger(console_logger, sys.stderr, lambda record: record.levelno > logging.INFO)  # redirect WARNING events and above to stderr (to avoid duplicate events)
-
-
-def setup_file_logger_output(name, directory, filename):
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
-    pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
-    handler = logging.FileHandler(f"{directory}/{filename}")
-    handler.setFormatter(file_formatter)
-    logger.addHandler(handler)
-    return logger
-
-
-file_episodes_logger = None
-file_run_logger = None
 
 
 class RenderMode(Enum):
@@ -85,23 +44,6 @@ class AgentType(Enum):
         return self.value
 
 
-class Verbosity(Enum):
-    INFO = "info"
-    DEBUG = "debug"
-    SILENT = "silent"
-
-    def __str__(self):
-        return self.value
-
-    def logging_level(self):
-        if self is Verbosity.DEBUG:
-            return logging.DEBUG
-        elif self is Verbosity.SILENT:
-            return logging.WARNING
-        else:
-            return logging.INFO
-
-
 @dataclass(frozen=True)
 class RunConfig:
     episodes: int = 1
@@ -110,7 +52,7 @@ class RunConfig:
     keyboard_agent: KeyboardAgent = None
     logging_dir: str = None
     record_dir: str = None
-    verbosity: Verbosity = Verbosity.INFO
+    verbosity: reporting.Verbosity = reporting.Verbosity.INFO
     election: bool = False
 
 
@@ -149,7 +91,7 @@ class ConfigParser(argparse.ArgumentParser):
         self.add_argument("-o", "--offroad", help="terminate when ego does not intersect road", action="store_true")
         self.add_argument("-s", "--seed", type=non_negative_int, metavar="N", help="set random seed as %(metavar)s")
         self.add_argument("-t", "--timesteps", type=positive_int, default=RunConfig.max_timesteps, metavar="N", help="set max timesteps per episode as %(metavar)s (default: %(default)s)")
-        self.add_argument("-v", "--verbosity", type=Verbosity, choices=[choice for choice in Verbosity], default=RunConfig.verbosity, metavar="LEVEL", help=f"set verbosity as %(metavar)s (choices: {utilities.pretty_str_set([choice for choice in Verbosity])}, default: {RunConfig.verbosity})")
+        self.add_argument("-v", "--verbosity", type=reporting.Verbosity, choices=[choice for choice in reporting.Verbosity], default=RunConfig.verbosity, metavar="LEVEL", help=f"set verbosity as %(metavar)s (choices: {utilities.pretty_str_set([choice for choice in reporting.Verbosity])}, default: {RunConfig.verbosity})")
 
         self.set_defaults(keyboard_agent=False, record=None, number=None, agent=Config.agent_type, zone=False)
 
@@ -204,10 +146,10 @@ class ConfigParser(argparse.ArgumentParser):
 
 
 def setup(config=Config()):
-    console_logger.setLevel(config.run.verbosity.logging_level())
+    reporting.console_logger.setLevel(config.run.verbosity.logging_level())
 
     np_random, np_seed = seeding.np_random(config.seed)
-    console_logger.info(f"seed={np_seed}")
+    reporting.console_logger.info(f"seed={np_seed}")
 
     if config.scenario is Scenario.PELICAN_CROSSING:
         env = gym.make('PelicanCrossing-v0', env_config=config.env, np_random=np_random)
@@ -246,22 +188,20 @@ def setup(config=Config()):
 
 
 def run(env, agents, run_config=RunConfig()):
-    console_logger.setLevel(run_config.verbosity.logging_level())
+    reporting.console_logger.setLevel(run_config.verbosity.logging_level())
 
     assert len(env.actors) == len(agents), "each actor must be assigned an agent and vice versa"
 
-    console_logger.info(f"actors={utilities.pretty_str_list(actor.__class__.__name__ for actor in env.actors)}")
-    console_logger.info(f"agents={utilities.pretty_str_list(agent.__class__.__name__ for agent in agents)}")
-    console_logger.info(f"ego=({env.actors[0].__class__.__name__}, {agents[0].__class__.__name__})")
+    reporting.console_logger.info(f"actors={utilities.pretty_str_list(actor.__class__.__name__ for actor in env.actors)}")
+    reporting.console_logger.info(f"agents={utilities.pretty_str_list(agent.__class__.__name__ for agent in agents)}")
+    reporting.console_logger.info(f"ego=({env.actors[0].__class__.__name__}, {agents[0].__class__.__name__})")
 
     if run_config.keyboard_agent is not None or run_config.record_dir is not None:
         assert run_config.render_mode is not RenderMode.HEADLESS, "keyboard agents and recordings do not work in headless mode"
 
     if run_config.logging_dir is not None:
-        global file_episodes_logger
-        global file_run_logger
-        file_episodes_logger = setup_file_logger_output("library.file.episodes", run_config.logging_dir, "episodes.log")
-        file_run_logger = setup_file_logger_output("library.file.run", run_config.logging_dir, "run.log")
+        reporting.file_episodes_logger = reporting.setup_file_logger_output("library.file.episodes", run_config.logging_dir, "episodes.log")
+        reporting.file_run_logger = reporting.setup_file_logger_output("library.file.run", run_config.logging_dir, "run.log")
 
     if run_config.record_dir is not None:
         from library import mods  # lazy import of pyglet to allow headless mode on headless machines
@@ -271,30 +211,6 @@ def run(env, agents, run_config=RunConfig()):
     if run_config.render_mode is not RenderMode.HEADLESS and run_config.keyboard_agent is not None:
         env.render()  # must render before key_press can be assigned
         env.unwrapped.viewer.window.on_key_press = run_config.keyboard_agent.key_press
-
-    def measure_time(start_time):
-        return (timeit.default_timer() - start_time) * 1000
-
-    def determine_simulation_speed(time_ms, timesteps):
-        return (timesteps * env.time_resolution * 1000) / time_ms
-
-    def analyse_episode(start_time, timesteps, env_info):
-        runtime = measure_time(start_time)
-        simulation_speed = determine_simulation_speed(runtime, timesteps)
-        assert 1 <= timesteps <= run_config.max_timesteps
-        completed = timesteps == run_config.max_timesteps
-        assert 'pedestrian' in env_info
-        pedestrian_index = env_info['pedestrian']
-        successful = pedestrian_index is not None
-        score = env.episode_liveness[pedestrian_index] * -5 if successful else 0
-        return runtime, simulation_speed, completed, successful, score
-
-    def report_episode(index, timesteps, runtime, simulation_speed, completed, successful, score):
-        episode_status = "completed" if completed else "terminated"
-        test_status = f"successful test with score {score}" if successful else "unsuccessful test"
-        console_logger.info(f"episode {index} {episode_status} after {timesteps} timestep(s) in {utilities.pretty_float(runtime, decimal_places=0)} ms ({utilities.pretty_float(simulation_speed)}:1 real-time), {test_status}")
-        if file_episodes_logger is not None:
-            file_episodes_logger.info(f"{episode},{timesteps},{runtime},{1 if successful else 0},{score}")
 
     def active_joint_action(joint_action_vote, electorate, active):
         assert active in electorate
@@ -350,60 +266,14 @@ def run(env, agents, run_config=RunConfig()):
         else:
             return joint_action_vote
 
-    episode_data = list()
-
-    def analyse_run(start_time):
-        runtime = measure_time(start_time)
-
-        # row = (episode, timesteps, runtime, success, score)
-        timesteps = sum([row[1] for row in episode_data])
-
-        simulation_speed = determine_simulation_speed(runtime, timesteps)
-
-        successful_test_data = [row for row in episode_data if row[3]]
-        successful_test_data_timesteps = [row[1] for row in successful_test_data]
-        successful_test_data_runtime = [row[2] for row in successful_test_data]
-        successful_test_data_score = [row[4] for row in successful_test_data]
-
-        successful_tests = len(successful_test_data)
-        assert successful_tests == len(successful_test_data_timesteps) == len(successful_test_data_runtime) == len(successful_test_data_score)
-
-        def confidence_interval(data, alpha=0.05):  # 95% confidence interval
-            data_length = len(data)
-            if data_length <= 1:  # variance (and thus data_sem) requires at least 2 data points
-                nan = float("nan")
-                return nan, nan
-            else:
-                data_mean = sum(data) / data_length
-                # data_sem = statistics.stdev(data) / math.sqrt(data_length)  # use data_sem = statistics.pstdev(data) if data is population
-                # data_sem = np.std(data, ddof=1) / math.sqrt(data_length)  # use data_sem = np.std(data) / math.sqrt(data_length) if data is population
-                data_sem = stats.sem(data)  # use data_sem = scipy.stats.sem(data, ddof=0) if data is population
-                data_df = data_length - 1
-                # data_error = data_sem * stats.t.isf(alpha / 2, data_df)  # equivalent to data_error = data_sem * -stats.t.ppf(alpha / 2, data_df)
-                # return data_mean - data_error, data_mean + data_error
-                return stats.t.interval(1 - alpha, data_df, loc=data_mean, scale=data_sem)
-
-        successful_tests_timesteps_ci = confidence_interval(successful_test_data_timesteps)
-        successful_tests_runtime_ci = confidence_interval(successful_test_data_runtime)
-        successful_tests_score_ci = confidence_interval(successful_test_data_score)
-
-        return timesteps, runtime, simulation_speed, successful_tests, successful_tests_timesteps_ci, successful_tests_runtime_ci, successful_tests_score_ci
-
-    def report_run(timesteps, runtime, simulation_speed, successful_tests, successful_tests_timesteps_ci, successful_tests_runtime_ci, successful_tests_score_ci):
-        test_status = f"{successful_tests} successful test(s) with timestep confidence {utilities.pretty_float_tuple(successful_tests_timesteps_ci, decimal_places=0)}, runtime confidence {utilities.pretty_float_tuple(successful_tests_runtime_ci, decimal_places=0)}, and score confidence {utilities.pretty_float_tuple(successful_tests_score_ci, decimal_places=0)}" if successful_tests > 0 else "no successful test(s)"
-        console_logger.info(f"run completed after {run_config.episodes} episode(s) and {timesteps} timestep(s) in {utilities.pretty_float(runtime, decimal_places=0)} ms ({utilities.pretty_float(simulation_speed)}:1 real-time), {test_status}")
-        if file_run_logger is not None:
-            file_run_logger.info(f"{run_config.episodes},{timesteps},{runtime},{successful_tests},{successful_tests_timesteps_ci},{successful_tests_runtime_ci},{successful_tests_score_ci}")
-
     run_start_time = timeit.default_timer()
-    episode = None
     for previous_episode in range(run_config.episodes):  # initially previous_episode=0
         episode_start_time = timeit.default_timer()
         episode = previous_episode + 1
 
         joint_observation = env.reset()
         info = None
-        console_logger.debug(f"observation={joint_observation}")
+        reporting.console_logger.debug(f"observation={joint_observation}")
 
         for agent in agents:
             agent.reset()
@@ -420,12 +290,12 @@ def run(env, agents, run_config=RunConfig()):
                 joint_action = election(joint_observation, joint_action)
             joint_observation, joint_reward, done, info = env.step(joint_action)
 
-            console_logger.debug(f"timestep={timestep}")
-            console_logger.debug(f"action={joint_action}")
-            console_logger.debug(f"observation={joint_observation}")
-            console_logger.debug(f"reward={joint_reward}")
-            console_logger.debug(f"done={done}")
-            console_logger.debug(f"info={info}")
+            reporting.console_logger.debug(f"timestep={timestep}")
+            reporting.console_logger.debug(f"action={joint_action}")
+            reporting.console_logger.debug(f"observation={joint_observation}")
+            reporting.console_logger.debug(f"reward={joint_reward}")
+            reporting.console_logger.debug(f"done={done}")
+            reporting.console_logger.debug(f"info={info}")
 
             if done:
                 break
@@ -433,12 +303,14 @@ def run(env, agents, run_config=RunConfig()):
             if run_config.record_dir is not None:
                 env.stats_recorder.done = True  # need to manually tell the monitor that the episode is over if it runs to completion (not sure why)
 
-        episode_runtime, episode_simulation_speed, episode_completed, episode_successful, episode_score = analyse_episode(episode_start_time, timestep, info)
-        episode_data.append((episode, timestep, episode_runtime, episode_successful, episode_score))
-        report_episode(episode, timestep, episode_runtime, episode_simulation_speed, episode_completed, episode_successful, episode_score)
+        episode_end_time = timeit.default_timer()
+        episode_results = reporting.analyse_episode(episode, episode_start_time, episode_end_time, timestep, info, run_config, env)
+        reporting.episode_data.append(episode_results)
+        episode_results.log()
     else:
-        run_results = analyse_run(run_start_time)
-        report_run(*run_results)
+        run_end_time = timeit.default_timer()
+        run_results = reporting.analyse_run(run_start_time, run_end_time, run_config, env)
+        run_results.log()
 
     env.close()
 
