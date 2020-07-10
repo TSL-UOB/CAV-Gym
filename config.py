@@ -5,7 +5,6 @@ from enum import Enum
 import gym
 from gym.utils import seeding
 
-import reporting
 from library.actors import DynamicActor, Pedestrian, TrafficLight, PelicanCrossing
 from library.environment import EnvConfig
 from reporting import Verbosity
@@ -142,10 +141,8 @@ class ConfigParser(ArgumentParser):
 
 
 def setup(config=Config()):
-    reporting.console_logger.setLevel(config.run.verbosity.logging_level())
-
     np_random, np_seed = seeding.np_random(config.seed)
-    reporting.console_logger.info(f"seed={np_seed}")
+    # reporting.console_logger.info(f"seed={np_seed}")
 
     if config.scenario is Scenario.PELICAN_CROSSING:
         env = gym.make('PelicanCrossing-v0', env_config=config.env, np_random=np_random)

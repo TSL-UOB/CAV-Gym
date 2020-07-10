@@ -18,20 +18,14 @@ console_formatter = logging.Formatter("%(levelname)-7s %(relativeCreated)-7d %(c
 file_formatter = logging.Formatter("%(message)s")
 
 
-def set_console_logger(logger, destination, event_filter):
+def make_console_handler(destination, event_filter):
     handler = logging.StreamHandler(destination)
     handler.addFilter(event_filter)
     handler.setFormatter(console_formatter)
-    logger.addHandler(handler)
+    return handler
 
 
-console_logger = logging.getLogger("library.console")
-
-set_console_logger(console_logger, sys.stdout, lambda record: record.levelno <= logging.INFO)  # redirect INFO events and below to stdout (to avoid duplicate events)
-set_console_logger(console_logger, sys.stderr, lambda record: record.levelno > logging.INFO)  # redirect WARNING events and above to stderr (to avoid duplicate events)
-
-
-def setup_file_logger_output(name, directory, filename):
+def make_file_logger(name, directory, filename):
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
     pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
@@ -39,10 +33,6 @@ def setup_file_logger_output(name, directory, filename):
     handler.setFormatter(file_formatter)
     logger.addHandler(handler)
     return logger
-
-
-file_episodes_logger = None
-file_run_logger = None
 
 
 class Verbosity(Enum):
@@ -53,13 +43,31 @@ class Verbosity(Enum):
     def __str__(self):
         return self.value
 
-    def logging_level(self):
-        if self is Verbosity.DEBUG:
-            return logging.DEBUG
-        elif self is Verbosity.SILENT:
-            return logging.WARNING
+
+class MyLogger:
+    def __init__(self, verbosity):
+        self.verbosity = verbosity
+
+        self.console = logging.getLogger("cavgym.console")
+        self.episode_file = None
+        self.run_file = None
+
+        if self.verbosity is Verbosity.DEBUG:
+            self.console.setLevel(logging.DEBUG)
+        elif self.verbosity is Verbosity.SILENT:
+            self.console.setLevel(logging.WARNING)
         else:
-            return logging.INFO
+            self.console.setLevel(logging.INFO)
+
+        info_below_handler = make_console_handler(sys.stdout, lambda record: record.levelno <= logging.INFO)  # redirect INFO events and below to stdout (to avoid duplicate events)
+        warning_above_handler = make_console_handler(sys.stderr, lambda record: record.levelno > logging.INFO)  # redirect WARNING events and above to stderr (to avoid duplicate events)
+
+        self.console.addHandler(info_below_handler)
+        self.console.addHandler(warning_above_handler)
+
+    def set_file_loggers(self, path):
+        self.episode_file = make_file_logger("cavgym.file.episodes", path, "episodes.log")
+        self.run_file = make_file_logger("cavgym.file.run", path, "run.log")
 
 
 class LogMessage:
@@ -106,12 +114,6 @@ class EpisodeResults(LogMessage):
 
     def file_message(self):
         return f"{self.index},{self.time.timesteps},{self.time.runtime()},{1 if self.successful else 0},{self.score}"
-
-    def log(self):
-        global file_episodes_logger
-        console_logger.info(self.console_message())
-        if file_episodes_logger is not None:
-            file_episodes_logger.info(self.file_message())
 
 
 @dataclass(frozen=True)
@@ -177,12 +179,6 @@ class RunResults(LogMessage):
 
     def file_message(self):
         return f"{self.episodes},{self.time.timesteps},{self.time.runtime()},{self.successful_tests.count},{self.successful_tests.confidence_timesteps.min},{self.successful_tests.confidence_timesteps.max},{self.successful_tests.confidence_runtime.min},{self.successful_tests.confidence_runtime.max},{self.successful_tests.confidence_score.min},{self.successful_tests.confidence_score.max}"
-
-    def log(self):
-        global file_run_logger
-        console_logger.info(self.console_message())
-        if file_run_logger is not None:
-            file_run_logger.info(self.file_message())
 
 
 def analyse_episode(index, start_time, end_time, timesteps, env_info, run_config, env):  # can run_config and env be removed?
