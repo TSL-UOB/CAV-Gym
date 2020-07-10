@@ -12,10 +12,9 @@ import scenarios  # noqa
 from scenarios.agents import RandomTrafficLightAgent, RandomVehicleAgent, KeyboardAgent, RandomConstrainedPedestrianAgent, \
     NoopVehicleAgent, RandomPedestrianAgent, ProximityPedestrianAgent, ElectionPedestrianAgent
 import utilities
-from library.actions import OrientationAction
 from library.actors import DynamicActor, TrafficLight, PelicanCrossing, Pedestrian
 from library.environment import EnvConfig
-from library.observations import OrientationObservation
+from scenarios.election import Election
 
 
 class RenderMode(Enum):
@@ -212,59 +211,10 @@ def run(env, agents, run_config=RunConfig()):
         env.render()  # must render before key_press can be assigned
         env.unwrapped.viewer.window.on_key_press = run_config.keyboard_agent.key_press
 
-    def active_joint_action(joint_action_vote, electorate, active):
-        assert active in electorate
-        for i in electorate:
-            if i != active:  # only the winner gets to cross
-                agents[i].reset()  # tell the agent their orientation action will not be executed
-                velocity_action_id, _ = joint_action_vote[i]  # allow the agent's velocity action to be executed
-                joint_action_vote[i] = velocity_action_id, OrientationAction.NOOP.value  # reset the agent's orientation action
-        return joint_action_vote
-
-    active_election_agent = None
-
-    def election(previous_joint_observation, joint_action_vote):
-        nonlocal active_election_agent
-
-        electorate = [i for i, agent in enumerate(agents) if isinstance(agent, ElectionPedestrianAgent)]
-
-        if active_election_agent and not agents[active_election_agent].crossing_action:
-            _, orientation_observation_id, _, _ = previous_joint_observation[active_election_agent]
-            orientation_observation = OrientationObservation(orientation_observation_id)
-            if orientation_observation is OrientationObservation.INACTIVE:
-                previous_active_election_agent = active_election_agent
-                active_election_agent = None  # previous winner has finished crossing
-                return active_joint_action(joint_action_vote, electorate, previous_active_election_agent)  # need to execute final action
-
-        if active_election_agent:
-            return active_joint_action(joint_action_vote, electorate, active_election_agent)
-
-        winner = None
-
-        voters = []
-        for i in electorate:
-            _, orientation_action_id = joint_action_vote[i]
-            orientation_action = OrientationAction(orientation_action_id)
-            if orientation_action is not OrientationAction.NOOP:  # agent has voted to cross
-                voters.append(i)
-
-        if voters:
-            joint_winners = []
-            winning_distance = float("inf")
-            for i in voters:
-                distance = env.actors[i].state.position.distance(env.ego.state.position)
-                if distance < winning_distance:
-                    joint_winners = [i]
-                    winning_distance = distance
-                elif distance == winning_distance:
-                    joint_winners.append(i)
-            winner = env.np_random.choice(joint_winners) if joint_winners else None
-
-        if winner:
-            active_election_agent = winner  # no elections show take place until the winner finishes crossing
-            return active_joint_action(joint_action_vote, electorate, active_election_agent)
-        else:
-            return joint_action_vote
+    if run_config.election:
+        election = Election(env, agents)
+    else:
+        election = None
 
     run_start_time = timeit.default_timer()
     for previous_episode in range(run_config.episodes):  # initially previous_episode=0
@@ -286,8 +236,9 @@ def run(env, agents, run_config=RunConfig()):
                 env.render()
 
             joint_action = [agent.choose_action(previous_observation, action_space) for agent, previous_observation, action_space in zip(agents, joint_observation, env.action_space)]
-            if run_config.election:
-                joint_action = election(joint_observation, joint_action)
+            if election:
+                joint_action = election.result(joint_observation, joint_action)
+
             joint_observation, joint_reward, done, info = env.step(joint_action)
 
             reporting.console_logger.debug(f"timestep={timestep}")
