@@ -5,14 +5,13 @@ import gym
 from gym import spaces
 from gym.utils import seeding
 
-from scenarios.constants import M2PX
 from library import geometry
 from library.actions import TrafficLightAction, OrientationAction, VelocityAction
 from library.actors import PelicanCrossing, DynamicActor, TrafficLight, Pedestrian
+from library.assets import RoadMap, Occlusion
 from library.observations import OrientationObservation, EmptyObservation, VelocityObservation, RoadObservation, \
     DistanceObservation
-from library.assets import RoadMap, Occlusion
-
+from scenarios.constants import M2PX
 
 console_logger = logging.getLogger("library.console.environment")
 

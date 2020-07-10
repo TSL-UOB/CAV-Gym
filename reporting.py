@@ -168,7 +168,8 @@ class RunResults(LogMessage):
     def __post_init__(self):
         assert self.episodes > 0
         assert 0 <= self.successful_tests.count <= self.episodes
-        assert 0 <= self.successful_tests.total_timesteps <= self.episodes * self.time.timesteps
+        if self.successful_tests.count > 0:
+            assert 0 <= self.successful_tests.total_timesteps <= self.episodes * self.time.timesteps
 
     def console_message(self):
         test_status = f"{self.successful_tests.count} successful test(s) with timestep confidence {self.successful_tests.confidence_timesteps.pretty(decimal_places=0)}, runtime confidence {self.successful_tests.confidence_runtime.pretty(decimal_places=0)}, and score confidence {self.successful_tests.confidence_score.pretty(decimal_places=0)}" if self.successful_tests.count > 0 else "no successful test(s)"
