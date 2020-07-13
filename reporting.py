@@ -210,6 +210,7 @@ def analyse_run(start_time, end_time, run_config, env):  # can run_config and en
     successful_test_data_timesteps = [row.time.timesteps for row in successful_test_data]
     successful_test_data_runtime = [row.time.runtime() for row in successful_test_data]
     successful_test_data_score = [row.score for row in successful_test_data]
+    nan = float("nan")
     return RunResults(
         episodes=run_config.episodes,
         time=TimeResults(
@@ -220,9 +221,9 @@ def analyse_run(start_time, end_time, run_config, env):  # can run_config and en
         ),
         successful_tests=SuccessfulTestResults(
             count=len(successful_test_data),
-            total_timesteps=sum(successful_test_data_timesteps) if successful_test_data else None,
-            total_runtime=sum(successful_test_data_runtime) if successful_test_data else None,
-            total_score=sum(successful_test_data_score) if successful_test_data else None,
+            total_timesteps=sum(successful_test_data_timesteps) if successful_test_data else nan,
+            total_runtime=sum(successful_test_data_runtime) if successful_test_data else nan,
+            total_score=sum(successful_test_data_score) if successful_test_data else nan,
             confidence_timesteps=confidence_interval(successful_test_data_timesteps),
             confidence_runtime=confidence_interval(successful_test_data_runtime),
             confidence_score=confidence_interval(successful_test_data_score),
