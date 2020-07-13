@@ -4,9 +4,7 @@ from gym import wrappers
 
 import reporting
 from config import RunConfig, RenderMode
-from reporting import MyLogger
 from scenarios.election import Election
-from utilities import pretty_str_list
 
 
 class Simulation:
@@ -29,10 +27,12 @@ class Simulation:
         else:
             self.election = None
 
-        self.logger = MyLogger(self.run_config.verbosity)
+        self.console = reporting.get_console(self.run_config.verbosity)
 
+        self.episode_file = None
+        self.run_file = None
         if self.run_config.logging_dir is not None:
-            self.logger.set_file_loggers(self.run_config.logging_dir)
+            self.episode_file, self.run_file = reporting.get_file_loggers(self.run_config.logging_dir)
 
     def conditional_render(self):
         if self.run_config.render_mode is not RenderMode.HEADLESS:
@@ -41,9 +41,9 @@ class Simulation:
                 self.env.unwrapped.viewer.window.on_key_press = self.run_config.keyboard_agent.key_press
 
     def run(self):
-        self.logger.console.info(f"actors={pretty_str_list(actor.__class__.__name__ for actor in self.env.actors)}")
-        self.logger.console.info(f"agents={pretty_str_list(agent.__class__.__name__ for agent in self.agents)}")
-        self.logger.console.info(f"ego=({self.env.actors[0].__class__.__name__}, {self.agents[0].__class__.__name__})")
+        self.console.info(f"actors={reporting.pretty_str_list(actor.__class__.__name__ for actor in self.env.actors)}")
+        self.console.info(f"agents={reporting.pretty_str_list(agent.__class__.__name__ for agent in self.agents)}")
+        self.console.info(f"ego=({self.env.actors[0].__class__.__name__}, {self.agents[0].__class__.__name__})")
 
         run_start_time = timeit.default_timer()
         for previous_episode in range(self.run_config.episodes):  # initially previous_episode=0
@@ -53,7 +53,7 @@ class Simulation:
             joint_observation = self.env.reset()
             info = None
 
-            self.logger.console.debug(f"observation={joint_observation}")
+            self.console.debug(f"observation={joint_observation}")
 
             for agent in self.agents:
                 agent.reset()
@@ -71,12 +71,12 @@ class Simulation:
 
                 joint_observation, joint_reward, done, info = self.env.step(joint_action)
 
-                self.logger.console.debug(f"timestep={timestep}")
-                self.logger.console.debug(f"action={joint_action}")
-                self.logger.console.debug(f"observation={joint_observation}")
-                self.logger.console.debug(f"reward={joint_reward}")
-                self.logger.console.debug(f"done={done}")
-                self.logger.console.debug(f"info={info}")
+                self.console.debug(f"timestep={timestep}")
+                self.console.debug(f"action={joint_action}")
+                self.console.debug(f"observation={joint_observation}")
+                self.console.debug(f"reward={joint_reward}")
+                self.console.debug(f"done={done}")
+                self.console.debug(f"info={info}")
 
                 self.conditional_render()
 
@@ -89,14 +89,14 @@ class Simulation:
             episode_end_time = timeit.default_timer()
             episode_results = reporting.analyse_episode(episode, episode_start_time, episode_end_time, timestep, info, self.run_config, self.env)
             reporting.episode_data.append(episode_results)
-            self.logger.console.info(episode_results.console_message())
-            if self.logger.episode_file:
-                self.logger.episode_file.info(episode_results.file_message())
+            self.console.info(episode_results.console_message())
+            if self.episode_file:
+                self.episode_file.info(episode_results.file_message())
         else:
             run_end_time = timeit.default_timer()
             run_results = reporting.analyse_run(run_start_time, run_end_time, self.run_config, self.env)
-            self.logger.console.info(run_results.console_message())
-            if self.logger.run_file:
-                self.logger.run_file.info(run_results.file_message())
+            self.console.info(run_results.console_message())
+            if self.run_file:
+                self.run_file.info(run_results.file_message())
 
         self.env.close()
