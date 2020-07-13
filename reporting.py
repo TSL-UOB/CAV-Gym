@@ -141,7 +141,7 @@ class EpisodeResults(LogMessage):
     score: int
 
     def __post_init__(self):
-        assert self.successful or not self.score
+        assert self.successful or math.isnan(self.score)
 
     def console_message(self):
         episode_status = "completed" if self.completed else "terminated"
@@ -223,7 +223,7 @@ def analyse_episode(index, start_time, end_time, timesteps, env_info, run_config
     assert 'pedestrian' in env_info
     pedestrian_index = env_info['pedestrian']
     successful = pedestrian_index is not None
-    score = env.episode_liveness[pedestrian_index] * -5 if successful else None
+    score = env.episode_liveness[pedestrian_index] * -5 if successful else float("nan")
     return EpisodeResults(
         index=index,
         time=TimeResults(
