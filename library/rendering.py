@@ -83,10 +83,11 @@ class VehicleView(DynamicActorView):
         super().__init__(vehicle, ego, road)
 
         braking_zone, reaction_zone = vehicle.stopping_zones()
-        self.braking = rendering.make_polygon(list(braking_zone), filled=False)
+        self.braking = rendering.make_polygon(list(braking_zone) if braking_zone else list(), filled=False)
         self.braking.set_color(*RGB.GREEN.value)
-        self.reaction = rendering.make_polygon(list(reaction_zone), filled=False)
-        self.reaction.set_color(*RGB.BLUE.value)
+        self.braking.add_attr(mods.FactoredLineStyle(0x0F0F, 1))
+        self.reaction = rendering.make_polygon(list(reaction_zone) if reaction_zone else list(), filled=False)
+        self.reaction.set_color(*RGB.GREEN.value)
 
         self.scale = {
             BulbState.OFF: 0.0,
@@ -116,8 +117,8 @@ class VehicleView(DynamicActorView):
         super().update(vehicle, ego)
 
         braking_zone, reaction_zone = vehicle.stopping_zones()
-        self.braking.v = list(braking_zone)
-        self.reaction.v = list(reaction_zone)
+        self.braking.v = list(braking_zone) if braking_zone else list()
+        self.reaction.v = list(reaction_zone) if reaction_zone else list()
 
         left_indicator_state = BulbState.OFF
         right_indicator_state = BulbState.OFF
@@ -142,7 +143,7 @@ class VehicleView(DynamicActorView):
         self.headlights.gs = self.make_lights(longitudinal_bounding_box.front_left, longitudinal_bounding_box.front_right, headlights_state).gs
 
     def geoms(self):
-        yield from [self.reaction, self.braking]
+        yield from [self.braking, self.reaction]
         yield from super().geoms()
 
 

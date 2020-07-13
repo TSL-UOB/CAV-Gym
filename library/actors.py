@@ -99,14 +99,18 @@ class DynamicActor(Actor, Occlusion):
 
     def stopping_zones(self):
         braking_distance = (self.state.velocity ** 2) / (2 * -self.constants.deceleration_rate)
-        reaction_distance = braking_distance + (self.state.velocity * REACTION_TIME)
+        reaction_distance = self.state.velocity * REACTION_TIME
+        total_distance = braking_distance + reaction_distance
 
-        front_remaining_length = (self.constants.length - self.constants.wheelbase) / 2.0
+        if total_distance == 0:
+            return None, None
 
         if self.state.angular_velocity == 0:
-            braking_zone = geometry.make_rectangle(braking_distance, self.constants.width, rear_offset=0).transform(self.state.orientation, Point(self.constants.length * 0.5, 0).transform(self.state.orientation, self.state.position))
-            reaction_zone = geometry.make_rectangle(reaction_distance, self.constants.width, rear_offset=0).transform(self.state.orientation, Point(self.constants.length * 0.5, 0).transform(self.state.orientation, self.state.position))
+            zone = geometry.make_rectangle(total_distance, self.constants.width, rear_offset=0).transform(self.state.orientation, Point(self.constants.length * 0.5, 0).transform(self.state.orientation, self.state.position))
+            braking_zone, reaction_zone = zone.split_longitudinally(braking_distance / total_distance)
             return braking_zone, reaction_zone
+
+        front_remaining_length = (self.constants.length - self.constants.wheelbase) / 2.0
 
         def find_radius(angle, opposite):
             opposite_to_adjacent_ratio = abs(math.tan(angle))
@@ -145,37 +149,31 @@ class DynamicActor(Actor, Occlusion):
         target_arc = circle_motion.arc_from_angle(current_angle, geometry.normalise_angle(target_angle - current_angle))
         target_arc_length = target_arc.arc_length()
 
-        braking_arc = circle_motion.arc_from_length(current_angle, min(braking_distance, target_arc_length) if counter_clockwise else -min(braking_distance, target_arc_length))
+        zone_arc = circle_motion.arc_from_length(current_angle, min(total_distance, target_arc_length) if counter_clockwise else -min(total_distance, target_arc_length))
 
-        braking_min_arc = circle_min.arc_from_angle(current_angle, braking_arc.arc_angle)
-        braking_mid_arc = circle_mid.arc_from_angle(geometry.normalise_angle(current_angle + angle_mid), braking_arc.arc_angle)
-        braking_max_arc = circle_max.arc_from_angle(geometry.normalise_angle(current_angle + angle_max), braking_arc.arc_angle)
-        braking_front_centre_arc = circle_front_centre.arc_from_angle(geometry.normalise_angle(current_angle + angle_front_centre), braking_arc.arc_angle)
+        zone_min_arc = circle_min.arc_from_angle(current_angle, zone_arc.arc_angle)
+        zone_mid_arc = circle_mid.arc_from_angle(geometry.normalise_angle(current_angle + angle_mid), zone_arc.arc_angle)
+        zone_max_arc = circle_max.arc_from_angle(geometry.normalise_angle(current_angle + angle_max), zone_arc.arc_angle)
+        zone_front_centre_arc = circle_front_centre.arc_from_angle(geometry.normalise_angle(current_angle + angle_front_centre), zone_arc.arc_angle)
 
-        braking_zone_arc = geometry.Arrow(left_arc=braking_min_arc if counter_clockwise else braking_max_arc, centre_arc=braking_mid_arc, right_arc=braking_max_arc if counter_clockwise else braking_min_arc)
-        remainder_braking_distance = braking_distance - braking_arc.arc_length()
-        if remainder_braking_distance == 0:
-            braking_zone = braking_zone_arc
+        zone_arrow = geometry.Arrow(left_arc=zone_min_arc if counter_clockwise else zone_max_arc, centre_arc=zone_mid_arc, right_arc=zone_max_arc if counter_clockwise else zone_min_arc)
+        zone_arrow_length = zone_arc.arc_length()
+        zone_straight_length = total_distance - zone_arrow_length
+
+        if zone_straight_length > 0:
+            zone_straight_orientation = geometry.normalise_angle(target_angle + (math.pi / 2.0) if counter_clockwise else target_angle - (math.pi / 2.0))
+            zone_straight = geometry.make_rectangle(zone_straight_length, self.constants.width, rear_offset=0).transform(zone_straight_orientation, zone_front_centre_arc.end_point())
+
+            if braking_distance < zone_arrow_length:  # braking zone entirely witin curve
+                braking_zone_arrow, reaction_zone_arrow = zone_arrow.split_longitudinally(braking_distance / zone_arrow_length)
+                braking_zone = braking_zone_arrow
+                reaction_zone = geometry.Zone(curve=reaction_zone_arrow, straight=zone_straight)
+            else:  # reaction zone entirely witin straight
+                braking_zone_straight, reaction_zone_straight = zone_straight.split_longitudinally((braking_distance - zone_arrow_length) / zone_straight_length)
+                braking_zone = geometry.Zone(curve=zone_arrow, straight=braking_zone_straight)
+                reaction_zone = reaction_zone_straight
         else:
-            braking_zone_straight_orientation = geometry.normalise_angle(target_angle + (math.pi / 2.0) if counter_clockwise else target_angle - (math.pi / 2.0))
-            braking_zone_straight = geometry.make_rectangle(remainder_braking_distance, self.constants.width, rear_offset=0).transform(braking_zone_straight_orientation, braking_front_centre_arc.end_point())
-            braking_zone = geometry.Zone(curve=braking_zone_arc, straight=braking_zone_straight)
-
-        reaction_arc = circle_motion.arc_from_length(current_angle, min(reaction_distance, target_arc_length) if counter_clockwise else -min(reaction_distance, target_arc_length))
-
-        reaction_min_arc = circle_min.arc_from_angle(current_angle, reaction_arc.arc_angle)
-        reaction_mid_arc = circle_mid.arc_from_angle(geometry.normalise_angle(current_angle + angle_mid), reaction_arc.arc_angle)
-        reaction_max_arc = circle_max.arc_from_angle(geometry.normalise_angle(current_angle + angle_max), reaction_arc.arc_angle)
-        reaction_front_centre_arc = circle_front_centre.arc_from_angle(geometry.normalise_angle(current_angle + angle_front_centre), reaction_arc.arc_angle)
-
-        reaction_zone_arc = geometry.Arrow(left_arc=reaction_min_arc if counter_clockwise else reaction_max_arc, centre_arc=reaction_mid_arc, right_arc=reaction_max_arc if counter_clockwise else reaction_min_arc)
-        remainder_reaction_distance = reaction_distance - reaction_arc.arc_length()
-        if remainder_reaction_distance == 0:
-            reaction_zone = reaction_zone_arc
-        else:
-            reaction_zone_straight_orientation = geometry.normalise_angle(target_angle + (math.pi / 2.0) if counter_clockwise else target_angle - (math.pi / 2.0))
-            reaction_zone_straight = geometry.make_rectangle(remainder_reaction_distance, self.constants.width, rear_offset=0).transform(reaction_zone_straight_orientation, reaction_front_centre_arc.end_point())
-            reaction_zone = geometry.Zone(curve=reaction_zone_arc, straight=reaction_zone_straight)
+            braking_zone, reaction_zone = zone_arrow.split_longitudinally(braking_distance / total_distance)
 
         return braking_zone, reaction_zone
 

@@ -412,6 +412,20 @@ class Arc(Shape):
     def end_point(self):
         return self.circle.circumference_point(self.start_angle + self.arc_angle)
 
+    def split_longitudinally(self, rear_percentage=0.5):
+        rear_arc_angle = self.arc_angle * rear_percentage
+        rear = Arc(
+            circle=self.circle,
+            start_angle=self.start_angle,
+            arc_angle=rear_arc_angle
+        )
+        front = Arc(
+            circle=self.circle,
+            start_angle=self.start_angle + rear_arc_angle,
+            arc_angle=self.arc_angle - rear_arc_angle
+        )
+        return rear, front
+
 
 @dataclass(frozen=True)
 class Arrow(Shape):
@@ -436,6 +450,22 @@ class Arrow(Shape):
             return self.translate(position)
         else:
             return Arrow(left_arc=self.left_arc.transform(orientation, position), centre_arc=self.centre_arc.transform(orientation, position), right_arc=self.right_arc.transform(orientation, position))
+
+    def split_longitudinally(self, rear_percentage=0.5):
+        left_arc_rear, left_arc_front = self.left_arc.split_longitudinally(rear_percentage)
+        centre_arc_rear, centre_arc_front = self.centre_arc.split_longitudinally(rear_percentage)
+        right_arc_rear, right_arc_front = self.right_arc.split_longitudinally(rear_percentage)
+        rear = Arrow(
+            left_arc=left_arc_rear,
+            centre_arc=centre_arc_rear,
+            right_arc=right_arc_rear
+        )
+        front = Arrow(
+            left_arc=left_arc_front,
+            centre_arc=centre_arc_front,
+            right_arc=right_arc_front
+        )
+        return rear, front
 
 
 @dataclass(frozen=True)
