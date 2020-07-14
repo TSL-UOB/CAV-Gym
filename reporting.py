@@ -146,7 +146,7 @@ class EpisodeResults(LogMessage):
     def console_message(self):
         episode_status = "completed" if self.completed else "terminated"
         test_status = f"successful test with score {self.score}" if self.successful else "unsuccessful test"
-        return f"episode {self.index} {episode_status} after {self.time.timesteps} timestep(s) in {pretty_float(self.time.runtime(), decimal_places=0)} ms ({pretty_float(self.time.simulation_speed())}:1 real-time), {test_status}"
+        return f"episode {self.index} {episode_status} after {self.time.timesteps} timestep(s) in {pretty_float(self.time.runtime(), decimal_places=0)} ms (*{pretty_float(self.time.simulation_speed())} real-time), {test_status}"
 
     def file_message(self):
         return f"{self.index},{self.time.timesteps},{self.time.runtime()},{1 if self.successful else 0},{self.score}"
@@ -154,22 +154,22 @@ class EpisodeResults(LogMessage):
 
 @dataclass(frozen=True)
 class Interval:
-    min: float
-    max: float
+    value: float
+    error: float
 
     def __iter__(self):
-        yield self.min
-        yield self.max
+        yield self.value
+        yield self.error
 
     def pretty(self, **kwargs):
-        return f"({pretty_float(self.min, **kwargs)}, {pretty_float(self.max, **kwargs)})"
+        return f"{pretty_float(self.value, **kwargs)} ± {pretty_float(self.error, **kwargs)}"
 
 
 def confidence_interval(data, alpha=0.05):  # 95% confidence interval
     data_length = len(data)
     if data_length <= 1:  # variance (and thus data_sem) requires at least 2 data points
         nan = float("nan")
-        return Interval(min=nan, max=nan)
+        return Interval(value=nan, error=nan)
     else:
         from scipy import stats
         data_mean = sum(data) / data_length
@@ -177,10 +177,10 @@ def confidence_interval(data, alpha=0.05):  # 95% confidence interval
         # data_sem = np.std(data, ddof=1) / math.sqrt(data_length)  # use data_sem = np.std(data) / math.sqrt(data_length) if data is population
         data_sem = stats.sem(data)  # use data_sem = scipy.stats.sem(data, ddof=0) if data is population
         data_df = data_length - 1
-        # data_error = data_sem * stats.t.isf(alpha / 2, data_df)  # equivalent to data_error = data_sem * -stats.t.ppf(alpha / 2, data_df)
+        data_error = data_sem * stats.t.isf(alpha / 2, data_df)  # equivalent to data_error = data_sem * -stats.t.ppf(alpha / 2, data_df)
         # return data_mean - data_error, data_mean + data_error
-        data_ci_min, data_ci_max = stats.t.interval(1 - alpha, data_df, loc=data_mean, scale=data_sem)
-        return Interval(min=data_ci_min, max=data_ci_max)
+        # data_ci_min, data_ci_max = stats.t.interval(1 - alpha, data_df, loc=data_mean, scale=data_sem)  # the interval itself
+        return Interval(value=data_mean, error=data_error)
 
 
 @dataclass(frozen=True)
@@ -210,11 +210,11 @@ class RunResults(LogMessage):
             assert 0 <= self.successful_tests.total_timesteps <= self.episodes * self.time.timesteps
 
     def console_message(self):
-        test_status = f"{self.successful_tests.count} successful test(s) with timestep confidence {self.successful_tests.confidence_timesteps.pretty(decimal_places=0)}, runtime confidence {self.successful_tests.confidence_runtime.pretty(decimal_places=0)}, and score confidence {self.successful_tests.confidence_score.pretty(decimal_places=0)}" if self.successful_tests.count > 0 else "no successful test(s)"
-        return f"run completed after {self.episodes} episode(s) and {self.time.timesteps} timestep(s) in {pretty_float(self.time.runtime(), decimal_places=0)} ms ({pretty_float(self.time.simulation_speed())}:1 real-time), {test_status}"
+        test_status = f"{self.successful_tests.count} successful test(s) with {self.successful_tests.confidence_timesteps.pretty(decimal_places=0)} timestep(s), {self.successful_tests.confidence_runtime.pretty(decimal_places=0)} ms runtime, and {self.successful_tests.confidence_score.pretty(decimal_places=0)} score" if self.successful_tests.count > 0 else "no successful test(s)"
+        return f"run completed after {self.episodes} episode(s) and {self.time.timesteps} timestep(s) in {pretty_float(self.time.runtime(), decimal_places=0)} ms (*{pretty_float(self.time.simulation_speed())} real-time), {test_status}"
 
     def file_message(self):
-        return f"{self.episodes},{self.time.timesteps},{self.time.runtime()},{self.successful_tests.count},{self.successful_tests.confidence_timesteps.min},{self.successful_tests.confidence_timesteps.max},{self.successful_tests.confidence_runtime.min},{self.successful_tests.confidence_runtime.max},{self.successful_tests.confidence_score.min},{self.successful_tests.confidence_score.max}"
+        return f"{self.episodes},{self.time.timesteps},{self.time.runtime()},{self.successful_tests.count},{self.successful_tests.confidence_timesteps.value},{self.successful_tests.confidence_timesteps.error},{self.successful_tests.confidence_runtime.value},{self.successful_tests.confidence_runtime.error},{self.successful_tests.confidence_score.value},{self.successful_tests.confidence_score.error}"
 
 
 def analyse_episode(index, start_time, end_time, timesteps, env_info, run_config, env):  # can run_config and env be removed?
@@ -223,7 +223,7 @@ def analyse_episode(index, start_time, end_time, timesteps, env_info, run_config
     assert 'pedestrian' in env_info
     pedestrian_index = env_info['pedestrian']
     successful = pedestrian_index is not None
-    score = env.episode_liveness[pedestrian_index] * -5 if successful else float("nan")
+    score = -sum(env.episode_liveness[1:]) if successful else float("nan")
     return EpisodeResults(
         index=index,
         time=TimeResults(
