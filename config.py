@@ -160,15 +160,14 @@ def setup(config=Config()):
     for actor in env.actors[1:]:
         if isinstance(actor, DynamicActor):
             if isinstance(actor, Pedestrian):
-                delay = env.env_config.frequency * 1  # one second delay before reorientation
                 if config.agent_type is AgentType.RANDOM:
                     agents.append(RandomPedestrianAgent(np_random=np_random))
                 elif config.agent_type is AgentType.RANDOM_CONSTRAINED:
-                    agents.append(RandomConstrainedPedestrianAgent(delay=delay, np_random=np_random))
+                    agents.append(RandomConstrainedPedestrianAgent(np_random=np_random))
                 elif config.agent_type is AgentType.PROXIMITY:
-                    agents.append(ProximityPedestrianAgent(delay=delay))
+                    agents.append(ProximityPedestrianAgent())
                 elif config.agent_type is AgentType.ELECTION:
-                    agents.append(ElectionPedestrianAgent(delay=delay))
+                    agents.append(ElectionPedestrianAgent())
                 else:
                     print(config.agent_type)
                     raise NotImplementedError

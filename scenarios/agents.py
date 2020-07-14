@@ -190,31 +190,33 @@ end_cross_road_action = {
 
 
 class RoadCrossingPedestrianAgent(Agent):
-    def __init__(self, delay, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-
-        self.delay = delay
 
         self.crossing_action = None
         self.entered_road = False
-        self.delay_count = 0
+        self.pavement_count = 0
+        self.reorient_count = 0
 
     def reset(self):
         self.crossing_action = None
         self.entered_road = False
-        self.delay_count = 0
+        self.pavement_count = 0
+        self.reorient_count = 0
 
     def choose_crossing_orientation_action(self, orientation_observation, road_observation, condition):
         orientation_action = OrientationAction.NOOP
 
-        if self.crossing_action is not None and not self.entered_road and road_observation is RoadObservation.ON_ROAD:
+        if self.crossing_action is not None and orientation_observation is not OrientationObservation.ACTIVE and not self.entered_road and road_observation is not RoadObservation.ON_ROAD:  # crossing, not turning, and on origin pavement
+            self.pavement_count += 1
+        if self.crossing_action is not None and not self.entered_road and road_observation is RoadObservation.ON_ROAD:  # crossing and on road
             self.entered_road = True
-        elif self.crossing_action is not None and self.entered_road and road_observation is not RoadObservation.ON_ROAD:
-            self.delay_count += 1
-            if self.delay_count >= self.delay:
+        elif self.crossing_action is not None and self.entered_road and road_observation is not RoadObservation.ON_ROAD:  # crossing and on destination pavement
+            self.reorient_count += 1
+            if self.reorient_count >= self.pavement_count:  # crossed on destination pavement for at least as long as origin pavement
                 orientation_action = end_cross_road_action[self.crossing_action]
                 self.reset()
-        elif self.crossing_action is None and orientation_observation is not OrientationObservation.ACTIVE and road_observation is not RoadObservation.ON_ROAD and condition:
+        elif self.crossing_action is None and orientation_observation is not OrientationObservation.ACTIVE and road_observation is not RoadObservation.ON_ROAD and condition:  # not crossing and decided to cross
             self.crossing_action = cross_road_action[road_observation]
             orientation_action = self.crossing_action
 
