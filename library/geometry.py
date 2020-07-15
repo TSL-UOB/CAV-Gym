@@ -1,7 +1,7 @@
 import math
 from dataclasses import dataclass
 
-from shapely.geometry import Polygon
+from shapely.geometry import Point as ShapelyPoint, Polygon as ShapelyPolygon
 
 DEG2RAD = 0.017453292519943295
 RAD2DEG = 57.29577951308232
@@ -69,15 +69,18 @@ class Shape:
         raise NotImplementedError
 
     def intersects(self, other):
-        return Polygon(list(self)).intersects(Polygon(list(other)))
+        return ShapelyPolygon(list(self)).intersects(ShapelyPolygon(list(other)))
 
     def contains(self, other):
-        return Polygon(list(self)).contains(Polygon(list(other)))
+        return ShapelyPolygon(list(self)).contains(ShapelyPolygon(list(other)))
 
     def mostly_intersects(self, other):
-        self_polygon = Polygon(list(self))
-        self_polygon_intersection = self_polygon.intersection(Polygon(list(other)))
+        self_polygon = ShapelyPolygon(list(self))
+        self_polygon_intersection = self_polygon.intersection(ShapelyPolygon(list(other)))
         return self_polygon_intersection.area / self_polygon.area > 0.5
+
+    def distance(self, point):
+        return ShapelyPolygon(list(self)).exterior.distance(ShapelyPoint(*point))
 
 
 @dataclass(frozen=True)

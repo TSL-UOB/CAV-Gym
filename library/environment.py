@@ -161,7 +161,8 @@ class CAVEnv(MarkovGameEnv):
                             raise Exception("relative angle is not in the interval (-math.pi, math.pi]")
 
                 road_observation = find_road_observation(self.constants.road_map.major_road)
-                distance_observation = DistanceObservation.SATISFIED if actor is not self.ego and actor.state.position.distance(self.ego.state.position) < self.env_config.distance_threshold else DistanceObservation.UNSATISFIED
+                _, assertion_zone = self.ego.stopping_zones()
+                distance_observation = DistanceObservation.SATISFIED if actor is not self.ego and assertion_zone is not None and assertion_zone.distance(actor.state.position) < self.env_config.distance_threshold else DistanceObservation.UNSATISFIED
                 joint_observation.append(tuple([velocity_observation.value, orientation_observation.value, road_observation.value, distance_observation.value]))
             else:
                 joint_observation.append(EmptyObservation.NONE.value)
