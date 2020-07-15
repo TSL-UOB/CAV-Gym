@@ -48,6 +48,12 @@ class Point:
     def __add__(self, other):
         return Point(self.x + other.x, self.y + other.y)
 
+    def __sub__(self, other):
+        return Point(self.x - other.x, self.y - other.y)
+
+    def __mul__(self, other):
+        return Point(self.x * other, self.y * other)
+
 
 class Shape:
     def __iter__(self):
@@ -182,6 +188,27 @@ class ConvexQuadrilateral(Shape):
     def longitudinal_line(self):
         return Line(self.rear_centre(), self.front_centre())
 
+    def triangles(self):
+        left = Triangle(
+            rear=self.front_left,
+            front_left=self.front_right,
+            front_right=self.rear_left
+        )
+        right = Triangle(
+            rear=self.rear_right,
+            front_left=self.rear_left,
+            front_right=self.front_right
+        )
+        return left, right
+
+    def random_point(self, np_random):
+        left, right = self.triangles()
+        left_area = left.area()
+        self_area = left_area + right.area()
+        fractional_left_area = left_area / self_area
+        chosen = np_random.choice([left, right], p=[fractional_left_area, 1 - fractional_left_area])
+        return chosen.random_point(np_random)
+
 
 def make_rectangle(length, width, anchor=Point(0, 0), rear_offset=0.5, left_offset=0.5):
     rear = anchor.x - (length * rear_offset)
@@ -293,6 +320,33 @@ class Triangle(Shape):
                 front_left=self.front_left.transform(orientation, position),
                 front_right=self.front_right.transform(orientation, position)
             )
+
+    def area(self):
+        numerator = self.rear.x * (self.front_left.y - self.front_right.y) + self.front_left.x * (self.front_right.y - self.rear.y) + self.front_right.x * (self.rear.y - self.front_left.y)
+        return abs(numerator / 2)
+
+    def includes(self, point):
+        def sign(p1, p2, p3):
+            return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y)
+
+        d1 = sign(point, self.rear, self.front_left)
+        d2 = sign(point, self.front_left, self.front_right)
+        d3 = sign(point, self.front_right, self.rear)
+
+        has_neg = (d1 < 0) or (d2 < 0) or (d3 < 0)
+        has_pos = (d1 > 0) or (d2 > 0) or (d3 > 0)
+
+        return not has_neg or not has_pos
+
+    def random_point(self, np_random):
+        u = np_random.uniform(0.0, 1.0)
+        v = np_random.uniform(0.0, 1.0)
+        if u + v > 1:
+            u = 1 - u
+            v = 1 - v
+        point = self.rear + (self.front_left - self.rear) * u + (self.front_right - self.rear) * v
+        # assert self.includes(point)
+        return point
 
 
 def normalise_angle(radians):
