@@ -1,3 +1,5 @@
+import math
+
 from gym.utils import seeding
 
 from library import geometry
@@ -19,17 +21,23 @@ road_map = RoadMap(
     )
 )
 
+pavement_width = (M2PX * 3)
+
 env_constants = CAVEnvConstants(
     viewer_width=road_map.major_road.constants.length,
-    viewer_height=road_map.major_road.width + ((M2PX * 3) * 2),
+    viewer_height=road_map.major_road.width + (pavement_width * 2),
     road_map=road_map
 )
 
 bounding_box = road_map.major_road.bounding_box()
-spawn_offset = M2PX * 1.5
-spawn_position_lines = [
-    geometry.Line(start=geometry.Point(0, spawn_offset).translate(bounding_box.rear_left), end=geometry.Point(0, spawn_offset).translate(bounding_box.front_left)),
-    geometry.Line(start=geometry.Point(0, -spawn_offset).translate(bounding_box.rear_right), end=geometry.Point(0, -spawn_offset).translate(bounding_box.front_right))
+outbound_pavement = geometry.make_rectangle(road_map.major_road.constants.length, pavement_width, rear_offset=0).transform(road_map.major_road.constants.orientation, geometry.Point(0, pavement_width / 2).translate(bounding_box.rear_left))
+inbound_pavement = geometry.make_rectangle(road_map.major_road.constants.length, pavement_width, rear_offset=0).transform(road_map.major_road.constants.orientation, geometry.Point(0, -(pavement_width / 2)).translate(bounding_box.rear_right))
+pedestrian_diameter = math.sqrt(pedestrian_constants.length ** 2 + pedestrian_constants.width ** 2)
+x_scale = 1 - (pedestrian_diameter / road_map.major_road.constants.length)
+y_scale = 1 - (pedestrian_diameter / pavement_width)
+spawn_position_boxes = [
+    outbound_pavement.rescale(x_scale=x_scale, y_scale=y_scale),
+    inbound_pavement.rescale(x_scale=x_scale, y_scale=y_scale)
 ]
 spawn_orientations = [road_map.major_road.outbound.orientation, road_map.major_road.inbound.orientation]
 
@@ -39,7 +47,7 @@ class PedestriansEnv(CAVEnv):
         def spawn_pedestrian():
             return SpawnPedestrian(
                 spawn_init_state=SpawnPedestrianState(
-                    position_lines=spawn_position_lines,
+                    position_boxes=spawn_position_boxes,
                     velocity=0.0,
                     orientations=spawn_orientations,
                     acceleration=0.0,

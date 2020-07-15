@@ -305,7 +305,7 @@ class Pedestrian(DynamicActor):
 
 @dataclass(frozen=True)
 class SpawnPedestrianState:
-    position_lines: list
+    position_boxes: list
     velocity: float
     orientations: list
     acceleration: float
@@ -325,8 +325,10 @@ class SpawnPedestrian(Pedestrian):
         super().reset()
 
     def spawn(self):
-        line = self.np_random.choice(self.spawn_init_state.position_lines)
-        position = line.random_point(self.np_random)
+        areas = [box.area() for box in self.spawn_init_state.position_boxes]
+        total_area = sum(areas)
+        chosen_box = self.np_random.choice(self.spawn_init_state.position_boxes, p=[area / total_area for area in areas])
+        position = chosen_box.random_point(self.np_random)
         orientation = self.np_random.choice(self.spawn_init_state.orientations)
         return DynamicActorState(
             position=position,

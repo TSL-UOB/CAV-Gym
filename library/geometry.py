@@ -28,9 +28,12 @@ class Point:
         return Point(x=rotated_x, y=rotated_y)
 
     def enlarge(self, center, scale=100):
+        return self.rescale(center, x_scale=scale, y_scale=scale)
+
+    def rescale(self, center, x_scale=1, y_scale=1):
         dist_x = self.x - center.x
         dist_y = self.y - center.y
-        return Point(center.x + (dist_x * scale), center.y + (dist_y * scale))
+        return Point(center.x + (dist_x * x_scale), center.y + (dist_y * y_scale))
 
     def transform(self, angle, anchor):
         if angle == 0:
@@ -201,6 +204,9 @@ class ConvexQuadrilateral(Shape):
         )
         return left, right
 
+    def area(self):
+        return sum(triangle.area() for triangle in self.triangles())
+
     def random_point(self, np_random):
         left, right = self.triangles()
         left_area = left.area()
@@ -208,6 +214,15 @@ class ConvexQuadrilateral(Shape):
         fractional_left_area = left_area / self_area
         chosen = np_random.choice([left, right], p=[fractional_left_area, 1 - fractional_left_area])
         return chosen.random_point(np_random)
+
+    def rescale(self, **kwargs):
+        centre = self.centre()
+        return ConvexQuadrilateral(
+            rear_left=self.rear_left.rescale(centre, **kwargs),
+            front_left=self.front_left.rescale(centre, **kwargs),
+            front_right=self.front_right.rescale(centre, **kwargs),
+            rear_right=self.rear_right.rescale(centre, **kwargs)
+        )
 
 
 def make_rectangle(length, width, anchor=Point(0, 0), rear_offset=0.5, left_offset=0.5):
