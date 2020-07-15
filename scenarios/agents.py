@@ -209,8 +209,6 @@ class RoadCrossingPedestrianAgent(Agent):
     def choose_crossing_orientation_action(self, orientation_observation, road_observation, condition):
         orientation_action = OrientationAction.NOOP
 
-        print(self.crossing_action, self.entered_road, self.pavement_count, self.reorient_count, orientation_observation, road_observation, condition)
-
         if self.crossing_action is not None and orientation_observation is not OrientationObservation.ACTIVE and not self.entered_road and road_observation is not RoadObservation.ON_ROAD:  # crossing, not turning, and on origin pavement
             self.pavement_count += 1
         elif self.crossing_action is not None and orientation_observation is not OrientationObservation.ACTIVE and not self.entered_road and road_observation is RoadObservation.ON_ROAD:  # crossing and on road
@@ -221,7 +219,6 @@ class RoadCrossingPedestrianAgent(Agent):
                 orientation_action = end_cross_road_action[self.crossing_action]
                 self.reset()
         elif self.crossing_action is None and orientation_observation is not OrientationObservation.ACTIVE and road_observation is not RoadObservation.ON_ROAD and condition:  # not crossing and decided to cross
-            print("DECIDED TO CROSS")
             self.crossing_action = cross_road_action[road_observation]
             orientation_action = self.crossing_action
 
