@@ -218,16 +218,23 @@ class CAVEnv(MarkovGameEnv):
 
         def ego_collision(entity):
             entity_bounding_box = entity.bounding_box()
-            return entity_bounding_box.intersects(self.ego.bounding_box()) or entity_bounding_box.intersects(self.ego.stopping_zones()[0])
+            if entity_bounding_box.intersects(self.ego.bounding_box()):
+                return True
+            braking_zone = self.ego.stopping_zones()[0]
+            if braking_zone is not None and entity_bounding_box.intersects(braking_zone):
+                return True
+            return False
 
         if not terminate:  # terminate early if pedestrian collides with ego or braking zone of ego (uninteresting tests)
             ego_collision = any(ego_collision(actor) for actor in self.actors if actor is not self.ego and isinstance(actor, Pedestrian))
             terminate = ego_collision
 
         def successful_test_pedestrian():
-            for other_actor_index, other_actor in enumerate(self.actors):
-                if other_actor is not self.ego and isinstance(other_actor, Pedestrian) and other_actor.bounding_box().intersects(self.ego.stopping_zones()[1]):
-                    return other_actor_index
+            braking_zone = self.ego.stopping_zones()[1]
+            if braking_zone is not None:
+                for other_actor_index, other_actor in enumerate(self.actors):
+                    if other_actor is not self.ego and isinstance(other_actor, Pedestrian) and other_actor.bounding_box().intersects(braking_zone):
+                        return other_actor_index
             return None
 
         pedestrian_in_reaction_zone = None

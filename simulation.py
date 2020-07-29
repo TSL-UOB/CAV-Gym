@@ -69,6 +69,7 @@ class Simulation:
                 if self.election:
                     joint_action = self.election.result(joint_observation, joint_action)
 
+                previous_joint_observation = joint_observation
                 joint_observation, joint_reward, done, info = self.env.step(joint_action)
 
                 self.console.debug(f"timestep={timestep}")
@@ -77,6 +78,9 @@ class Simulation:
                 self.console.debug(f"reward={joint_reward}")
                 self.console.debug(f"done={done}")
                 self.console.debug(f"info={info}")
+
+                for agent, previous_observation, action, observation, reward in zip(self.agents, previous_joint_observation, joint_action, joint_observation, joint_reward):
+                    agent.process_feedback(previous_observation, action, observation, reward)
 
                 self.conditional_render()
 
