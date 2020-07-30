@@ -180,12 +180,17 @@ class CAVEnv(MarkovGameEnv):
 
         joint_observation = self.observe()
 
+        joint_reward = [-1 for _ in self.actors]
+
         for i, actor in enumerate(self.actors):
-            if any(actor.bounding_box().mostly_intersects(road.bounding_box()) for road in self.constants.road_map.roads):
+            if any(actor.bounding_box().mostly_intersects(road.bounding_box()) for road in self.constants.road_map.roads):  # on road
                 self.episode_liveness[i] += 1
                 self.run_liveness[i] += 1
-
-        joint_reward = [0 for _ in self.actors]
+                if i > 0:  # not ego
+                    joint_reward[i] -= 5
+            else:  # off road
+                if i == 0:  # ego
+                    joint_reward[i] -= 5
 
         terminate = False
 
@@ -243,6 +248,12 @@ class CAVEnv(MarkovGameEnv):
             terminate = pedestrian_in_reaction_zone is not None
 
         info = {'pedestrian': pedestrian_in_reaction_zone}
+
+        if terminate:
+            if pedestrian_in_reaction_zone is None:
+                joint_reward[0] += 100
+            else:
+                joint_reward[pedestrian_in_reaction_zone] += 100
 
         return joint_observation, joint_reward, terminate, info
 
