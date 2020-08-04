@@ -50,7 +50,9 @@ actors = [
             velocity=car_constants.target_fast_velocity,
             orientation=road_map.major_road.outbound.orientation,
             acceleration=0.0,
-            angular_velocity=0.0
+            angular_velocity=0.0,
+            target_velocity=None,
+            target_orientation=None
         ),
         constants=car_constants
     ),
@@ -60,7 +62,9 @@ actors = [
             velocity=0.0,
             orientation=road_map.major_road.inbound.orientation,
             acceleration=0.0,
-            angular_velocity=0.0
+            angular_velocity=0.0,
+            target_velocity=None,
+            target_orientation=None
         ),
         constants=car_constants
     ),
@@ -71,7 +75,9 @@ actors = [
             velocity=0.0,
             orientation=road_map.major_road.outbound.orientation + (geometry.DEG2RAD * 90.0),
             acceleration=0.0,
-            angular_velocity=0.0
+            angular_velocity=0.0,
+            target_velocity=None,
+            target_orientation=None
         ),
         constants=pedestrian_constants
     ),
@@ -81,7 +87,9 @@ actors = [
             velocity=0.0,
             orientation=road_map.major_road.outbound.orientation + (geometry.DEG2RAD * 270.0),
             acceleration=0.0,
-            angular_velocity=0.0
+            angular_velocity=0.0,
+            target_velocity=None,
+            target_orientation=None
         ),
         constants=pedestrian_constants
     )

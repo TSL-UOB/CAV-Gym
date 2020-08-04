@@ -24,8 +24,8 @@ road_map = RoadMap(
 pavement_width = (M2PX * 3)
 
 env_constants = CAVEnvConstants(
-    viewer_width=road_map.major_road.constants.length,
-    viewer_height=road_map.major_road.width + (pavement_width * 2),
+    viewer_width=int(road_map.major_road.constants.length),
+    viewer_height=int(road_map.major_road.width + (pavement_width * 2)),
     road_map=road_map
 )
 
@@ -51,7 +51,9 @@ class PedestriansEnv(CAVEnv):
                     velocity=0.0,
                     orientations=spawn_orientations,
                     acceleration=0.0,
-                    angular_velocity=0.0
+                    angular_velocity=0.0,
+                    target_velocity=None,
+                    target_orientation=None
                 ),
                 constants=pedestrian_constants,
                 np_random=np_random
@@ -64,7 +66,9 @@ class PedestriansEnv(CAVEnv):
                     velocity=car_constants.target_fast_velocity,
                     orientation=road_map.major_road.outbound.orientation,
                     acceleration=0.0,
-                    angular_velocity=0.0
+                    angular_velocity=0.0,
+                    target_velocity=None,
+                    target_orientation=None
                 ),
                 constants=car_constants
             )

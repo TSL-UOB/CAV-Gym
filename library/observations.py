@@ -6,20 +6,6 @@ class Observation(Enum):
         return self.name
 
 
-class EmptyObservation(Observation):
-    NONE = 0
-
-
-class VelocityObservation(Observation):
-    INACTIVE = 0
-    ACTIVE = 1
-
-
-class OrientationObservation(Observation):
-    INACTIVE = 0
-    ACTIVE = 1
-
-
 class RoadObservation(Observation):
     ON_ROAD = 0
     ROAD_FRONT = 1
@@ -30,8 +16,3 @@ class RoadObservation(Observation):
     ROAD_REAR_RIGHT = 6
     ROAD_RIGHT = 7
     ROAD_FRONT_RIGHT = 8
-
-
-class DistanceObservation(Observation):
-    UNSATISFIED = 0
-    SATISFIED = 1

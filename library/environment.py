@@ -5,13 +5,8 @@ import gym
 from gym import spaces
 from gym.utils import seeding
 
-from library import geometry
-from library.actions import TrafficLightAction, OrientationAction, VelocityAction
-from library.actors import PelicanCrossing, DynamicActor, TrafficLight, Pedestrian
+from library.actors import PelicanCrossing, Pedestrian
 from library.assets import RoadMap, Occlusion
-from library.observations import OrientationObservation, EmptyObservation, VelocityObservation, RoadObservation, \
-    DistanceObservation
-from scenarios.constants import M2PX
 
 console_logger = logging.getLogger("library.console.environment")
 
@@ -61,7 +56,6 @@ class EnvConfig:
     terminate_collision: bool = False
     terminate_offroad: bool = False
     terminate_zone: bool = False
-    distance_threshold: float = M2PX * 22.5
 
 
 class CAVEnv(MarkovGameEnv):
@@ -85,31 +79,10 @@ class CAVEnv(MarkovGameEnv):
                 for subspace in space:
                     set_np_random(subspace)
 
-        actor_spaces = list()
-        for actor in self.actors:
-            actor_space = None
-            if isinstance(actor, DynamicActor):
-                velocity_action_space = spaces.Discrete(VelocityAction.__len__())
-                orientation_action_space = spaces.Discrete(OrientationAction.__len__())
-                actor_space = spaces.Tuple([velocity_action_space, orientation_action_space])
-            elif isinstance(actor, PelicanCrossing) or isinstance(actor, TrafficLight):
-                actor_space = spaces.Discrete(TrafficLightAction.__len__())
-            actor_spaces.append(actor_space)
-        self.action_space = spaces.Tuple(actor_spaces)
+        self.action_space = spaces.Tuple([actor.action_space() for actor in self.actors])
         set_np_random(self.action_space)
 
-        observation_spaces = list()
-        for actor in self.actors:
-            if isinstance(actor, DynamicActor):
-                velocity_observation_space = spaces.Discrete(VelocityObservation.__len__())
-                orientation_observation_space = spaces.Discrete(OrientationObservation.__len__())
-                road_observation_space = spaces.Discrete(RoadObservation.__len__())
-                distance_observation_space = spaces.Discrete(DistanceObservation.__len__())
-                observation_space = spaces.Tuple([velocity_observation_space, orientation_observation_space, road_observation_space, distance_observation_space])
-            else:
-                observation_space = spaces.Discrete(EmptyObservation.__len__())
-            observation_spaces.append(observation_space)
-        self.observation_space = spaces.Tuple(observation_spaces)
+        self.observation_space = spaces.Tuple([actor.observation_space() for actor in self.actors])
         set_np_random(self.observation_space)
 
         self.episode_liveness = [0 for _ in self.actors]
@@ -128,46 +101,21 @@ class CAVEnv(MarkovGameEnv):
             entities.append(self.constants.road_map.obstacle)
         return entities
 
-    def observe(self):
-        joint_observation = list()
-        for actor in self.actors:
-            if isinstance(actor, DynamicActor):
-                velocity_observation = VelocityObservation.ACTIVE if actor.target_velocity is not None else VelocityObservation.INACTIVE
-                orientation_observation = OrientationObservation.ACTIVE if actor.target_orientation is not None else OrientationObservation.INACTIVE
+    def state(self):
+        return [tuple(actor.state) for actor in self.actors]
 
-                def find_road_observation(road):
-                    if actor.bounding_box().intersects(road.bounding_box()):
-                        return RoadObservation.ON_ROAD
-                    else:
-                        relative_angle = actor.line_anchor_relative_angle(road)
+    def info(self):
+        actor_polygons = [actor.bounding_box() for actor in self.actors]
 
-                        if geometry.DEG2RAD * -157.5 <= relative_angle < geometry.DEG2RAD * -112.5:
-                            return RoadObservation.ROAD_REAR_RIGHT
-                        elif geometry.DEG2RAD * -112.5 <= relative_angle < geometry.DEG2RAD * -67.5:
-                            return RoadObservation.ROAD_RIGHT
-                        elif geometry.DEG2RAD * -67.5 <= relative_angle < geometry.DEG2RAD * -22.5:
-                            return RoadObservation.ROAD_FRONT_RIGHT
-                        elif geometry.DEG2RAD * -22.5 <= relative_angle < geometry.DEG2RAD * 22.5:
-                            return RoadObservation.ROAD_FRONT
-                        elif geometry.DEG2RAD * 22.5 <= relative_angle < geometry.DEG2RAD * 67.5:
-                            return RoadObservation.ROAD_FRONT_LEFT
-                        elif geometry.DEG2RAD * 67.5 <= relative_angle < geometry.DEG2RAD * 112.5:
-                            return RoadObservation.ROAD_LEFT
-                        elif geometry.DEG2RAD * 112.5 <= relative_angle < geometry.DEG2RAD * 157.5:
-                            return RoadObservation.ROAD_REAR_LEFT
-                        elif geometry.DEG2RAD * 157.5 <= relative_angle <= geometry.DEG2RAD * 180 or geometry.DEG2RAD * -180 < relative_angle < geometry.DEG2RAD * -157.5:
-                            return RoadObservation.ROAD_REAR
-                        else:
-                            raise Exception("relative angle is not in the interval (-math.pi, math.pi]")
+        road = self.constants.road_map.major_road
+        road_polygon = road.bounding_box()
 
-                road_observation = find_road_observation(self.constants.road_map.major_road)
-                _, assertion_zone = self.ego.stopping_zones()
-                distance_observation = DistanceObservation.SATISFIED if actor is not self.ego and assertion_zone is not None and assertion_zone.distance(actor.state.position) < self.env_config.distance_threshold else DistanceObservation.UNSATISFIED
-                joint_observation.append(tuple([velocity_observation.value, orientation_observation.value, road_observation.value, distance_observation.value]))
-            else:
-                joint_observation.append(EmptyObservation.NONE.value)
+        def angle(entity, entity_polygon):
+            return entity.line_anchor_relative_angle(road) if not entity_polygon.intersects(road_polygon) else None
 
-        return joint_observation
+        road_angles = [angle(actor, actor_polygons[i]) for i, actor in enumerate(self.actors)]
+
+        return {'actor_polygons': actor_polygons, 'road_angles': road_angles}
 
     def step(self, joint_action):
         assert self.action_space.contains(joint_action), f"{joint_action} ({type(joint_action)}) invalid"
@@ -178,12 +126,16 @@ class CAVEnv(MarkovGameEnv):
         for actor in self.actors:
             actor.step_dynamics(self.time_resolution)
 
-        joint_observation = self.observe()
+        info = self.info()
+
+        actor_polygons = info['actor_polygons']
+
+        state = self.state()
 
         joint_reward = [-1 for _ in self.actors]
 
-        for i, actor in enumerate(self.actors):
-            if any(actor.bounding_box().mostly_intersects(road.bounding_box()) for road in self.constants.road_map.roads):  # on road
+        for i, polygon in enumerate(actor_polygons):
+            if any(polygon.mostly_intersects(road.bounding_box()) for road in self.constants.road_map.roads):  # on road
                 self.episode_liveness[i] += 1
                 self.run_liveness[i] += 1
                 if i > 0:  # not ego
@@ -218,12 +170,11 @@ class CAVEnv(MarkovGameEnv):
             terminate = collision_occurred
 
         if not terminate and self.env_config.terminate_offroad:
-            ego_on_road = any(self.ego.bounding_box().intersects(road.bounding_box()) for road in self.constants.road_map.roads)
+            ego_on_road = any(actor_polygons[0].intersects(road.bounding_box()) for road in self.constants.road_map.roads)
             terminate = not ego_on_road
 
-        def ego_collision(entity):
-            entity_bounding_box = entity.bounding_box()
-            if entity_bounding_box.intersects(self.ego.bounding_box()):
+        def ego_collision(entity_bounding_box):
+            if entity_bounding_box.intersects(actor_polygons[0]):
                 return True
             braking_zone = self.ego.stopping_zones()[0]
             if braking_zone is not None and entity_bounding_box.intersects(braking_zone):
@@ -231,37 +182,35 @@ class CAVEnv(MarkovGameEnv):
             return False
 
         if not terminate:  # terminate early if pedestrian collides with ego or braking zone of ego (uninteresting tests)
-            ego_collision = any(ego_collision(actor) for actor in self.actors if actor is not self.ego and isinstance(actor, Pedestrian))
+            ego_collision = any(ego_collision(actor_polygons[i]) for i, actor in enumerate(self.actors) if actor is not self.ego and isinstance(actor, Pedestrian))
             terminate = ego_collision
 
-        def successful_test_pedestrian():
+        def check_pedestrian_in_reaction_zone():
             braking_zone = self.ego.stopping_zones()[1]
             if braking_zone is not None:
                 for other_actor_index, other_actor in enumerate(self.actors):
-                    if other_actor is not self.ego and isinstance(other_actor, Pedestrian) and other_actor.bounding_box().intersects(braking_zone):
+                    if other_actor is not self.ego and isinstance(other_actor, Pedestrian) and actor_polygons[other_actor_index].intersects(braking_zone):
                         return other_actor_index
             return None
 
         pedestrian_in_reaction_zone = None
         if not terminate and self.env_config.terminate_zone:
-            pedestrian_in_reaction_zone = successful_test_pedestrian()
+            pedestrian_in_reaction_zone = check_pedestrian_in_reaction_zone()
             terminate = pedestrian_in_reaction_zone is not None
 
-        info = {'pedestrian': pedestrian_in_reaction_zone}
-
         if terminate:
-            if pedestrian_in_reaction_zone is None:
-                joint_reward[0] += 100
-            else:
-                joint_reward[pedestrian_in_reaction_zone] += 100
+            winner = pedestrian_in_reaction_zone if pedestrian_in_reaction_zone else 0  # index of winner
+            joint_reward[winner] += 100
+            # noinspection PyTypeChecker
+            info['winner'] = winner
 
-        return joint_observation, joint_reward, terminate, info
+        return state, joint_reward, terminate, info
 
     def reset(self):
         for actor in self.actors:
             actor.reset()
         self.episode_liveness = [0 for _ in self.actors]
-        return self.observe()
+        return self.state()
 
     def render(self, mode='human'):
         from library.rendering import RoadEnvViewer  # lazy import of pyglet to allow headless mode on headless machines

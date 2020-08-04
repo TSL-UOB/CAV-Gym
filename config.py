@@ -10,7 +10,9 @@ from library.actors import DynamicActor, Pedestrian, TrafficLight, PelicanCrossi
 from library.environment import EnvConfig
 from reporting import Verbosity, pretty_str_set
 from scenarios.agents import KeyboardAgent, RandomPedestrianAgent, RandomConstrainedPedestrianAgent, \
-    ProximityPedestrianAgent, ElectionPedestrianAgent, RandomVehicleAgent, RandomTrafficLightAgent, NoopVehicleAgent
+    ProximityPedestrianAgent, ElectionPedestrianAgent, RandomVehicleAgent, RandomTrafficLightAgent, NoopAgent, \
+    ApproximateQLearningAgent
+from scenarios.constants import M2PX
 
 
 class RenderMode(Enum):
@@ -34,6 +36,7 @@ class AgentType(Enum):
     RANDOM_CONSTRAINED = "random-constrained"
     PROXIMITY = "proximity"
     ELECTION = "election"
+    Q_LEARNING = "q-learning"
 
     def __str__(self):
         return self.value
@@ -59,6 +62,7 @@ class Config:
     actors: int = 3
     agent_type: AgentType = AgentType.RANDOM
     seed: int = None
+    distance_threshold: float = M2PX * 22.5
 
     def __post_init__(self):
         pass
@@ -120,7 +124,7 @@ class ConfigParser(ArgumentParser):
                 episodes=args.episodes,
                 max_timesteps=args.timesteps,
                 render_mode=render_mode,
-                keyboard_agent=KeyboardAgent() if args.keyboard_agent else None,
+                keyboard_agent=KeyboardAgent(index=0) if args.keyboard_agent else None,
                 logging_dir=args.log,
                 record_dir=args.record,
                 verbosity=args.verbosity,
@@ -130,8 +134,7 @@ class ConfigParser(ArgumentParser):
                 frequency=30 if render_mode is RenderMode.VIDEO else 60,  # frequency appears to be locked by Gym rendering
                 terminate_collision=args.collisions,
                 terminate_offroad=args.offroad,
-                terminate_zone=args.zone,
-                distance_threshold=EnvConfig.distance_threshold
+                terminate_zone=args.zone
             ),
             scenario=Scenario(args.scenario),
             actors=args.number,
@@ -155,24 +158,26 @@ def setup(config=Config()):
     else:
         raise NotImplementedError
 
-    agent = config.run.keyboard_agent if config.run.keyboard_agent is not None else NoopVehicleAgent()
+    agent = config.run.keyboard_agent if config.run.keyboard_agent is not None else NoopAgent(index=0)
     agents = [agent]
-    for actor in env.actors[1:]:
+    for i, actor in enumerate(env.actors[1:], start=1):
         if isinstance(actor, DynamicActor):
             if isinstance(actor, Pedestrian):
                 if config.agent_type is AgentType.RANDOM:
-                    agents.append(RandomPedestrianAgent(np_random=np_random))
+                    agents.append(RandomPedestrianAgent(index=i, np_random=np_random))
                 elif config.agent_type is AgentType.RANDOM_CONSTRAINED:
-                    agents.append(RandomConstrainedPedestrianAgent(np_random=np_random))
+                    agents.append(RandomConstrainedPedestrianAgent(index=i, road=env.constants.road_map.major_road, np_random=np_random))
                 elif config.agent_type is AgentType.PROXIMITY:
-                    agents.append(ProximityPedestrianAgent())
+                    agents.append(ProximityPedestrianAgent(index=i, road=env.constants.road_map.major_road, distance_threshold=config.distance_threshold))
                 elif config.agent_type is AgentType.ELECTION:
-                    agents.append(ElectionPedestrianAgent())
+                    agents.append(ElectionPedestrianAgent(index=i, road=env.constants.road_map.major_road, distance_threshold=config.distance_threshold))
+                elif config.agent_type is AgentType.Q_LEARNING:
+                    agents.append(ApproximateQLearningAgent(index=i, ego_constants=env.actors[0].constants, self_constants=env.actors[1].constants, time_resolution=env.time_resolution, width=env.constants.viewer_width, height=env.constants.viewer_height, np_random=np_random))
                 else:
                     print(config.agent_type)
                     raise NotImplementedError
             else:
-                agents.append(RandomVehicleAgent(np_random=np_random))
+                agents.append(RandomVehicleAgent(index=i, np_random=np_random))
         elif isinstance(actor, TrafficLight) or isinstance(actor, PelicanCrossing):
             agents.append(RandomTrafficLightAgent(np_random=np_random))
 

@@ -50,10 +50,10 @@ class Simulation:
             episode_start_time = timeit.default_timer()
             episode = previous_episode + 1
 
-            joint_observation = self.env.reset()
-            info = None
+            state = self.env.reset()
+            info = self.env.info()
 
-            self.console.debug(f"observation={joint_observation}")
+            self.console.debug(f"state={state}")
 
             for agent in self.agents:
                 agent.reset()
@@ -64,23 +64,23 @@ class Simulation:
             for previous_timestep in range(self.run_config.max_timesteps):  # initially previous_timestep=0
                 timestep = previous_timestep + 1
 
-                joint_action = [agent.choose_action(previous_observation, action_space) for agent, previous_observation, action_space in zip(self.agents, joint_observation, self.env.action_space)]
+                joint_action = [agent.choose_action(state, info) for agent in self.agents]
 
                 if self.election:
-                    joint_action = self.election.result(joint_observation, joint_action)
+                    joint_action = self.election.result(state, joint_action)
 
-                previous_joint_observation = joint_observation
-                joint_observation, joint_reward, done, info = self.env.step(joint_action)
+                previous_state = state
+                state, joint_reward, done, info = self.env.step(joint_action)
 
                 self.console.debug(f"timestep={timestep}")
                 self.console.debug(f"action={joint_action}")
-                self.console.debug(f"observation={joint_observation}")
+                self.console.debug(f"state={state}")
                 self.console.debug(f"reward={joint_reward}")
                 self.console.debug(f"done={done}")
                 self.console.debug(f"info={info}")
 
-                for agent, previous_observation, action, observation, reward in zip(self.agents, previous_joint_observation, joint_action, joint_observation, joint_reward):
-                    agent.process_feedback(previous_observation, action, observation, reward)
+                for agent, action, reward in zip(self.agents, joint_action, joint_reward):
+                    agent.process_feedback(previous_state, action, state, reward)
 
                 self.conditional_render()
 

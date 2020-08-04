@@ -12,6 +12,12 @@ class Point:
     x: float
     y: float
 
+    def distance_x(self, other):
+        return other.x - self.x
+
+    def distance_y(self, other):
+        return other.y - self.y
+
     def distance(self, other):
         return math.sqrt(((other.y - self.y) ** 2) + ((other.x - self.x) ** 2))
 

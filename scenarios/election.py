@@ -1,5 +1,4 @@
 from library.actions import OrientationAction
-from library.observations import OrientationObservation
 from scenarios.agents import ElectionPedestrianAgent
 
 
@@ -21,13 +20,13 @@ class Election:
                 joint_action_vote[i] = velocity_action_id, OrientationAction.NOOP.value  # reset the agent's orientation action
         return joint_action_vote
 
-    def result(self, previous_joint_observation, joint_action_vote):
-        assert len(self.agents) == len(previous_joint_observation) == len(joint_action_vote)
+    def result(self, previous_state, joint_action_vote):
+        assert len(self.agents) == len(previous_state) == len(joint_action_vote)
 
         if self.active_player and not self.agents[self.active_player].crossing_action:
-            _, orientation_observation_id, _, _ = previous_joint_observation[self.active_player]
-            orientation_observation = OrientationObservation(orientation_observation_id)
-            if orientation_observation is OrientationObservation.INACTIVE:
+            target_orientation = previous_state[self.active_player][7]
+            active_orientation = target_orientation is not None
+            if not active_orientation:
                 previous_active_player = self.active_player
                 self.active_player = None  # previous winner has finished crossing
                 return self.focal_joint_action(joint_action_vote, previous_active_player)  # previous_active_player needs to execute final action

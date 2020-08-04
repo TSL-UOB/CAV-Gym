@@ -3,6 +3,8 @@ from copy import copy
 from dataclasses import dataclass
 from enum import Enum
 
+import numpy as np
+from gym import spaces
 from gym.utils import seeding
 
 from library import geometry
@@ -35,6 +37,12 @@ class Actor:
     def step_dynamics(self, time_resolution):
         raise NotImplementedError
 
+    def observation_space(self):
+        raise NotImplementedError
+
+    def action_space(self):
+        raise NotImplementedError
+
 
 @dataclass
 class DynamicActorState:
@@ -43,9 +51,20 @@ class DynamicActorState:
     orientation: float
     acceleration: float
     angular_velocity: float
+    target_velocity: float or None
+    target_orientation: float or None
 
     def __copy__(self):
-        return DynamicActorState(copy(self.position), self.velocity, self.orientation, self.acceleration, self.angular_velocity)
+        return DynamicActorState(copy(self.position), self.velocity, self.orientation, self.acceleration, self.angular_velocity, self.target_velocity, self.target_orientation)
+
+    def __iter__(self):
+        yield from self.position
+        yield self.velocity
+        yield self.orientation
+        yield self.acceleration
+        yield self.angular_velocity
+        yield self.target_velocity
+        yield self.target_orientation
 
 
 @dataclass(frozen=True)
@@ -82,14 +101,23 @@ class DynamicActor(Actor, Occlusion):
 
         self.wheels = geometry.make_rectangle(self.constants.wheelbase, self.constants.track)
 
-        self.target_velocity = None
-        self.target_orientation = None
+    def observation_space(self):
+        return spaces.Tuple([
+            spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),  # x
+            spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),  # y
+            spaces.Box(low=0.0, high=np.inf, shape=(1,), dtype=np.float32),  # velocity
+            spaces.Box(low=-np.pi, high=np.pi, shape=(1,), dtype=np.float32),  # orientation
+            spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),  # acceleration
+            spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),  # angular_velocity
+            spaces.Box(low=0.0, high=np.inf, shape=(1,), dtype=np.float32),  # target_velocity
+            spaces.Box(low=-np.pi, high=np.pi, shape=(1,), dtype=np.float32)  # target_orientation
+        ])
+
+    def action_space(self):
+        return spaces.Tuple([spaces.Discrete(VelocityAction.__len__()), spaces.Discrete(OrientationAction.__len__())])
 
     def reset(self):
         super().reset()
-
-        self.target_velocity = None
-        self.target_orientation = None
 
     def bounding_box(self):
         return self.shape.transform(self.state.orientation, self.state.position)
@@ -145,7 +173,7 @@ class DynamicActor(Actor, Occlusion):
         angle_max = geometry.Triangle(rear=rotation_point, front_left=max_corner, front_right=rear_axle_centre_point).angle()
         angle_front_centre = geometry.Triangle(rear=rotation_point, front_left=self.bounding_box().front_centre(), front_right=rear_axle_centre_point).angle()
 
-        target_angle = geometry.normalise_angle(self.target_orientation - (math.pi / 2.0) if counter_clockwise else self.target_orientation + (math.pi / 2.0))
+        target_angle = geometry.normalise_angle(self.state.target_orientation - (math.pi / 2.0) if counter_clockwise else self.state.target_orientation + (math.pi / 2.0))
         target_arc = circle_motion.arc_from_angle(current_angle, geometry.normalise_angle(target_angle - current_angle))
         target_arc_length = target_arc.arc_length()
 
@@ -187,52 +215,52 @@ class DynamicActor(Actor, Occlusion):
 
     def step_action(self, joint_action, index_self):
         velocity_action_id, orientation_action_id = joint_action[index_self]
-        velocity_action = VelocityAction(velocity_action_id)
-        orientation_action = OrientationAction(orientation_action_id)
+        velocity_action = VelocityAction(velocity_action_id) if self.state.target_velocity is None else VelocityAction.NOOP
+        orientation_action = OrientationAction(orientation_action_id) if self.state.target_orientation is None else OrientationAction.NOOP
 
         if velocity_action is VelocityAction.STOP:
-            self.target_velocity = 0
+            self.state.target_velocity = 0
         elif velocity_action is VelocityAction.SLOW:
-            self.target_velocity = self.constants.target_slow_velocity
+            self.state.target_velocity = self.constants.target_slow_velocity
         elif velocity_action is VelocityAction.FAST:
-            self.target_velocity = self.constants.target_fast_velocity
+            self.state.target_velocity = self.constants.target_fast_velocity
 
-        if self.target_velocity is not None:
-            difference = self.target_velocity - self.state.velocity
+        if self.state.target_velocity is not None:
+            difference = self.state.target_velocity - self.state.velocity
             if difference < 0:
                 self.state.acceleration = self.constants.deceleration_rate
             elif difference > 0:
                 self.state.acceleration = self.constants.acceleration_rate
             else:
-                self.target_velocity = None
+                self.state.target_velocity = None
 
         if orientation_action is OrientationAction.FORWARD_LEFT:
-            self.target_orientation = self.state.orientation + (geometry.DEG2RAD * 45)
+            self.state.target_orientation = self.state.orientation + (geometry.DEG2RAD * 45)
         elif orientation_action is OrientationAction.LEFT:
-            self.target_orientation = self.state.orientation + (geometry.DEG2RAD * 90)
+            self.state.target_orientation = self.state.orientation + (geometry.DEG2RAD * 90)
         elif orientation_action is OrientationAction.REAR_LEFT:
-            self.target_orientation = self.state.orientation + (geometry.DEG2RAD * 135)
+            self.state.target_orientation = self.state.orientation + (geometry.DEG2RAD * 135)
         elif orientation_action is OrientationAction.REAR:
-            self.target_orientation = self.state.orientation + (geometry.DEG2RAD * 180)
+            self.state.target_orientation = self.state.orientation + (geometry.DEG2RAD * 180)
         elif orientation_action is OrientationAction.REAR_RIGHT:
-            self.target_orientation = self.state.orientation - (geometry.DEG2RAD * 135)
+            self.state.target_orientation = self.state.orientation - (geometry.DEG2RAD * 135)
         elif orientation_action is OrientationAction.RIGHT:
-            self.target_orientation = self.state.orientation - (geometry.DEG2RAD * 90)
+            self.state.target_orientation = self.state.orientation - (geometry.DEG2RAD * 90)
         elif orientation_action is OrientationAction.FORWARD_RIGHT:
-            self.target_orientation = self.state.orientation - (geometry.DEG2RAD * 45)
+            self.state.target_orientation = self.state.orientation - (geometry.DEG2RAD * 45)
 
-        if self.target_orientation is not None:
-            self.target_orientation = geometry.normalise_angle(self.target_orientation)
-            assert -math.pi < self.target_orientation <= math.pi
+        if self.state.target_orientation is not None:
+            self.state.target_orientation = geometry.normalise_angle(self.state.target_orientation)
+            assert -math.pi < self.state.target_orientation <= math.pi
 
-        if orientation_action is not OrientationAction.NOOP and self.target_orientation is not None:
-            difference = geometry.normalise_angle(self.target_orientation - self.state.orientation)
+        if orientation_action is not OrientationAction.NOOP and self.state.target_orientation is not None:
+            difference = geometry.normalise_angle(self.state.target_orientation - self.state.orientation)
             if difference < 0:
                 self.state.angular_velocity = self.constants.right_turn_rate
             elif difference > 0:
                 self.state.angular_velocity = self.constants.left_turn_rate
             else:
-                self.target_orientation = None
+                self.state.target_orientation = None
 
     def step_dynamics(self, time_resolution):
         previous_velocity = self.state.velocity
@@ -274,27 +302,27 @@ class DynamicActor(Actor, Occlusion):
             y=(front_wheel_position.y + back_wheel_position.y) / 2.0
         )
 
-        previous_orientation_diff = geometry.normalise_angle(self.target_orientation - self.state.orientation) if self.target_orientation is not None else None
+        previous_orientation_diff = geometry.normalise_angle(self.state.target_orientation - self.state.orientation) if self.state.target_orientation is not None else None
         self.state.orientation = math.atan2(front_wheel_position.y - back_wheel_position.y, front_wheel_position.x - back_wheel_position.x)  # range is [-math.pi, math.pi] (min or max may be exclusive)
         assert -math.pi < self.state.orientation <= math.pi
 
-        if self.target_velocity is not None and (
-                (self.state.velocity == self.target_velocity)  # actor has reached target velocity
-                or (previous_velocity < self.target_velocity < self.state.velocity)  # actor has accelerated too far
-                or (previous_velocity > self.target_velocity > self.state.velocity)  # actor has decelerated too far
+        if self.state.target_velocity is not None and (
+                (self.state.velocity == self.state.target_velocity)  # actor has reached target velocity
+                or (previous_velocity < self.state.target_velocity < self.state.velocity)  # actor has accelerated too far
+                or (previous_velocity > self.state.target_velocity > self.state.velocity)  # actor has decelerated too far
         ):
-            self.state.velocity = self.target_velocity
-            self.target_velocity = None
+            self.state.velocity = self.state.target_velocity
+            self.state.target_velocity = None
             self.state.acceleration = 0
 
-        current_orientation_diff = geometry.normalise_angle(self.target_orientation - self.state.orientation) if self.target_orientation is not None else None
-        if self.target_orientation is not None and (
-                (self.state.orientation == self.target_orientation)  # actor has reached target orientation
+        current_orientation_diff = geometry.normalise_angle(self.state.target_orientation - self.state.orientation) if self.state.target_orientation is not None else None
+        if self.state.target_orientation is not None and (
+                (self.state.orientation == self.state.target_orientation)  # actor has reached target orientation
                 or (previous_orientation_diff < 0 < current_orientation_diff)  # actor has turned too far left
                 or (previous_orientation_diff > 0 > current_orientation_diff)  # actor has turned too far right
         ):
-            self.state.orientation = self.target_orientation
-            self.target_orientation = None
+            self.state.orientation = self.state.target_orientation
+            self.state.target_orientation = None
             self.state.angular_velocity = 0
 
 
@@ -310,6 +338,8 @@ class SpawnPedestrianState:
     orientations: list
     acceleration: float
     angular_velocity: float
+    target_velocity: float or None
+    target_orientation: float or None
 
 
 class SpawnPedestrian(Pedestrian):
@@ -335,7 +365,9 @@ class SpawnPedestrian(Pedestrian):
             velocity=self.spawn_init_state.velocity,
             orientation=orientation,
             acceleration=self.spawn_init_state.acceleration,
-            angular_velocity=self.spawn_init_state.angular_velocity
+            angular_velocity=self.spawn_init_state.angular_velocity,
+            target_velocity=self.spawn_init_state.target_velocity,
+            target_orientation=self.spawn_init_state.target_orientation
         )
 
 
@@ -381,6 +413,9 @@ class TrafficLightState(Enum):
     def __copy__(self):
         return TrafficLightState(self)
 
+    def __iter__(self):
+        yield self
+
 
 @dataclass(frozen=True)
 class TrafficLightConstants:
@@ -402,6 +437,12 @@ class TrafficLight(Actor, Occlusion):
         self.red_light = make_light(self.constants.height * 0.25)
         self.amber_light = make_light(0.0)
         self.green_light = make_light(-self.constants.height * 0.25)
+
+    def observation_space(self):
+        return [state for state in TrafficLightState]
+
+    def action_space(self):
+        return [action for action in TrafficLightAction]
 
     def bounding_box(self):
         return self.static_bounding_box
@@ -458,6 +499,12 @@ class PelicanCrossing(Actor):
 
         self.outbound_spawn = Point(self.constants.x_position + (self.constants.width * 0.15), (self.constants.road.width / 2.0) + (self.constants.road.constants.lane_width / 2.0)).transform(self.constants.road.constants.orientation, self.constants.road.constants.position)
         self.inbound_spawn = Point(self.constants.x_position - (self.constants.width * 0.15), -(self.constants.road.width / 2.0) - (self.constants.road.constants.lane_width / 2.0)).transform(self.constants.road.constants.orientation, self.constants.road.constants.position)
+
+    def observation_space(self):
+        return spaces.Discrete(TrafficLightState.__len__())
+
+    def action_space(self):
+        return spaces.Discrete(TrafficLightAction.__len__())
 
     def bounding_box(self):
         return self.static_bounding_box

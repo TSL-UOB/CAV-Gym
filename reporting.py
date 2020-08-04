@@ -220,9 +220,7 @@ class RunResults(LogMessage):
 def analyse_episode(index, start_time, end_time, timesteps, env_info, run_config, env):  # can run_config and env be removed?
     assert 1 <= timesteps <= run_config.max_timesteps
     completed = timesteps == run_config.max_timesteps
-    assert 'pedestrian' in env_info
-    pedestrian_index = env_info['pedestrian']
-    successful = pedestrian_index is not None
+    successful = 'winner' in env_info and env_info['winner'] > 0  # otherwise, draw or ego wons
     score = -sum(env.episode_liveness[1:]) if successful else float("nan")
     return EpisodeResults(
         index=index,
