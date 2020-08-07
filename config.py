@@ -55,14 +55,22 @@ class RunConfig:
 
 
 @dataclass(frozen=True)
+class AgentConfig:
+    alpha: float = 0.1
+    threshold: float = M2PX * 22.5
+    epsilon: float = 0.01
+    gamma: float = 0.99
+    type: AgentType = AgentType.RANDOM
+
+
+@dataclass(frozen=True)
 class Config:
     run: RunConfig = RunConfig()
     env: EnvConfig = EnvConfig()
     scenario: Scenario = Scenario.PEDESTRIANS
     actors: int = 3
-    agent_type: AgentType = AgentType.RANDOM
     seed: int = None
-    distance_threshold: float = M2PX * 22.5
+    agent: AgentConfig = AgentConfig()
 
     def __post_init__(self):
         pass
@@ -84,6 +92,18 @@ class ConfigParser(ArgumentParser):
                 raise ArgumentTypeError(f"invalid positive int value: {value}")
             return ivalue
 
+        def zero_one_float(value):
+            fvalue = float(value)
+            if fvalue < 0 or fvalue > 1:
+                raise ArgumentTypeError(f"invalid [0, 1] value: {value}")
+            return fvalue
+
+        def non_negative_float(value):
+            fvalue = float(value)
+            if fvalue <= 0:
+                raise ArgumentTypeError(f"invalid non-negative float value: {value}")
+            return fvalue
+
         self.add_argument("-c", "--collisions", help="terminate when any collision occurs", action="store_true")
         self.add_argument("-e", "--episodes", type=positive_int, default=RunConfig.episodes, metavar="N", help="set number of episodes as %(metavar)s (default: %(default)s)")
         self.add_argument("-l", "--log", metavar="DIR", help="enable logging of run to %(metavar)s")
@@ -92,33 +112,57 @@ class ConfigParser(ArgumentParser):
         self.add_argument("-t", "--timesteps", type=positive_int, default=RunConfig.max_timesteps, metavar="N", help="set max timesteps per episode as %(metavar)s (default: %(default)s)")
         self.add_argument("-v", "--verbosity", type=Verbosity, choices=[choice for choice in Verbosity], default=RunConfig.verbosity, metavar="LEVEL", help=f"set verbosity as %(metavar)s (choices: {pretty_str_set([choice for choice in Verbosity])}, default: {RunConfig.verbosity})")
 
-        self.set_defaults(keyboard_agent=False, record=None, number=None, agent=Config.agent_type, zone=False)
+        self.set_defaults(keyboard_agent=False, record=None, number=None, agent=AgentConfig.type, zone=False, alpha=AgentConfig.alpha, threshold=AgentConfig.threshold, epsilon=AgentConfig.epsilon, gamma=AgentConfig.gamma)
 
-        scenario_subparsers = self.add_subparsers(dest="scenario", required=True, metavar="SCENARIO", parser_class=ArgumentParser)
-
-        scenario_subparsers.add_parser(Scenario.BUS_STOP.value, help="three-lane one-way major road with three cars, a cyclist, a bus, and a bus stop")
-        scenario_subparsers.add_parser(Scenario.CROSSROADS.value, help="two-lane two-way crossroads road with two cars and a pedestrian")
-        pedestrians_subparser = scenario_subparsers.add_parser(Scenario.PEDESTRIANS.value, help="two-lane one-way major road with a car and a variable number of pedestrians")
-        scenario_subparsers.add_parser(Scenario.PELICAN_CROSSING.value, help="two-lane two-way major road with two cars, two pedestrians, and a pelican crossing")
-
-        pedestrians_subparser.add_argument("-a", "--agent", type=AgentType, choices=[choice for choice in AgentType], default=Config.agent_type, metavar="TYPE", help=f"set agent type as %(metavar)s (choices: {pretty_str_set([choice for choice in AgentType])}, default: {Config.agent_type})")
-        pedestrians_subparser.add_argument("-n", "--number", type=positive_int, default=Config.actors, metavar="N", help="set number of actors as %(metavar)s (default: %(default)s)")
-        pedestrians_subparser.add_argument("-z", "--zone", help="terminate when pedestrian intersects assertion zone", action="store_true")
-
-        for scenario, scenario_subparser in scenario_subparsers.choices.items():
-            mode_subparsers = scenario_subparser.add_subparsers(dest="mode", required=True, metavar="MODE")
+        def add_mode_options(parser):
+            mode_subparsers = parser.add_subparsers(dest="mode", required=True, metavar="MODE")
 
             mode_subparsers.add_parser("headless", help="run without rendering")  # headless mode has no additional options
-
             render_subparser = mode_subparsers.add_parser("render", help="run while rendering to screen")
 
             render_subparser.add_argument("-k", "--keyboard-agent", help="enable keyboard-control of ego actor", action="store_true")
             render_subparser.add_argument("-r", "--record", metavar="DIR", help="enable video recording of run to %(metavar)s")
 
+        def add_agent_options(parser):
+            agent_subparsers = parser.add_subparsers(dest="agent", required=True, metavar="AGENT")
+
+            random_subparser = agent_subparsers.add_parser(AgentType.RANDOM.value, help=f"randomly choose action")
+            random_constrained_subparser = agent_subparsers.add_parser(AgentType.RANDOM_CONSTRAINED.value, help=f"randomly choose crossing behaviour")
+            proximity_subparser = agent_subparsers.add_parser(AgentType.PROXIMITY.value, help=f"choose crossing behaviour based on proximity to ego")
+            election_subparser = agent_subparsers.add_parser(AgentType.ELECTION.value, help=f"vote for crossing behaviour based on proximity to ego")
+            q_learning_subparser = agent_subparsers.add_parser(AgentType.Q_LEARNING.value, help=f"choose action based on Q learning")
+
+            q_learning_subparser.add_argument("--alpha", type=zero_one_float, default=AgentConfig.alpha, metavar="N", help="set learning rate as %(metavar)s (default: %(default)s)")
+            for agent_subparser in [proximity_subparser, election_subparser]:
+                agent_subparser.add_argument("--threshold", type=non_negative_float, default=AgentConfig.threshold, metavar="N", help="set distance threshold as %(metavar)s (default: %(default)s)")
+            for agent_subparser in [random_subparser, random_constrained_subparser, q_learning_subparser]:
+                agent_subparser.add_argument("--epsilon", type=zero_one_float, default=AgentConfig.epsilon, metavar="N", help="set exploration probability as %(metavar)s (default: %(default)s)")
+            q_learning_subparser.add_argument("--gamma", type=zero_one_float, default=AgentConfig.gamma, metavar="N", help="set discount factor as %(metavar)s (default: %(default)s)")
+
+            for _, agent_subparser in agent_subparsers.choices.items():
+                add_mode_options(agent_subparser)
+
+        def add_scenario_subparser(parser):
+            scenario_subparsers = parser.add_subparsers(dest="scenario", required=True, metavar="SCENARIO", parser_class=ArgumentParser)
+
+            bus_stop_subparser = scenario_subparsers.add_parser(Scenario.BUS_STOP.value, help="three-lane one-way major road with three cars, a cyclist, a bus, and a bus stop")
+            crossroads_subparser = scenario_subparsers.add_parser(Scenario.CROSSROADS.value, help="two-lane two-way crossroads road with two cars and a pedestrian")
+            pedestrians_subparser = scenario_subparsers.add_parser(Scenario.PEDESTRIANS.value, help="two-lane one-way major road with a car and a variable number of pedestrians")
+            pelican_crossing_subparser = scenario_subparsers.add_parser(Scenario.PELICAN_CROSSING.value, help="two-lane two-way major road with two cars, two pedestrians, and a pelican crossing")
+
+            pedestrians_subparser.add_argument("-n", "--number", type=positive_int, default=Config.actors, metavar="N", help="set number of actors as %(metavar)s (default: %(default)s)")
+            pedestrians_subparser.add_argument("-z", "--zone", help="terminate when pedestrian intersects assertion zone", action="store_true")
+
+            add_agent_options(pedestrians_subparser)
+            for scenario_subparser in [bus_stop_subparser, crossroads_subparser, pelican_crossing_subparser]:
+                add_mode_options(scenario_subparser)
+
+        add_scenario_subparser(self)
+
     def parse_config(self):
         args = self.parse_args()
         render_mode = RenderMode.HEADLESS if args.mode == "headless" else RenderMode.VIDEO if args.record else RenderMode.SCREEN
-        agent_type = args.agent
+        agent_type = AgentType(args.agent)
         return Config(
             run=RunConfig(
                 episodes=args.episodes,
@@ -138,8 +182,14 @@ class ConfigParser(ArgumentParser):
             ),
             scenario=Scenario(args.scenario),
             actors=args.number,
-            agent_type=agent_type,
-            seed=args.seed
+            seed=args.seed,
+            agent=AgentConfig(
+                alpha=args.alpha,
+                threshold=args.threshold,
+                epsilon=args.epsilon,
+                gamma=args.gamma,
+                type=agent_type
+            )
         )
 
 
@@ -163,18 +213,17 @@ def setup(config=Config()):
     for i, actor in enumerate(env.actors[1:], start=1):
         if isinstance(actor, DynamicActor):
             if isinstance(actor, Pedestrian):
-                if config.agent_type is AgentType.RANDOM:
-                    agents.append(RandomPedestrianAgent(index=i, np_random=np_random))
-                elif config.agent_type is AgentType.RANDOM_CONSTRAINED:
-                    agents.append(RandomConstrainedPedestrianAgent(index=i, road=env.constants.road_map.major_road, np_random=np_random))
-                elif config.agent_type is AgentType.PROXIMITY:
-                    agents.append(ProximityPedestrianAgent(index=i, road=env.constants.road_map.major_road, distance_threshold=config.distance_threshold))
-                elif config.agent_type is AgentType.ELECTION:
-                    agents.append(ElectionPedestrianAgent(index=i, road=env.constants.road_map.major_road, distance_threshold=config.distance_threshold))
-                elif config.agent_type is AgentType.Q_LEARNING:
-                    agents.append(ApproximateQLearningAgent(index=i, ego_constants=env.actors[0].constants, self_constants=env.actors[1].constants, road_polgon=env.constants.road_map.major_road.static_bounding_box, time_resolution=env.time_resolution, width=env.constants.viewer_width, height=env.constants.viewer_height, np_random=np_random))
+                if config.agent.type is AgentType.RANDOM:
+                    agents.append(RandomPedestrianAgent(index=i, epsilon=config.agent.epsilon, np_random=np_random))
+                elif config.agent.type is AgentType.RANDOM_CONSTRAINED:
+                    agents.append(RandomConstrainedPedestrianAgent(index=i, epsilon=config.agent.epsilon, road=env.constants.road_map.major_road, np_random=np_random))
+                elif config.agent.type is AgentType.PROXIMITY:
+                    agents.append(ProximityPedestrianAgent(index=i, road=env.constants.road_map.major_road, distance_threshold=config.agent.threshold))
+                elif config.agent.type is AgentType.ELECTION:
+                    agents.append(ElectionPedestrianAgent(index=i, road=env.constants.road_map.major_road, distance_threshold=config.agent.threshold))
+                elif config.agent.type is AgentType.Q_LEARNING:
+                    agents.append(ApproximateQLearningAgent(index=i, alpha=config.agent.alpha, epsilon=config.agent.epsilon, gamma=config.agent.gamma, ego_constants=env.actors[0].constants, self_constants=env.actors[1].constants, road_polgon=env.constants.road_map.major_road.static_bounding_box, time_resolution=env.time_resolution, width=env.constants.viewer_width, height=env.constants.viewer_height, np_random=np_random))
                 else:
-                    print(config.agent_type)
                     raise NotImplementedError
             else:
                 agents.append(RandomVehicleAgent(index=i, np_random=np_random))
