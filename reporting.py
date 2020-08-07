@@ -26,16 +26,16 @@ def pretty_float(float_value, decimal_places=2):
     return f"{round(float_value, decimal_places):g}"
 
 
-# def pretty_float_iter(float_iter, **kwargs):
-#     return ", ".join(pretty_float(float_value, **kwargs) for float_value in float_iter)
-#
-#
+def pretty_float_iter(float_iter, **kwargs):
+    return ", ".join(pretty_float(float_value, **kwargs) for float_value in float_iter)
+
+
 # def pretty_float_tuple(float_list, **kwargs):
 #     return f"({pretty_float_iter(float_list, **kwargs)})"
-#
-#
-# def pretty_float_list(float_list, **kwargs):
-#     return f"[{pretty_float_iter(float_list, **kwargs)}]"
+
+
+def pretty_float_list(float_list, **kwargs):
+    return f"[{pretty_float_iter(float_list, **kwargs)}]"
 
 
 class CustomLogRecord(logging.LogRecord):

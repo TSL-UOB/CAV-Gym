@@ -13,10 +13,10 @@ class Point:
     y: float
 
     def distance_x(self, other):
-        return other.x - self.x
+        return abs(other.x - self.x)
 
     def distance_y(self, other):
-        return other.y - self.y
+        return abs(other.y - self.y)
 
     def distance(self, other):
         return math.sqrt(((other.y - self.y) ** 2) + ((other.x - self.x) ** 2))
@@ -80,10 +80,17 @@ class Shape:
     def contains(self, other):
         return ShapelyPolygon(list(self)).contains(ShapelyPolygon(list(other)))
 
-    def mostly_intersects(self, other):
+    def percentage_intersects(self, other):
+        if not self.intersects(other):
+            return 0
+        if other.contains(self):
+            return 1
         self_polygon = ShapelyPolygon(list(self))
         self_polygon_intersection = self_polygon.intersection(ShapelyPolygon(list(other)))
-        return self_polygon_intersection.area / self_polygon.area > 0.5
+        return self_polygon_intersection.area / self_polygon.area
+
+    def mostly_intersects(self, other):
+        return self.percentage_intersects(other) > 0.5
 
     def distance(self, point):
         return ShapelyPolygon(list(self)).exterior.distance(ShapelyPoint(*point))

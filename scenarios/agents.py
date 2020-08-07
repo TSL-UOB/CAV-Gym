@@ -1,6 +1,5 @@
 import math
 
-import numpy as np
 from gym.utils import seeding
 
 from library import geometry
@@ -145,7 +144,7 @@ class KeyboardAgent(DynamicActorAgent):
     def process_feedback(self, previous_observation, action, observation, reward):
         pass
 
-    def key_press(self, key, mod):
+    def key_press(self, key, _mod):
         if key in key_velocity_actions:
             self.pending_velocity_action = key_velocity_actions[key]
         if key in key_orientation_actions:
@@ -354,17 +353,25 @@ class ElectionPedestrianAgent(ProximityPedestrianAgent):
 
 
 class ApproximateQLearningAgent(RandomPedestrianAgent):
-    def __init__(self, ego_constants, self_constants, time_resolution, width, height, alpha=0.1, gamma=0.99, epsilon=0.02, **kwargs):
+    def __init__(self, ego_constants, self_constants, road_polgon, time_resolution, width, height, alpha=0.1, gamma=0.99, epsilon=0.01, **kwargs):
         super().__init__(epsilon=epsilon, **kwargs)  # self.epsilon is exploration probability (should decrease over time)
 
         self.ego_constants = ego_constants
         self.self_constants = self_constants
+        self.road_polgon = road_polgon
         self.time_resolution = time_resolution
         self.alpha = alpha  # learning rate (should decrease over time)
         self.gamma = gamma  # discount factor (should decrease over time?)
 
-        self.feature_bounds = [(0.0, width), (0.0, height), (0.0, math.sqrt((width ** 2) + (height ** 2)))]
-        self.feature_weights = np.zeros((3,), dtype=np.float32)
+        self.feature_bounds = [
+            (0, width),
+            (0, height),
+            (1, math.sqrt((width ** 2) + (height ** 2))),
+            # (0, 1),
+            # (0, math.pi)
+        ]
+        self.num_featues = len(self.feature_bounds)
+        self.feature_weights = [0.0 for _ in range(self.num_featues)]
 
         self.available_actions = [(velocity_action.value, orientation_action.value) for velocity_action in VelocityAction for orientation_action in OrientationAction]
 
@@ -373,6 +380,7 @@ class ApproximateQLearningAgent(RandomPedestrianAgent):
 
     def features(self, state, action):  # question: what does it mean for a feature to depend on an action and/or what does a Q value mean if it does not depend on an action?
         def make_actor_state(data):
+            # assert len(data) == 8
             return DynamicActorState(
                 position=Point(data[0], data[1]),
                 velocity=data[2],
@@ -385,19 +393,21 @@ class ApproximateQLearningAgent(RandomPedestrianAgent):
 
         ego_state = make_actor_state(state[0])
         self_state = make_actor_state(state[self.index])
-        spawn_actors = [Car(ego_state, self.ego_constants), Pedestrian(self_state, self.self_constants)]
+
+        ego_actor = Car(ego_state, self.ego_constants)
+        self_actor = Pedestrian(self_state, self.self_constants)
+
         joint_action = [(VelocityAction.NOOP.value, OrientationAction.NOOP.value), action]
 
+        spawn_actors = [ego_actor, self_actor]
         for i, spawn_actor in enumerate(spawn_actors):
             spawn_actor.step_action(joint_action, i)
 
         for i, spawn_actor in enumerate(spawn_actors):
             spawn_actor.step_dynamics(self.time_resolution)
 
-        ego_position = spawn_actors[0].state.position
-        self_position = spawn_actors[1].state.position
-
-        unnormalised_values = [self_position.distance_x(ego_position), self_position.distance_y(ego_position), self_position.distance(ego_position)]  # extract feature values from state
+        ego_position = ego_actor.state.position
+        self_position = self_actor.state.position
 
         def normalise(value, min_bound, max_bound):
             if value < min_bound:
@@ -407,16 +417,26 @@ class ApproximateQLearningAgent(RandomPedestrianAgent):
             else:
                 return (value - min_bound) / (max_bound - min_bound)
 
-        return tuple(normalise(value, *bounds) for value, bounds in zip(unnormalised_values, self.feature_bounds))  # normalise values
+        unnormalised_values = [
+            self_position.distance_x(ego_position),
+            self_position.distance_y(ego_position),
+            self_position.distance(ego_position),
+            # 1 if self_actor.bounding_box().intersects(self.road_polgon) else 0,
+            # abs(geometry.Line(start=ego_position, end=self_position).orientation() - ego_actor.state.orientation)
+        ]
+
+        assert len(unnormalised_values) == self.num_featues
+        normalised_values = tuple(normalise(value, *bounds) for value, bounds in zip(unnormalised_values, self.feature_bounds))
+        # print(pretty_float_list(unnormalised_values), pretty_float_list(normalised_values))
+        return normalised_values
 
     def q_value(self, state, action):  # if features do not depend on action, then the Q value will not either
-        observation_action_features = self.features(state, action)
-        # value = sum(weight * feature for weight, feature in zip(self.feature_weights, observation_action_features))
-        np_multiply = np.multiply(self.feature_weights, observation_action_features)
-        # np_sum = np.sum(np_multiply)
-        np_sum = np_multiply.sum()
-        assert str(np_sum) != "inf" and str(np_sum) != "-inf", f"Q value error: {np_sum}"
-        return np_sum
+        feature_values = self.features(state, action)
+        # assert len(feature_values) == self.num_featues
+        q_value = sum(weight * feature for weight, feature in zip(self.feature_weights, feature_values))
+        # assert math.isfinite(q_value)
+        # print(pretty_float_list(feature_values), pretty_float_list(self.feature_weights), pretty_float(q_value))
+        return q_value
 
     def choose_action(self, state, info=None):
         if self.epsilon_valid():

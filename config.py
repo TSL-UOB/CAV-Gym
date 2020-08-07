@@ -172,7 +172,7 @@ def setup(config=Config()):
                 elif config.agent_type is AgentType.ELECTION:
                     agents.append(ElectionPedestrianAgent(index=i, road=env.constants.road_map.major_road, distance_threshold=config.distance_threshold))
                 elif config.agent_type is AgentType.Q_LEARNING:
-                    agents.append(ApproximateQLearningAgent(index=i, ego_constants=env.actors[0].constants, self_constants=env.actors[1].constants, time_resolution=env.time_resolution, width=env.constants.viewer_width, height=env.constants.viewer_height, np_random=np_random))
+                    agents.append(ApproximateQLearningAgent(index=i, ego_constants=env.actors[0].constants, self_constants=env.actors[1].constants, road_polgon=env.constants.road_map.major_road.static_bounding_box, time_resolution=env.time_resolution, width=env.constants.viewer_width, height=env.constants.viewer_height, np_random=np_random))
                 else:
                     print(config.agent_type)
                     raise NotImplementedError
