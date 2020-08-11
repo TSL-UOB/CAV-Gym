@@ -7,6 +7,7 @@ from library.actions import OrientationAction, VelocityAction, TrafficLightActio
 from library.actors import Car, Pedestrian, DynamicActorState
 from library.geometry import Point
 from library.observations import RoadObservation
+from reporting import pretty_float
 
 
 class Agent:
@@ -352,7 +353,7 @@ class ElectionPedestrianAgent(ProximityPedestrianAgent):
     pass
 
 
-class ApproximateQLearningAgent(RandomPedestrianAgent):
+class QLearningAgent(RandomPedestrianAgent):
     def __init__(self, ego_constants, self_constants, road_polgon, time_resolution, width, height, alpha=0.1, gamma=0.99, epsilon=0.01, **kwargs):
         super().__init__(epsilon=epsilon, **kwargs)  # self.epsilon is exploration probability (should decrease over time)
 
@@ -361,7 +362,7 @@ class ApproximateQLearningAgent(RandomPedestrianAgent):
         self.road_polgon = road_polgon
         self.time_resolution = time_resolution
         self.alpha = alpha  # learning rate (should decrease over time)
-        self.gamma = gamma  # discount factor (should decrease over time?)
+        self.gamma = gamma  # discount factor (should be fixed over time?)
 
         self.feature_bounds = [
             (0, width),
@@ -464,3 +465,30 @@ class ApproximateQLearningAgent(RandomPedestrianAgent):
         for i, weight_feature in enumerate(zip(self.feature_weights, self.features(previous_state, action))):
             weight, feature = weight_feature
             self.feature_weights[i] = weight + self.alpha * q_value_gain * feature
+
+
+class DecayedQLearningAgent(QLearningAgent):
+    def __init__(self, decay_length=1000, alpha_start=1, alpha_end=0.01, epsilon_start=0.2, epsilon_end=0, **kwargs):
+        assert decay_length > 0
+
+        super().__init__(alpha=alpha_start, epsilon=epsilon_start, **kwargs)
+
+        self.decay_length = decay_length
+        self.alpha_start = alpha_start
+        self.alpha_end = alpha_end
+        self.epsilon_start = epsilon_start
+        self.epsilon_end = epsilon_end
+
+        self.decay_updates = 0
+
+    def reset(self):
+        decay = max((self.decay_length - self.decay_updates) / self.decay_length, 0)
+
+        def decayed_value(start, end):
+            return ((start - end) * decay) + end
+
+        self.alpha = decayed_value(self.alpha_start, self.alpha_end)
+        self.epsilon = decayed_value(self.epsilon_start, self.epsilon_end)
+        self.decay_updates += 1
+
+        print(f"alpha={pretty_float(self.alpha)}, epsilon={pretty_float(self.epsilon)}, gamma={pretty_float(self.gamma)}")
