@@ -137,19 +137,19 @@ class EpisodeResults(LogMessage):
     index: int
     time: TimeResults
     completed: bool
-    successful: bool
+    interesting: bool
     score: int
 
     def __post_init__(self):
-        assert self.successful or math.isnan(self.score)
+        assert self.interesting or math.isnan(self.score)
 
     def console_message(self):
         episode_status = "completed" if self.completed else "terminated"
-        test_status = f"successful test with score {self.score}" if self.successful else "unsuccessful test"
+        test_status = f"interesting test with score {self.score}" if self.interesting else "uninteresting test"
         return f"episode {self.index} {episode_status} after {self.time.timesteps} timestep(s) in {pretty_float(self.time.runtime(), decimal_places=0)} ms (*{pretty_float(self.time.simulation_speed())} real-time), {test_status}"
 
     def file_message(self):
-        return f"{self.index},{self.time.timesteps},{self.time.runtime()},{1 if self.successful else 0},{self.score}"
+        return f"{self.index},{self.time.timesteps},{self.time.runtime()},{1 if self.interesting else 0},{self.score}"
 
 
 @dataclass(frozen=True)
@@ -184,7 +184,7 @@ def confidence_interval(data, alpha=0.05):  # 95% confidence interval
 
 
 @dataclass(frozen=True)
-class SuccessfulTestResults:
+class InterestingTestResults:
     count: int
     total_timesteps: int
     total_runtime: float
@@ -201,27 +201,27 @@ class SuccessfulTestResults:
 class RunResults(LogMessage):
     episodes: int
     time: TimeResults
-    successful_tests: SuccessfulTestResults
+    interesting_tests: InterestingTestResults
 
     def __post_init__(self):
         assert self.episodes > 0
-        assert 0 <= self.successful_tests.count <= self.episodes
-        if self.successful_tests.count > 0:
-            assert 0 <= self.successful_tests.total_timesteps <= self.episodes * self.time.timesteps
+        assert 0 <= self.interesting_tests.count <= self.episodes
+        if self.interesting_tests.count > 0:
+            assert 0 <= self.interesting_tests.total_timesteps <= self.episodes * self.time.timesteps
 
     def console_message(self):
-        test_status = f"{self.successful_tests.count} successful test(s) with {self.successful_tests.confidence_timesteps.pretty(decimal_places=0)} timestep(s), {self.successful_tests.confidence_runtime.pretty(decimal_places=0)} ms runtime, and {self.successful_tests.confidence_score.pretty(decimal_places=0)} score" if self.successful_tests.count > 0 else "no successful test(s)"
+        test_status = f"{self.interesting_tests.count} interesting test(s) with {self.interesting_tests.confidence_timesteps.pretty(decimal_places=0)} timestep(s), {self.interesting_tests.confidence_runtime.pretty(decimal_places=0)} ms runtime, and {self.interesting_tests.confidence_score.pretty(decimal_places=0)} score" if self.interesting_tests.count > 0 else "no interesting test(s)"
         return f"run completed after {self.episodes} episode(s) and {self.time.timesteps} timestep(s) in {pretty_float(self.time.runtime(), decimal_places=0)} ms (*{pretty_float(self.time.simulation_speed())} real-time), {test_status}"
 
     def file_message(self):
-        return f"{self.episodes},{self.time.timesteps},{self.time.runtime()},{self.successful_tests.count},{self.successful_tests.confidence_timesteps.value},{self.successful_tests.confidence_timesteps.error},{self.successful_tests.confidence_runtime.value},{self.successful_tests.confidence_runtime.error},{self.successful_tests.confidence_score.value},{self.successful_tests.confidence_score.error}"
+        return f"{self.episodes},{self.time.timesteps},{self.time.runtime()},{self.interesting_tests.count},{self.interesting_tests.confidence_timesteps.value},{self.interesting_tests.confidence_timesteps.error},{self.interesting_tests.confidence_runtime.value},{self.interesting_tests.confidence_runtime.error},{self.interesting_tests.confidence_score.value},{self.interesting_tests.confidence_score.error}"
 
 
 def analyse_episode(index, start_time, end_time, timesteps, env_info, run_config, env):  # can run_config and env be removed?
     assert 1 <= timesteps <= run_config.max_timesteps
     completed = timesteps == run_config.max_timesteps
-    successful = 'winner' in env_info and env_info['winner'] > 0  # otherwise, draw or ego wons
-    score = -sum(env.episode_liveness[1:]) if successful else float("nan")
+    interesting = 'winner' in env_info and env_info['winner'] > 0  # otherwise, draw or ego wons
+    score = -sum(env.episode_liveness[1:]) if interesting else float("nan")
     return EpisodeResults(
         index=index,
         time=TimeResults(
@@ -231,7 +231,7 @@ def analyse_episode(index, start_time, end_time, timesteps, env_info, run_config
             resolution=env.time_resolution
         ),
         completed=completed,
-        successful=successful,
+        interesting=interesting,
         score=score
     )
 
@@ -240,10 +240,10 @@ episode_data = list()
 
 
 def analyse_run(start_time, end_time, run_config, env):  # can run_config and env be removed?
-    successful_test_data = [row for row in episode_data if row.successful]
-    successful_test_data_timesteps = [row.time.timesteps for row in successful_test_data]
-    successful_test_data_runtime = [row.time.runtime() for row in successful_test_data]
-    successful_test_data_score = [row.score for row in successful_test_data]
+    interesting_test_data = [row for row in episode_data if row.interesting]
+    interesting_test_data_timesteps = [row.time.timesteps for row in interesting_test_data]
+    interesting_test_data_runtime = [row.time.runtime() for row in interesting_test_data]
+    interesting_test_data_score = [row.score for row in interesting_test_data]
     nan = float("nan")
     return RunResults(
         episodes=run_config.episodes,
@@ -253,13 +253,13 @@ def analyse_run(start_time, end_time, run_config, env):  # can run_config and en
             end_time=end_time,
             resolution=env.time_resolution
         ),
-        successful_tests=SuccessfulTestResults(
-            count=len(successful_test_data),
-            total_timesteps=sum(successful_test_data_timesteps) if successful_test_data else nan,
-            total_runtime=sum(successful_test_data_runtime) if successful_test_data else nan,
-            total_score=sum(successful_test_data_score) if successful_test_data else nan,
-            confidence_timesteps=confidence_interval(successful_test_data_timesteps),
-            confidence_runtime=confidence_interval(successful_test_data_runtime),
-            confidence_score=confidence_interval(successful_test_data_score),
+        interesting_tests=InterestingTestResults(
+            count=len(interesting_test_data),
+            total_timesteps=sum(interesting_test_data_timesteps) if interesting_test_data else nan,
+            total_runtime=sum(interesting_test_data_runtime) if interesting_test_data else nan,
+            total_score=sum(interesting_test_data_score) if interesting_test_data else nan,
+            confidence_timesteps=confidence_interval(interesting_test_data_timesteps),
+            confidence_runtime=confidence_interval(interesting_test_data_runtime),
+            confidence_score=confidence_interval(interesting_test_data_score),
         )
     )
