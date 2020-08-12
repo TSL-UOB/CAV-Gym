@@ -33,7 +33,7 @@ def write_profile(statement, directory="logs", stats_file="profile.pstats", dot_
 if __name__ == '__main__':
     cli_args = ConfigParser()
     cli_config = cli_args.parse_config()
-    cli_env, cli_agents, cli_run_config = setup(cli_config)
-    simulation = Simulation(cli_env, cli_agents, run_config=cli_run_config)
+    cli_env, cli_agents = setup(cli_config)
+    simulation = Simulation(cli_env, cli_agents, config=cli_config)
     simulation.run()
     # profile("simulation.run()")  # reminder: there is a significant performance hit when using cProfile

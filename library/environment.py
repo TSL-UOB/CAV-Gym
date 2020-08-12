@@ -5,6 +5,7 @@ import gym
 from gym import spaces
 from gym.utils import seeding
 
+from config import EnvConfig
 from library.actors import PelicanCrossing, Pedestrian
 from library.assets import RoadMap, Occlusion
 
@@ -48,14 +49,6 @@ class CAVEnvConstants:
     viewer_width: int
     viewer_height: int
     road_map: RoadMap
-
-
-@dataclass(frozen=True)
-class EnvConfig:
-    frequency: int = 60
-    terminate_collision: bool = False
-    terminate_offroad: bool = False
-    terminate_zone: bool = False
 
 
 class CAVEnv(MarkovGameEnv):
