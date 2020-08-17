@@ -31,7 +31,6 @@ def write_profile(statement, directory="logs", stats_file="profile.pstats", dot_
 
 
 if __name__ == '__main__':
-    cli_args = ConfigParser()
     parser = ConfigParser()
     config = parser.parse_config()
     env, agents, keyboard_agent = config.setup()
