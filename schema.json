@@ -1,0 +1,187 @@
+{
+    "type": "object",
+    "properties": {
+        "collisions": {
+            "type": "boolean"
+        },
+        "episodes": {
+            "type": "integer",
+            "minimum": 1
+        },
+        "log": {
+            "type": [ "string", "null" ]
+        },
+        "offroad": {
+            "type": "boolean"
+        },
+        "seed": {
+            "type": [ "integer", "null" ],
+            "minimum": 0
+        },
+        "timesteps": {
+            "type": "integer",
+            "minimum": 1
+        },
+        "verbosity": {
+            "type": "string",
+            "enum": [ "info", "debug", "silent" ]
+        },
+        "scenario_config": {
+            "oneOf": [
+                { "$ref": "#/definitions/bus_stop_config" },
+                { "$ref": "#/definitions/crossroads_config" },
+                { "$ref": "#/definitions/pedestrians_config" },
+                { "$ref": "#/definitions/pelican_crossing_config" }
+            ]
+        },
+        "agent_config": {
+            "oneOf": [
+                { "$ref": "#/definitions/random_config" },
+                { "$ref": "#/definitions/random_constrained_config" },
+                { "$ref": "#/definitions/proximity_config" },
+                { "$ref": "#/definitions/election_config" },
+                { "$ref": "#/definitions/q_learning_config" }
+            ]
+        },
+        "mode_config": {
+            "oneOf": [
+                { "$ref": "#/definitions/headless_config" },
+                { "$ref": "#/definitions/render_config" }
+            ]
+        }
+    },
+    "required": [ "collisions", "episodes", "log", "offroad", "seed", "timesteps", "verbosity", "scenario_config", "agent_config", "mode_config" ],
+    "additionalProperties": false,
+    "definitions": {
+        "bus_stop_config": {
+            "type": "object",
+            "properties": {
+                "option": { "const": "bus-stop" }
+            },
+            "required": [ "option" ],
+            "additionalProperties": false
+        },
+        "crossroads_config": {
+            "type": "object",
+            "properties": {
+                "option": { "const": "crossroads" }
+            },
+            "required": [ "option" ],
+            "additionalProperties": false
+        },
+        "pedestrians_config": {
+            "type": "object",
+            "properties": {
+                "option": { "const": "pedestrians" },
+                "actors": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "zone": { "type": "boolean" }
+            },
+            "required": [ "option", "actors", "zone" ],
+            "additionalProperties": false
+        },
+        "pelican_crossing_config": {
+            "type": "object",
+            "properties": {
+                "option": { "const": "pelican-crossing" }
+            },
+            "required": [ "option" ],
+            "additionalProperties": false
+        },
+        "random_config": {
+            "type": "object",
+            "properties": {
+                "option": { "const": "random" },
+                "epsilon": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                }
+            },
+            "required": [ "option", "epsilon" ],
+            "additionalProperties": false
+        },
+        "random_constrained_config": {
+            "type": "object",
+            "properties": {
+                "option": { "const": "random-constrained" },
+                "epsilon": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                }
+            },
+            "required": [ "option", "epsilon" ],
+            "additionalProperties": false
+        },
+        "proximity_config": {
+            "type": "object",
+            "properties": {
+                "option": { "const": "proximity" },
+                "threshold": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                }
+            },
+            "required": [ "option", "threshold" ],
+            "additionalProperties": false
+        },
+        "election_config": {
+            "type": "object",
+            "properties": {
+                "option": { "const": "election" },
+                "threshold": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                }
+            },
+            "required": [ "option", "threshold" ],
+            "additionalProperties": false
+        },
+        "q_learning_config": {
+            "type": "object",
+            "properties": {
+                "option": { "const": "q-learning" },
+                "alpha": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                },
+                "epsilon": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                },
+                "gamma": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                }
+            },
+            "required": [ "option", "alpha", "epsilon", "gamma" ],
+            "additionalProperties": false
+        },
+        "headless_config": {
+            "type": "object",
+            "properties": {
+                "option": { "const": "headless" }
+            },
+            "required": [ "option" ],
+            "additionalProperties": false
+        },
+        "render_config": {
+            "type": "object",
+            "properties": {
+                "option": { "const": "render" },
+                "keyboard": { "type": "boolean" },
+                "record": {
+                    "type": [ "string", "null" ]
+                }
+            },
+            "required": [ "option", "keyboard", "record" ],
+            "additionalProperties": false
+        }
+    }
+}

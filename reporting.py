@@ -218,8 +218,8 @@ class RunResults(LogMessage):
 
 
 def analyse_episode(index, start_time, end_time, timesteps, env_info, run_config, env):  # can run_config and env be removed?
-    assert 1 <= timesteps <= run_config.max_timesteps
-    completed = timesteps == run_config.max_timesteps
+    assert 1 <= timesteps <= run_config.timesteps
+    completed = timesteps == run_config.timesteps
     interesting = 'winner' in env_info and env_info['winner'] > 0  # otherwise, draw or ego wons
     score = -sum(env.episode_liveness[1:]) if interesting else float("nan")
     return EpisodeResults(

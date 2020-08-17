@@ -1,0 +1,25 @@
+{
+  "collisions": true,
+  "episodes": 1,
+  "log": null,
+  "offroad": true,
+  "seed": null,
+  "timesteps": 1000,
+  "verbosity": "info",
+  "scenario_config": {
+    "option": "pedestrians",
+    "actors": 3,
+    "zone": true
+  },
+  "agent_config": {
+    "option": "q-learning",
+    "alpha": 0.5,
+    "epsilon": 0.01,
+    "gamma": 0.5
+  },
+  "mode_config": {
+    "option": "render",
+    "keyboard": false,
+    "record": null
+  }
+}

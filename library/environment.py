@@ -5,7 +5,7 @@ import gym
 from gym import spaces
 from gym.utils import seeding
 
-from config import EnvConfig
+from config import Mode, Scenario
 from library.actors import PelicanCrossing, Pedestrian
 from library.assets import RoadMap, Occlusion
 
@@ -56,15 +56,16 @@ class CAVEnv(MarkovGameEnv):
         'render.modes': ['human', 'rgb_array']
     }
 
-    def __init__(self, actors, constants, env_config=EnvConfig(), np_random=seeding.np_random(None)[0]):
+    def __init__(self, actors, constants, env_config, np_random=seeding.np_random(None)[0]):
         self.actors = actors
         self.constants = constants
         self.env_config = env_config
         self.np_random = np_random
 
-        self.time_resolution = 1.0 / self.env_config.frequency
+        self.frequency = 30 if self.env_config.mode_config.mode is Mode.RENDER and self.env_config.mode_config.record else 60
+        self.time_resolution = 1.0 / self.frequency
 
-        console_logger.info(f"frequency={self.env_config.frequency}")
+        console_logger.info(f"frequency={self.frequency}")
 
         def set_np_random(space):
             space.np_random = self.np_random
@@ -139,7 +140,7 @@ class CAVEnv(MarkovGameEnv):
 
         terminate = False
 
-        if self.env_config.terminate_collision:
+        if self.env_config.collisions:
             collidable_entities = self.collidable_entities()
             collidable_bounding_boxes = [entity.bounding_box() for entity in collidable_entities]  # no need to recompute bounding boxes
             collided_entities = list()  # record collided entities so that they can be skipped in subsequent iterations
@@ -162,7 +163,7 @@ class CAVEnv(MarkovGameEnv):
             collision_occurred = any(collision_detections)
             terminate = collision_occurred
 
-        if not terminate and self.env_config.terminate_offroad:
+        if not terminate and self.env_config.offroad:
             ego_on_road = any(actor_polygons[0].intersects(road.bounding_box()) for road in self.constants.road_map.roads)
             terminate = not ego_on_road
 
@@ -187,7 +188,7 @@ class CAVEnv(MarkovGameEnv):
             return None
 
         pedestrian_in_reaction_zone = None
-        if not terminate and self.env_config.terminate_zone:
+        if not terminate and self.env_config.scenario_config.scenario is Scenario.PEDESTRIANS and self.env_config.scenario_config.zone:
             pedestrian_in_reaction_zone = check_pedestrian_in_reaction_zone()
             terminate = pedestrian_in_reaction_zone is not None
 

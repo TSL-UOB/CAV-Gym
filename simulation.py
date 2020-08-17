@@ -3,26 +3,27 @@ import timeit
 from gym import wrappers
 
 import reporting
-from config import RenderMode, RandomConfig, AgentType
+from config import Mode, AgentType
 from scenarios.election import Election
 
 
 class Simulation:
-    def __init__(self, env, agents, config=RandomConfig()):
+    def __init__(self, env, agents, config, keyboard_agent):
         assert len(env.actors) == len(agents), "each actor must be assigned an agent and vice versa"
         self.env = env
         self.agents = agents
         self.config = config
+        self.keyboard_agent = keyboard_agent
 
-        if self.config.keyboard_agent is not None or self.config.record_dir is not None:
-            assert self.config.render_mode is not RenderMode.HEADLESS, "keyboard agents and recordings do not work in headless mode"
+        if self.keyboard_agent is not None:
+            assert self.config.mode_config.mode is Mode.RENDER and self.config.mode_config.keyboard, "keyboard agents and recordings do not work in headless mode"
 
-        if self.config.record_dir is not None:
+        if self.config.mode_config.mode is Mode.RENDER and self.config.mode_config.record is not None:
             from library import mods  # lazy import of pyglet to allow headless mode on headless machines
-            self.env = wrappers.Monitor(self.env, self.config.record_dir, video_callable=lambda episode_id: True, force=True)  # save all episodes instead of default behaviour (episodes 1, 8, 27, 64, ...)
+            self.env = wrappers.Monitor(self.env, self.config.mode_config.record, video_callable=lambda episode_id: True, force=True)  # save all episodes instead of default behaviour (episodes 1, 8, 27, 64, ...)
             self.env.stats_recorder = mods.make_joint_stats_recorder(self.env, len(agents))  # workaround to avoid bugs due to existence of joint rewards
 
-        if self.config.agent_type() is AgentType.ELECTION:
+        if self.config.agent_config.agent is AgentType.ELECTION:
             self.election = Election(env, agents)
         else:
             self.election = None
@@ -31,14 +32,14 @@ class Simulation:
 
         self.episode_file = None
         self.run_file = None
-        if self.config.logging_dir is not None:
-            self.episode_file, self.run_file = reporting.get_file_loggers(self.config.logging_dir)
+        if self.config.log is not None:
+            self.episode_file, self.run_file = reporting.get_file_loggers(self.config.log)
 
     def conditional_render(self):
-        if self.config.render_mode is not RenderMode.HEADLESS:
+        if self.config.mode_config.mode is not Mode.HEADLESS:
             self.env.render()
-            if self.config.keyboard_agent is not None and self.env.unwrapped.viewer.window.on_key_press is not self.config.keyboard_agent.key_press:  # must render before key_press can be assigned
-                self.env.unwrapped.viewer.window.on_key_press = self.config.keyboard_agent.key_press
+            if self.keyboard_agent is not None and self.env.unwrapped.viewer.window.on_key_press is not self.keyboard_agent.key_press:  # must render before key_press can be assigned
+                self.env.unwrapped.viewer.window.on_key_press = self.keyboard_agent.key_press
 
     def run(self):
         self.console.info(f"actors={reporting.pretty_str_list(actor.__class__.__name__ for actor in self.env.actors)}")
@@ -61,7 +62,7 @@ class Simulation:
             self.conditional_render()
 
             timestep = None
-            for previous_timestep in range(self.config.max_timesteps):  # initially previous_timestep=0
+            for previous_timestep in range(self.config.timesteps):  # initially previous_timestep=0
                 timestep = previous_timestep + 1
 
                 joint_action = [agent.choose_action(state, info) for agent in self.agents]
@@ -87,7 +88,7 @@ class Simulation:
                 if done:
                     break
             else:
-                if self.config.record_dir is not None:
+                if self.config.mode_config.mode is Mode.RENDER and self.config.mode_config.record is not None:
                     self.env.stats_recorder.done = True  # need to manually tell the monitor that the episode is over if it runs to completion (not sure why)
 
             episode_end_time = timeit.default_timer()
