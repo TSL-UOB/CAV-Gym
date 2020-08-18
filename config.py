@@ -154,10 +154,21 @@ class ElectionConfig(AgentConfig):
 
 @enforce_types
 @dataclass(frozen=True)
+class FeatureConfig:
+    distance_x: bool
+    distance_y: bool
+    distance: bool
+    on_road: bool
+    facing: bool
+
+
+@enforce_types
+@dataclass(frozen=True)
 class QLearningConfig(AgentConfig):
     alpha: float
     epsilon: float
     gamma: float
+    features: FeatureConfig
 
     agent = AgentType.Q_LEARNING
 
@@ -264,7 +275,8 @@ class Config:
                             time_resolution=env.time_resolution,
                             width=env.constants.viewer_width,
                             height=env.constants.viewer_height,
-                            np_random=np_random
+                            np_random=np_random,
+                            feature_config=self.agent_config.features
                         )
                     else:
                         raise NotImplementedError
@@ -321,7 +333,9 @@ def make_agent_config(data):  # deserialise data to AgentConfig
     elif option == AgentType.ELECTION.value:
         return ElectionConfig(**data)
     elif option == AgentType.Q_LEARNING.value:
-        return QLearningConfig(**data)
+        feature_config_data = data.pop("feature_config")
+        feature_config = FeatureConfig(**feature_config_data)
+        return QLearningConfig(**data, features=feature_config)
     else:
         raise NotImplementedError
 

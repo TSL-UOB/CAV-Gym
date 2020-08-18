@@ -140,6 +140,28 @@
             "required": [ "option", "threshold" ],
             "additionalProperties": false
         },
+        "feature_config": {
+            "type": "object",
+            "properties": {
+                "distance_x": {
+                    "type": "boolean"
+                },
+                "distance_y": {
+                    "type": "boolean"
+                },
+                "distance": {
+                    "type": "boolean"
+                },
+                "on_road": {
+                    "type": "boolean"
+                },
+                "facing": {
+                    "type": "boolean"
+                }
+            },
+            "required": [ "distance_x", "distance_y", "distance", "on_road", "facing" ],
+            "additionalProperties": false
+        },
         "q_learning_config": {
             "type": "object",
             "properties": {
@@ -158,6 +180,9 @@
                     "type": "number",
                     "minimum": 0,
                     "maximum": 1
+                },
+                "feature_config": {
+                    "$ref": "#/definitions/feature_config"
                 }
             },
             "required": [ "option", "alpha", "epsilon", "gamma" ],

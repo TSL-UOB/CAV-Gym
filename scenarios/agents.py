@@ -353,7 +353,7 @@ class ElectionPedestrianAgent(ProximityPedestrianAgent):
 
 
 class QLearningAgent(RandomPedestrianAgent):
-    def __init__(self, ego_constants, self_constants, road_polgon, time_resolution, width, height, alpha=0.1, gamma=0.99, epsilon=0.01, **kwargs):
+    def __init__(self, ego_constants, self_constants, road_polgon, time_resolution, width, height, feature_config, alpha=0.1, gamma=0.99, epsilon=0.01, **kwargs):
         super().__init__(epsilon=epsilon, **kwargs)  # self.epsilon is exploration probability (should decrease over time)
 
         self.ego_constants = ego_constants
@@ -362,16 +362,20 @@ class QLearningAgent(RandomPedestrianAgent):
         self.time_resolution = time_resolution
         self.alpha = alpha  # learning rate (should decrease over time)
         self.gamma = gamma  # discount factor (should be fixed over time?)
+        self.feature_config = feature_config
 
-        self.feature_bounds = [
-            (0, width),
-            (0, height),
-            (1, math.sqrt((width ** 2) + (height ** 2))),
-            # (0, 1),
-            # (0, math.pi)
-        ]
-        self.num_featues = len(self.feature_bounds)
-        self.feature_weights = [0.0 for _ in range(self.num_featues)]
+        self.feature_bounds = dict()
+        if self.feature_config.distance_x:
+            self.feature_bounds["distance_x"] = (0, width)
+        if self.feature_config.distance_y:
+            self.feature_bounds["distance_y"] = (0, height)
+        if self.feature_config.distance:
+            self.feature_bounds["distance"] = (1, math.sqrt((width ** 2) + (height ** 2)))
+        if self.feature_config.on_road:
+            self.feature_bounds["on_road"] = (0, 1)
+        if self.feature_config.facing:
+            self.feature_bounds["facing"] = (0, math.pi)
+        self.feature_weights = {feature: 0.0 for feature in self.feature_bounds.keys()}
 
         self.available_actions = [(velocity_action.value, orientation_action.value) for velocity_action in VelocityAction for orientation_action in OrientationAction]
 
@@ -417,23 +421,26 @@ class QLearningAgent(RandomPedestrianAgent):
             else:
                 return (value - min_bound) / (max_bound - min_bound)
 
-        unnormalised_values = [
-            self_position.distance_x(ego_position),
-            self_position.distance_y(ego_position),
-            self_position.distance(ego_position),
-            # 1 if self_actor.bounding_box().intersects(self.road_polgon) else 0,
-            # abs(geometry.Line(start=ego_position, end=self_position).orientation() - ego_actor.state.orientation)
-        ]
+        unnormalised_values = dict()
+        if self.feature_config.distance_x:
+            unnormalised_values["distance_x"] = self_position.distance_x(ego_position)
+        if self.feature_config.distance_y:
+            unnormalised_values["distance_y"] = self_position.distance_y(ego_position)
+        if self.feature_config.distance:
+            unnormalised_values["distance"] = self_position.distance(ego_position)
+        if self.feature_config.on_road:
+            unnormalised_values["on_road"] = 1 if self_actor.bounding_box().intersects(self.road_polgon) else 0
+        if self.feature_config.facing:
+            unnormalised_values["facing"] = abs(geometry.Line(start=ego_position, end=self_position).orientation() - ego_actor.state.orientation)
 
-        assert len(unnormalised_values) == self.num_featues
-        normalised_values = tuple(normalise(value, *bounds) for value, bounds in zip(unnormalised_values, self.feature_bounds))
+        normalised_values = {feature: normalise(feature_value, *self.feature_bounds[feature]) for feature, feature_value in unnormalised_values.items()}
         # print(pretty_float_list(unnormalised_values), pretty_float_list(normalised_values))
         return normalised_values
 
     def q_value(self, state, action):  # if features do not depend on action, then the Q value will not either
         feature_values = self.features(state, action)
         # assert len(feature_values) == self.num_featues
-        q_value = sum(weight * feature for weight, feature in zip(self.feature_weights, feature_values))
+        q_value = sum(feature_value * self.feature_weights[feature] for feature, feature_value in feature_values.items())
         # assert math.isfinite(q_value)
         # print(pretty_float_list(feature_values), pretty_float_list(self.feature_weights), pretty_float(q_value))
         return q_value
@@ -461,9 +468,8 @@ class QLearningAgent(RandomPedestrianAgent):
         q_value = self.q_value(previous_state, action)
         new_q_value = reward + self.gamma * max(self.q_value(state, action_prime) for action_prime in self.available_actions)
         q_value_gain = new_q_value - q_value
-        for i, weight_feature in enumerate(zip(self.feature_weights, self.features(previous_state, action))):
-            weight, feature = weight_feature
-            self.feature_weights[i] = weight + self.alpha * q_value_gain * feature
+        for feature, feature_value in self.features(previous_state, action).items():
+            self.feature_weights[feature] = self.feature_weights[feature] + self.alpha * q_value_gain * feature_value
 
 
 class DecayedQLearningAgent(QLearningAgent):

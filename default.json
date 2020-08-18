@@ -8,14 +8,21 @@
   "verbosity": "info",
   "scenario_config": {
     "option": "pedestrians",
-    "actors": 3,
+    "actors": 1,
     "zone": true
   },
   "agent_config": {
     "option": "q-learning",
     "alpha": 0.5,
     "epsilon": 0.01,
-    "gamma": 0.5
+    "gamma": 0.5,
+    "feature_config": {
+      "distance_x": true,
+      "distance_y": true,
+      "distance": true,
+      "on_road": false,
+      "facing": false
+    }
   },
   "mode_config": {
     "option": "render",
