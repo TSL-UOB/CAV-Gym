@@ -3,7 +3,8 @@ import math
 import pathlib
 import sys
 from dataclasses import dataclass
-from enum import Enum
+
+from config import Verbosity
 
 
 def pretty_str_iter(str_iter):
@@ -47,15 +48,6 @@ class CustomLogRecord(logging.LogRecord):
 logging.setLogRecordFactory(CustomLogRecord)
 console_formatter = logging.Formatter("%(levelname)-7s %(relativeCreated)-7d %(code)-27s %(message)s")
 file_formatter = logging.Formatter("%(message)s")
-
-
-class Verbosity(Enum):
-    INFO = "info"
-    DEBUG = "debug"
-    SILENT = "silent"
-
-    def __str__(self):
-        return self.value
 
 
 def make_console_handler(destination, event_filter):

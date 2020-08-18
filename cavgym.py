@@ -1,3 +1,4 @@
+import reporting
 from config import ConfigParser
 from simulation import Simulation
 
@@ -33,7 +34,14 @@ def write_profile(statement, directory="logs", stats_file="profile.pstats", dot_
 if __name__ == '__main__':
     parser = ConfigParser()
     config = parser.parse_config()
-    env, agents, keyboard_agent = config.setup()
+    np_seed, env, agents, keyboard_agent = config.setup()
+
+    console = reporting.get_console(config.verbosity)
+    console.info(f"seed={np_seed}")
+    console.info(f"actors={reporting.pretty_str_list(actor.__class__.__name__ for actor in env.actors)}")
+    console.info(f"agents={reporting.pretty_str_list(agent.__class__.__name__ for agent in agents)}")
+    console.info(f"ego=({env.actors[0].__class__.__name__}, {agents[0].__class__.__name__})")
+
     simulation = Simulation(env, agents, config=config, keyboard_agent=keyboard_agent)
     simulation.run()
     # profile("simulation.run()")  # reminder: there is a significant performance hit when using cProfile

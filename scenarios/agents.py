@@ -7,7 +7,6 @@ from library.actions import OrientationAction, VelocityAction, TrafficLightActio
 from library.actors import Car, Pedestrian, DynamicActorState
 from library.geometry import Point
 from library.observations import RoadObservation
-from reporting import pretty_float
 
 
 class Agent:
@@ -491,4 +490,4 @@ class DecayedQLearningAgent(QLearningAgent):
         self.epsilon = decayed_value(self.epsilon_start, self.epsilon_end)
         self.decay_updates += 1
 
-        print(f"alpha={pretty_float(self.alpha)}, epsilon={pretty_float(self.epsilon)}, gamma={pretty_float(self.gamma)}")
+        print(f"alpha={self.alpha}, epsilon={self.epsilon}, gamma={self.gamma}")

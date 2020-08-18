@@ -42,10 +42,6 @@ class Simulation:
                 self.env.unwrapped.viewer.window.on_key_press = self.keyboard_agent.key_press
 
     def run(self):
-        self.console.info(f"actors={reporting.pretty_str_list(actor.__class__.__name__ for actor in self.env.actors)}")
-        self.console.info(f"agents={reporting.pretty_str_list(agent.__class__.__name__ for agent in self.agents)}")
-        self.console.info(f"ego=({self.env.actors[0].__class__.__name__}, {self.agents[0].__class__.__name__})")
-
         run_start_time = timeit.default_timer()
         for previous_episode in range(self.config.episodes):  # initially previous_episode=0
             episode_start_time = timeit.default_timer()

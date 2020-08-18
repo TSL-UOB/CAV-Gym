@@ -9,10 +9,18 @@ import gym
 from enforce_typing import enforce_types
 from gym.utils import seeding
 
-import reporting
 from library.actors import DynamicActor, Pedestrian, TrafficLight, PelicanCrossing
 from scenarios.agents import RandomPedestrianAgent, RandomConstrainedPedestrianAgent, ElectionPedestrianAgent, \
     QLearningAgent, RandomVehicleAgent, RandomTrafficLightAgent, NoopAgent, ProximityPedestrianAgent, KeyboardAgent
+
+
+class Verbosity(Enum):
+    INFO = "info"
+    DEBUG = "debug"
+    SILENT = "silent"
+
+    def __str__(self):
+        return self.value
 
 
 class Scenario(Enum):
@@ -186,7 +194,7 @@ class Config:
     offroad: bool
     seed: Optional[int]
     timesteps: int
-    verbosity: reporting.Verbosity
+    verbosity: Verbosity
     scenario_config: Union[BusStopConfig, CrossroadsConfig, PedestriansConfig, PelicanCrossingConfig]
     agent_config: Union[RandomConfig, RandomConstrainedConfig, ProximityConfig, ElectionConfig, QLearningConfig]
     mode_config: Union[HeadlessConfig, RenderConfig]
@@ -201,7 +209,6 @@ class Config:
 
     def setup(self):
         np_random, np_seed = seeding.np_random(self.seed)
-        reporting.get_console(self.verbosity).info(f"seed={np_seed}")
 
         if self.scenario_config.scenario is Scenario.PELICAN_CROSSING:
             env = gym.make('PelicanCrossing-v0', env_config=self, np_random=np_random)
@@ -267,10 +274,10 @@ class Config:
                 agent = RandomTrafficLightAgent(np_random=np_random)
             agents.append(agent)
 
-        return env, agents, keyboard_agent
+        return np_seed, env, agents, keyboard_agent
 
 
-class ConfigJSONEncoder(JSONEncoder):
+class ConfigJSONEncoder(JSONEncoder):  # serialise Config to data
     def default(self, obj):
         if isinstance(obj, Config):
             obj_dict = asdict(obj)
@@ -283,59 +290,56 @@ class ConfigJSONEncoder(JSONEncoder):
             return super().default(obj)
 
 
-def make_scenario_config(data):
-    option = data["option"]
-    config = {key: value for key, value in data.items() if key != "option"}
+def make_scenario_config(data):  # deserialise data to ScenarioConfig
+    option = data.pop("option")
     if option == Scenario.BUS_STOP.value:
-        if config:
-            raise ValueError(f"unexpected parameters {config}")
+        if data:
+            raise ValueError(f"unexpected parameters {data}")
         return BusStopConfig()
     elif option == Scenario.CROSSROADS.value:
-        if data["config"]:
-            raise ValueError(f"unexpected parameters {config}")
+        if data:
+            raise ValueError(f"unexpected parameters {data}")
         return CrossroadsConfig()
     elif option == Scenario.PEDESTRIANS.value:
-        return PedestriansConfig(**config)
+        return PedestriansConfig(**data)
     elif option == Scenario.PELICAN_CROSSING.value:
-        if data["config"]:
-            raise ValueError(f"unexpected parameters {config}")
+        if data:
+            raise ValueError(f"unexpected parameters {data}")
         return PelicanCrossingConfig()
     else:
         raise NotImplementedError
 
 
-def make_agent_config(data):
-    option = data["option"]
-    config = {key: value for key, value in data.items() if key != "option"}
+def make_agent_config(data):  # deserialise data to AgentConfig
+    option = data.pop("option")
     if option == AgentType.RANDOM.value:
-        return RandomConfig(**config)
+        return RandomConfig(**data)
     elif option == AgentType.RANDOM_CONSTRAINED.value:
-        return RandomConstrainedConfig(**config)
+        return RandomConstrainedConfig(**data)
     elif option == AgentType.PROXIMITY.value:
-        return ProximityConfig(**config)
+        return ProximityConfig(**data)
     elif option == AgentType.ELECTION.value:
-        return ElectionConfig(**config)
+        return ElectionConfig(**data)
     elif option == AgentType.Q_LEARNING.value:
-        return QLearningConfig(**config)
+        return QLearningConfig(**data)
     else:
         raise NotImplementedError
 
 
-def make_mode_config(data):
-    option = data["option"]
-    config = {key: value for key, value in data.items() if key != "option"}
+def make_mode_config(data):  # deserialise data to ModeConfig
+    option = data.pop("option")
     if option == Mode.HEADLESS.value:
-        if config:
-            raise ValueError(f"unexpected parameters {config}")
+        if data:
+            raise ValueError(f"unexpected parameters {data}")
         return HeadlessConfig()
     elif option == Mode.RENDER.value:
-        return RenderConfig(**config)
+        return RenderConfig(**data)
     else:
         raise NotImplementedError
 
 
 def make_config(data):
-    data["verbosity"] = reporting.Verbosity(str(data["verbosity"]))
+    data["verbosity"] = Verbosity(str(data["verbosity"]))
     data["scenario_config"] = make_scenario_config(data["scenario_config"])
     data["agent_config"] = make_agent_config(data["agent_config"])
     data["mode_config"] = make_mode_config(data["mode_config"])
