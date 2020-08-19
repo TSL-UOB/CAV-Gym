@@ -378,8 +378,10 @@ class QLearningAgent(RandomPedestrianAgent):
             self.feature_bounds["facing"] = (0, math.pi)
         if self.feature_config.inverse_distance:
             self.feature_bounds["inverse_distance"] = (0, 1)
-            self.x_mid = M2PX * 16
+            x_mid = M2PX * 16  # 0 < x_mid < self.x_max
+            y_mid = 0.5  # 0 < y_mid < 1
             self.x_max = self.feature_bounds["distance"][1] if "distance" in self.feature_bounds else math.sqrt((width ** 2) + (height ** 2))
+            self.n = math.log(1 - y_mid) / math.log(x_mid / self.x_max)
 
         self.feature_weights = {feature: 0.0 for feature in self.feature_bounds.keys()}
 
@@ -440,8 +442,7 @@ class QLearningAgent(RandomPedestrianAgent):
             unnormalised_values["facing"] = abs(geometry.Line(start=ego_position, end=self_position).orientation() - ego_actor.state.orientation)
         if self.feature_config.inverse_distance:
             x = unnormalised_values["distance"] if "distance" in unnormalised_values else self_position.distance(ego_position)
-            n = math.log(0.5) / math.log(self.x_mid / self.x_max)
-            unnormalised_values["inverse_distance"] = 1 - (x / self.x_max) ** n
+            unnormalised_values["inverse_distance"] = 1 - (x / self.x_max) ** self.n  # thanks to Ram Varadarajan
 
         normalised_values = {feature: normalise(feature_value, *self.feature_bounds[feature]) for feature, feature_value in unnormalised_values.items()}
         # print(pretty_float_list(unnormalised_values), pretty_float_list(normalised_values))
