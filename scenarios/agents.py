@@ -7,6 +7,7 @@ from library.actions import OrientationAction, VelocityAction, TrafficLightActio
 from library.actors import Car, Pedestrian, DynamicActorState
 from library.geometry import Point
 from library.observations import RoadObservation
+from scenarios.constants import M2PX
 
 
 class Agent:
@@ -375,6 +376,11 @@ class QLearningAgent(RandomPedestrianAgent):
             self.feature_bounds["on_road"] = (0, 1)
         if self.feature_config.facing:
             self.feature_bounds["facing"] = (0, math.pi)
+        if self.feature_config.inverse_distance:
+            self.feature_bounds["inverse_distance"] = (0, 1)
+            self.x_mid = M2PX * 16
+            self.x_max = self.feature_bounds["distance"][1] if "distance" in self.feature_bounds else math.sqrt((width ** 2) + (height ** 2))
+
         self.feature_weights = {feature: 0.0 for feature in self.feature_bounds.keys()}
 
         self.available_actions = [(velocity_action.value, orientation_action.value) for velocity_action in VelocityAction for orientation_action in OrientationAction]
@@ -432,6 +438,10 @@ class QLearningAgent(RandomPedestrianAgent):
             unnormalised_values["on_road"] = 1 if self_actor.bounding_box().intersects(self.road_polgon) else 0
         if self.feature_config.facing:
             unnormalised_values["facing"] = abs(geometry.Line(start=ego_position, end=self_position).orientation() - ego_actor.state.orientation)
+        if self.feature_config.inverse_distance:
+            x = unnormalised_values["distance"] if "distance" in unnormalised_values else self_position.distance(ego_position)
+            n = math.log(0.5) / math.log(self.x_mid / self.x_max)
+            unnormalised_values["inverse_distance"] = 1 - (x / self.x_max) ** n
 
         normalised_values = {feature: normalise(feature_value, *self.feature_bounds[feature]) for feature, feature_value in unnormalised_values.items()}
         # print(pretty_float_list(unnormalised_values), pretty_float_list(normalised_values))

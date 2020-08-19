@@ -160,6 +160,7 @@ class FeatureConfig:
     distance: bool
     on_road: bool
     facing: bool
+    inverse_distance: bool
 
 
 @enforce_types

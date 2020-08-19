@@ -9,14 +9,22 @@
             "minimum": 1
         },
         "log": {
-            "type": [ "string", "null" ]
+            "oneOf": [
+                { "type": "string" },
+                { "type": "null" }
+            ]
         },
         "offroad": {
             "type": "boolean"
         },
         "seed": {
-            "type": [ "integer", "null" ],
-            "minimum": 0
+            "oneOf": [
+                {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                { "type": "null" }
+            ]
         },
         "timesteps": {
             "type": "integer",
@@ -156,6 +164,9 @@
                     "type": "boolean"
                 },
                 "facing": {
+                    "type": "boolean"
+                },
+                "inverse_distance": {
                     "type": "boolean"
                 }
             },

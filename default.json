@@ -1,9 +1,9 @@
 {
   "collisions": true,
-  "episodes": 1,
+  "episodes": 100,
   "log": null,
   "offroad": true,
-  "seed": null,
+  "seed": 0,
   "timesteps": 1000,
   "verbosity": "info",
   "scenario_config": {
@@ -21,12 +21,12 @@
       "distance_y": true,
       "distance": true,
       "on_road": false,
-      "facing": false
+      "facing": false,
+      "inverse_distance": true
     }
   },
   "mode_config": {
-    "option": "render",
-    "keyboard": false,
-    "record": null
+    "option": "headless"
   }
 }
+
