@@ -6,7 +6,7 @@ from library import geometry
 from library.actors import DynamicActorState, Car, SpawnPedestrian, SpawnPedestrianState
 from library.environment import CAVEnvConstants, RoadMap, CAVEnv
 from library.assets import Road, RoadConstants
-from scenarios.constants import car_constants, pedestrian_constants, M2PX
+from examples.constants import car_constants, pedestrian_constants, M2PX
 
 road_map = RoadMap(
     major_road=Road(

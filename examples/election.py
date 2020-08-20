@@ -1,5 +1,5 @@
 from library.actions import OrientationAction
-from scenarios.agents import ElectionPedestrianAgent
+from examples.agents import ElectionPedestrianAgent
 
 
 class Election:

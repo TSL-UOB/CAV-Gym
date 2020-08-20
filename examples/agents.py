@@ -7,7 +7,7 @@ from library.actions import OrientationAction, VelocityAction, TrafficLightActio
 from library.actors import Car, Pedestrian, DynamicActorState
 from library.geometry import Point
 from library.observations import RoadObservation
-from scenarios.constants import M2PX
+from examples.constants import M2PX
 
 
 class Agent:

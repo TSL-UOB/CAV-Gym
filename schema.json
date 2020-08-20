@@ -1,21 +1,15 @@
 {
     "type": "object",
     "properties": {
-        "collisions": {
-            "type": "boolean"
-        },
-        "episodes": {
-            "type": "integer",
-            "minimum": 1
+        "verbosity": {
+            "type": "string",
+            "enum": [ "info", "debug", "silent" ]
         },
         "log": {
             "oneOf": [
                 { "type": "string" },
                 { "type": "null" }
             ]
-        },
-        "offroad": {
-            "type": "boolean"
         },
         "seed": {
             "oneOf": [
@@ -26,13 +20,19 @@
                 { "type": "null" }
             ]
         },
-        "timesteps": {
+        "episodes": {
             "type": "integer",
             "minimum": 1
         },
-        "verbosity": {
-            "type": "string",
-            "enum": [ "info", "debug", "silent" ]
+        "max_timesteps": {
+            "type": "integer",
+            "minimum": 1
+        },
+        "collisions": {
+            "type": "boolean"
+        },
+        "offroad": {
+            "type": "boolean"
         },
         "scenario_config": {
             "oneOf": [
@@ -58,7 +58,7 @@
             ]
         }
     },
-    "required": [ "collisions", "episodes", "log", "offroad", "seed", "timesteps", "verbosity", "scenario_config", "agent_config", "mode_config" ],
+    "required": [ "verbosity", "log", "seed", "episodes", "max_timesteps", "collisions", "offroad", "scenario_config", "agent_config", "mode_config" ],
     "additionalProperties": false,
     "definitions": {
         "bus_stop_config": {
@@ -170,7 +170,7 @@
                     "type": "boolean"
                 }
             },
-            "required": [ "distance_x", "distance_y", "distance", "on_road", "facing" ],
+            "required": [ "distance_x", "distance_y", "distance", "on_road", "facing", "inverse_distance" ],
             "additionalProperties": false
         },
         "q_learning_config": {
@@ -182,12 +182,12 @@
                     "minimum": 0,
                     "maximum": 1
                 },
-                "epsilon": {
+                "gamma": {
                     "type": "number",
                     "minimum": 0,
                     "maximum": 1
                 },
-                "gamma": {
+                "epsilon": {
                     "type": "number",
                     "minimum": 0,
                     "maximum": 1
@@ -196,7 +196,7 @@
                     "$ref": "#/definitions/feature_config"
                 }
             },
-            "required": [ "option", "alpha", "epsilon", "gamma" ],
+            "required": [ "option", "alpha", "gamma","epsilon" ],
             "additionalProperties": false
         },
         "headless_config": {

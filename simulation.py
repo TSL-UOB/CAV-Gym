@@ -4,7 +4,7 @@ from gym import wrappers
 
 import reporting
 from config import Mode, AgentType
-from scenarios.election import Election
+from examples.election import Election
 
 
 class Simulation:
@@ -58,7 +58,7 @@ class Simulation:
             self.conditional_render()
 
             timestep = None
-            for previous_timestep in range(self.config.timesteps):  # initially previous_timestep=0
+            for previous_timestep in range(self.config.max_timesteps):  # initially previous_timestep=0
                 timestep = previous_timestep + 1
 
                 joint_action = [agent.choose_action(state, info) for agent in self.agents]

@@ -50,9 +50,9 @@ class JointStatsRecorder(object):
         assert not self.closed
 
         if self.done:
-            raise error.ResetNeeded("Trying to step environment which is currently done. While the monitor is active for {}, you cannot step beyond the end of an episode. Call 'scenarios.reset()' to start the next episode.".format(self.env_id))
+            raise error.ResetNeeded("Trying to step environment which is currently done. While the monitor is active for {}, you cannot step beyond the end of an episode. Call 'examples.reset()' to start the next episode.".format(self.env_id))
         elif self.steps is None:
-            raise error.ResetNeeded("Trying to step an environment before reset. While the monitor is active for {}, you must call 'scenarios.reset()' before taking an initial step.".format(self.env_id))
+            raise error.ResetNeeded("Trying to step an environment before reset. While the monitor is active for {}, you must call 'examples.reset()' before taking an initial step.".format(self.env_id))
 
     def after_step(self, observation, reward, done, info):
         self.steps += 1

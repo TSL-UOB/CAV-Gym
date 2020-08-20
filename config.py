@@ -10,7 +10,7 @@ from enforce_typing import enforce_types
 from gym.utils import seeding
 
 from library.actors import DynamicActor, Pedestrian, TrafficLight, PelicanCrossing
-from scenarios.agents import RandomPedestrianAgent, RandomConstrainedPedestrianAgent, ElectionPedestrianAgent, \
+from examples.agents import RandomPedestrianAgent, RandomConstrainedPedestrianAgent, ElectionPedestrianAgent, \
     QLearningAgent, RandomVehicleAgent, RandomTrafficLightAgent, NoopAgent, ProximityPedestrianAgent, KeyboardAgent
 
 
@@ -167,8 +167,8 @@ class FeatureConfig:
 @dataclass(frozen=True)
 class QLearningConfig(AgentConfig):
     alpha: float
-    epsilon: float
     gamma: float
+    epsilon: float
     features: FeatureConfig
 
     agent = AgentType.Q_LEARNING
@@ -200,13 +200,13 @@ class RenderConfig(ModeConfig):
 @enforce_types
 @dataclass(frozen=True)
 class Config:
-    collisions: bool
-    episodes: int
-    log: Optional[str]
-    offroad: bool
-    seed: Optional[int]
-    timesteps: int
     verbosity: Verbosity
+    log: Optional[str]
+    seed: Optional[int]
+    episodes: int
+    max_timesteps: int
+    collisions: bool
+    offroad: bool
     scenario_config: Union[BusStopConfig, CrossroadsConfig, PedestriansConfig, PelicanCrossingConfig]
     agent_config: Union[RandomConfig, RandomConstrainedConfig, ProximityConfig, ElectionConfig, QLearningConfig]
     mode_config: Union[HeadlessConfig, RenderConfig]
@@ -216,7 +216,7 @@ class Config:
             raise ValueError("seed must be > 0")
         if self.seed and self.seed < 0:
             raise ValueError("seed must be >= 0")
-        if self.timesteps <= 0:
+        if self.max_timesteps <= 0:
             raise ValueError("seed must be > 0")
 
     def setup(self):

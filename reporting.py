@@ -210,8 +210,8 @@ class RunResults(LogMessage):
 
 
 def analyse_episode(index, start_time, end_time, timesteps, env_info, run_config, env):  # can run_config and env be removed?
-    assert 1 <= timesteps <= run_config.timesteps
-    completed = timesteps == run_config.timesteps
+    assert 1 <= timesteps <= run_config.max_timesteps
+    completed = timesteps == run_config.max_timesteps
     interesting = 'winner' in env_info and env_info['winner'] > 0  # otherwise, draw or ego wons
     score = -sum(env.episode_liveness[1:]) if interesting else float("nan")
     return EpisodeResults(
@@ -233,14 +233,14 @@ episode_data = list()
 
 def analyse_run(start_time, end_time, run_config, env):  # can run_config and env be removed?
     interesting_test_data = [row for row in episode_data if row.interesting]
-    interesting_test_data_timesteps = [row.time.timesteps for row in interesting_test_data]
+    interesting_test_data_timesteps = [row.time.max_timesteps for row in interesting_test_data]
     interesting_test_data_runtime = [row.time.runtime() for row in interesting_test_data]
     interesting_test_data_score = [row.score for row in interesting_test_data]
     nan = float("nan")
     return RunResults(
         episodes=run_config.episodes,
         time=TimeResults(
-            timesteps=sum([row.time.timesteps for row in episode_data]),
+            timesteps=sum([row.time.max_timesteps for row in episode_data]),
             start_time=start_time,
             end_time=end_time,
             resolution=env.time_resolution
