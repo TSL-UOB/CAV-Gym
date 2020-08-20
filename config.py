@@ -89,7 +89,6 @@ class CrossroadsConfig(ScenarioConfig):
 @dataclass(frozen=True)
 class PedestriansConfig(ScenarioConfig):
     actors: int
-    zone: bool
 
     scenario = Scenario.PEDESTRIANS
 
@@ -207,6 +206,7 @@ class Config:
     max_timesteps: int
     collisions: bool
     offroad: bool
+    zone: bool
     scenario_config: Union[BusStopConfig, CrossroadsConfig, PedestriansConfig, PelicanCrossingConfig]
     agent_config: Union[RandomConfig, RandomConstrainedConfig, ProximityConfig, ElectionConfig, QLearningConfig]
     mode_config: Union[HeadlessConfig, RenderConfig]

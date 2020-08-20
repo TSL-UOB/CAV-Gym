@@ -34,6 +34,7 @@
         "offroad": {
             "type": "boolean"
         },
+        "zone": { "type": "boolean" },
         "scenario_config": {
             "oneOf": [
                 { "$ref": "#/definitions/bus_stop_config" },
@@ -58,7 +59,7 @@
             ]
         }
     },
-    "required": [ "verbosity", "log", "seed", "episodes", "max_timesteps", "collisions", "offroad", "scenario_config", "agent_config", "mode_config" ],
+    "required": [ "verbosity", "log", "seed", "episodes", "max_timesteps", "collisions", "offroad", "zone", "scenario_config", "agent_config", "mode_config" ],
     "additionalProperties": false,
     "definitions": {
         "bus_stop_config": {
@@ -84,10 +85,9 @@
                 "actors": {
                     "type": "integer",
                     "minimum": 1
-                },
-                "zone": { "type": "boolean" }
+                }
             },
-            "required": [ "option", "actors", "zone" ],
+            "required": [ "option", "actors" ],
             "additionalProperties": false
         },
         "pelican_crossing_config": {

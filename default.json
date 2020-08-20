@@ -4,12 +4,12 @@
   "seed": 0,
   "episodes": 100,
   "max_timesteps": 1000,
-  "collisions": true,
+  "collisions": false,
   "offroad": true,
+  "zone": true,
   "scenario_config": {
     "option": "pedestrians",
-    "actors": 1,
-    "zone": true
+    "actors": 1
   },
   "agent_config": {
     "option": "q-learning",

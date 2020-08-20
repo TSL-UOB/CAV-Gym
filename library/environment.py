@@ -188,7 +188,7 @@ class CAVEnv(MarkovGameEnv):
             return None
 
         pedestrian_in_reaction_zone = None
-        if not terminate and self.env_config.scenario_config.scenario is Scenario.PEDESTRIANS and self.env_config.scenario_config.zone:
+        if not terminate and self.env_config.zone:
             pedestrian_in_reaction_zone = check_pedestrian_in_reaction_zone()
             terminate = pedestrian_in_reaction_zone is not None
 
