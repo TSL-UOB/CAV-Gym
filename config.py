@@ -12,15 +12,7 @@ from gym.utils import seeding
 from library.actors import DynamicActor, Pedestrian, TrafficLight, PelicanCrossing
 from examples.agents import RandomPedestrianAgent, RandomConstrainedPedestrianAgent, ElectionPedestrianAgent, \
     QLearningAgent, RandomVehicleAgent, RandomTrafficLightAgent, NoopAgent, ProximityPedestrianAgent, KeyboardAgent
-
-
-class Verbosity(Enum):
-    INFO = "info"
-    DEBUG = "debug"
-    SILENT = "silent"
-
-    def __str__(self):
-        return self.value
+from reporting import Verbosity
 
 
 class Scenario(Enum):

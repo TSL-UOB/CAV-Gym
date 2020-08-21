@@ -3,8 +3,16 @@ import math
 import pathlib
 import sys
 from dataclasses import dataclass
+from enum import Enum
 
-from config import Verbosity
+
+class Verbosity(Enum):  # cannot be included in config.py due to circular imports
+    INFO = "info"
+    DEBUG = "debug"
+    SILENT = "silent"
+
+    def __str__(self):
+        return self.value
 
 
 def pretty_str_iter(str_iter):
@@ -233,14 +241,14 @@ episode_data = list()
 
 def analyse_run(start_time, end_time, run_config, env):  # can run_config and env be removed?
     interesting_test_data = [row for row in episode_data if row.interesting]
-    interesting_test_data_timesteps = [row.time.max_timesteps for row in interesting_test_data]
+    interesting_test_data_timesteps = [row.time.timesteps for row in interesting_test_data]
     interesting_test_data_runtime = [row.time.runtime() for row in interesting_test_data]
     interesting_test_data_score = [row.score for row in interesting_test_data]
     nan = float("nan")
     return RunResults(
         episodes=run_config.episodes,
         time=TimeResults(
-            timesteps=sum([row.time.max_timesteps for row in episode_data]),
+            timesteps=sum([row.time.timesteps for row in episode_data]),
             start_time=start_time,
             end_time=end_time,
             resolution=env.time_resolution
