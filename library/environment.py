@@ -5,7 +5,7 @@ import gym
 from gym import spaces
 from gym.utils import seeding
 
-from config import Mode, Scenario
+from config import Mode
 from library.actors import PelicanCrossing, Pedestrian
 from library.assets import RoadMap, Occlusion
 
@@ -64,6 +64,9 @@ class CAVEnv(MarkovGameEnv):
 
         self.frequency = 30 if self.env_config.mode_config.mode is Mode.RENDER and self.env_config.mode_config.record else 60
         self.time_resolution = 1.0 / self.frequency
+
+        self.living_cost = 1 / self.frequency
+        self.on_road_cost = 5 / self.frequency
 
         console_logger.info(f"frequency={self.frequency}")
 
@@ -126,17 +129,17 @@ class CAVEnv(MarkovGameEnv):
 
         state = self.state()
 
-        joint_reward = [-1 for _ in self.actors]
+        joint_reward = [-self.living_cost for _ in self.actors]
 
         for i, polygon in enumerate(actor_polygons):
             if any(polygon.mostly_intersects(road.bounding_box()) for road in self.constants.road_map.roads):  # on road
                 self.episode_liveness[i] += 1
                 self.run_liveness[i] += 1
                 if i > 0:  # not ego
-                    joint_reward[i] -= 5
+                    joint_reward[i] -= self.on_road_cost
             else:  # off road
                 if i == 0:  # ego
-                    joint_reward[i] -= 5
+                    joint_reward[i] -= self.on_road_cost
 
         terminate = False
 

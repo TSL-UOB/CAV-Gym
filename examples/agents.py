@@ -384,11 +384,13 @@ class QLearningAgent(RandomPedestrianAgent):
             self.n = math.log(1 - y_mid) / math.log(x_mid / self.x_max)
 
         self.feature_weights = {feature: 0.0 for feature in self.feature_bounds.keys()}
+        self.ordered_features = sorted(self.feature_bounds.keys())
+        print(f"{','.join(map(str, self.ordered_features))}")
 
         self.available_actions = [(velocity_action.value, orientation_action.value) for velocity_action in VelocityAction for orientation_action in OrientationAction]
 
     def reset(self):
-        pass
+        print(f"{','.join(map(str, [self.feature_weights[feature] for feature in self.ordered_features]))}")
 
     def features(self, state, action):  # question: what does it mean for a feature to depend on an action and/or what does a Q value mean if it does not depend on an action?
         def make_actor_state(data):

@@ -1,6 +1,6 @@
 {
-  "verbosity": "info",
-  "log": null,
+  "verbosity": "silent",
+  "log": "logs",
   "seed": 0,
   "episodes": 100,
   "max_timesteps": 1000,
@@ -26,9 +26,7 @@
     }
   },
   "mode_config": {
-    "option": "render",
-    "keyboard": false,
-    "record": null
+    "option": "headless"
   }
 }
 
