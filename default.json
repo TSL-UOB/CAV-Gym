@@ -1,6 +1,7 @@
 {
-  "verbosity": "silent",
-  "log": "logs",
+  "verbosity": "info",
+  "episode_log": "logs/episode.log",
+  "run_log": "logs/run.log",
   "seed": 0,
   "episodes": 100,
   "max_timesteps": 1000,
@@ -23,10 +24,10 @@
       "on_road": false,
       "facing": false,
       "inverse_distance": true
-    }
+    },
+    "log": "logs/qlearning.log"
   },
   "mode_config": {
     "option": "headless"
   }
 }
-

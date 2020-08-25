@@ -87,23 +87,32 @@ def get_console(verbosity):
     return console
 
 
-def make_file_logger(name, directory, filename):
+def make_file_logger(name, path):
     logger = logging.getLogger(name)
     if logger.handlers:
         logger.handlers = list()
+        raise Exception("what is logger.handlers?")
     else:
-        logger.setLevel(logging.INFO)
-        pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
-        handler = logging.FileHandler(f"{directory}/{filename}")
+        path_obj = pathlib.Path(path)
+        directory_obj = path_obj.parent
+        directory_obj.mkdir(parents=True, exist_ok=True)
+        handler = logging.FileHandler(f"{path_obj}")
         handler.setFormatter(file_formatter)
         logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
     return logger
 
 
-def get_file_loggers(path):
-    episode_file = make_file_logger("cavgym.file.episodes", path, "episodes.log")
-    run_file = make_file_logger("cavgym.file.run", path, "run.log")
-    return episode_file, run_file
+def get_episode_file_logger(path):
+    return make_file_logger("cavgym.file.episodes", path)
+
+
+def get_run_file_logger(path):
+    return make_file_logger("cavgym.file.run", path)
+
+
+def get_agent_file_logger(path):
+    return make_file_logger("cavgym.file.agent", path)
 
 
 class LogMessage:

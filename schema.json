@@ -5,7 +5,13 @@
             "type": "string",
             "enum": [ "info", "debug", "silent" ]
         },
-        "log": {
+        "episode_log": {
+            "oneOf": [
+                { "type": "string" },
+                { "type": "null" }
+            ]
+        },
+        "run_log": {
             "oneOf": [
                 { "type": "string" },
                 { "type": "null" }
@@ -59,7 +65,7 @@
             ]
         }
     },
-    "required": [ "verbosity", "log", "seed", "episodes", "max_timesteps", "collisions", "offroad", "zone", "scenario_config", "agent_config", "mode_config" ],
+    "required": [ "verbosity", "episode_log", "run_log", "seed", "episodes", "max_timesteps", "collisions", "offroad", "zone", "scenario_config", "agent_config", "mode_config" ],
     "additionalProperties": false,
     "definitions": {
         "bus_stop_config": {
@@ -194,9 +200,15 @@
                 },
                 "feature_config": {
                     "$ref": "#/definitions/feature_config"
+                },
+                "log": {
+                    "oneOf": [
+                        { "type": "string" },
+                        { "type": "null" }
+                    ]
                 }
             },
-            "required": [ "option", "alpha", "gamma","epsilon" ],
+            "required": [ "option", "alpha", "gamma", "epsilon", "feature_config", "log" ],
             "additionalProperties": false
         },
         "headless_config": {

@@ -2,6 +2,7 @@ import math
 
 from gym.utils import seeding
 
+import reporting
 from library import geometry
 from library.actions import OrientationAction, VelocityAction, TrafficLightAction
 from library.actors import Car, Pedestrian, DynamicActorState
@@ -354,16 +355,23 @@ class ElectionPedestrianAgent(ProximityPedestrianAgent):
 
 
 class QLearningAgent(RandomPedestrianAgent):
-    def __init__(self, ego_constants, self_constants, road_polgon, time_resolution, width, height, feature_config, alpha=0.1, gamma=0.99, epsilon=0.01, **kwargs):
-        super().__init__(epsilon=epsilon, **kwargs)  # self.epsilon is exploration probability (should decrease over time)
+    # self.alpha is learning rate (should decrease over time)
+    # self.gamma is discount factor (should be fixed over time?)
+    # self.epsilon is exploration probability (should decrease over time)
+    def __init__(self, ego_constants, self_constants, road_polgon, time_resolution, width, height, q_learning_config, **kwargs):
+        super().__init__(epsilon=q_learning_config.epsilon, **kwargs)  # self.epsilon is exploration probability (should decrease over time)
 
         self.ego_constants = ego_constants
         self.self_constants = self_constants
         self.road_polgon = road_polgon
         self.time_resolution = time_resolution
-        self.alpha = alpha  # learning rate (should decrease over time)
-        self.gamma = gamma  # discount factor (should be fixed over time?)
-        self.feature_config = feature_config
+        self.alpha = q_learning_config.alpha  # learning rate (should decrease over time)
+        self.gamma = q_learning_config.gamma  # discount factor (should be fixed over time?)
+        self.feature_config = q_learning_config.features
+
+        self.log_file = None
+        if q_learning_config.log is not None:
+            self.log_file = reporting.get_agent_file_logger(q_learning_config.log)
 
         self.feature_bounds = dict()
         if self.feature_config.distance_x:
@@ -384,13 +392,15 @@ class QLearningAgent(RandomPedestrianAgent):
             self.n = math.log(1 - y_mid) / math.log(x_mid / self.x_max)
 
         self.feature_weights = {feature: 0.0 for feature in self.feature_bounds.keys()}
-        self.ordered_features = sorted(self.feature_bounds.keys())
-        print(f"{','.join(map(str, self.ordered_features))}")
+        if self.log_file:
+            self.enabled_features = sorted(self.feature_bounds.keys())
+            self.log_file.info(f"{','.join(map(str, self.enabled_features))}")
 
         self.available_actions = [(velocity_action.value, orientation_action.value) for velocity_action in VelocityAction for orientation_action in OrientationAction]
 
     def reset(self):
-        print(f"{','.join(map(str, [self.feature_weights[feature] for feature in self.ordered_features]))}")
+        if self.log_file:
+            self.log_file.info(f"{','.join(map(str, [self.feature_weights[feature] for feature in self.enabled_features]))}")
 
     def features(self, state, action):  # question: what does it mean for a feature to depend on an action and/or what does a Q value mean if it does not depend on an action?
         def make_actor_state(data):

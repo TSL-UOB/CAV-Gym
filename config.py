@@ -161,6 +161,7 @@ class QLearningConfig(AgentConfig):
     gamma: float
     epsilon: float
     features: FeatureConfig
+    log: Optional[str]
 
     agent = AgentType.Q_LEARNING
 
@@ -192,7 +193,8 @@ class RenderConfig(ModeConfig):
 @dataclass(frozen=True)
 class Config:
     verbosity: Verbosity
-    log: Optional[str]
+    episode_log: Optional[str]
+    run_log: Optional[str]
     seed: Optional[int]
     episodes: int
     max_timesteps: int
@@ -259,9 +261,6 @@ class Config:
                     elif self.agent_config.agent is AgentType.Q_LEARNING:
                         agent = QLearningAgent(
                             index=i,
-                            alpha=self.agent_config.alpha,
-                            epsilon=self.agent_config.epsilon,
-                            gamma=self.agent_config.gamma,
                             ego_constants=env.actors[0].constants,
                             self_constants=env.actors[1].constants,
                             road_polgon=env.constants.road_map.major_road.static_bounding_box,
@@ -269,7 +268,7 @@ class Config:
                             width=env.constants.viewer_width,
                             height=env.constants.viewer_height,
                             np_random=np_random,
-                            feature_config=self.agent_config.features
+                            q_learning_config=self.agent_config
                         )
                     else:
                         raise NotImplementedError

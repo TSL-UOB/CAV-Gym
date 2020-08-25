@@ -31,9 +31,12 @@ class Simulation:
         self.console = reporting.get_console(self.config.verbosity)
 
         self.episode_file = None
+        if self.config.episode_log is not None:
+            self.episode_file = reporting.get_episode_file_logger(self.config.episode_log)
+
         self.run_file = None
-        if self.config.log is not None:
-            self.episode_file, self.run_file = reporting.get_file_loggers(self.config.log)
+        if self.config.run_log is not None:
+            self.run_file = reporting.get_run_file_logger(self.config.run_log)
 
     def conditional_render(self):
         if self.config.mode_config.mode is not Mode.HEADLESS:
