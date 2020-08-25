@@ -5,7 +5,7 @@ from config import Config, PedestriansConfig, HeadlessConfig, QLearningConfig, F
 from simulation import Simulation
 
 
-def generate_config(alpha, gamma, epsilon):
+def make_config(alpha, gamma, epsilon):
     log_dir = f"logs/alpha={alpha}/gamma={gamma}/epsilon={epsilon}"
     return log_dir, Config(
         verbosity=Verbosity.SILENT,
@@ -42,7 +42,7 @@ def generate_config(alpha, gamma, epsilon):
 def run(alpha, gamma, epsilon):
     print(f"starting: alpha={alpha}, gamma={gamma}, epsilon={epsilon}")
 
-    log_dir, config = generate_config(alpha, gamma, epsilon)
+    log_dir, config = make_config(alpha, gamma, epsilon)
     config.write_json(f"{log_dir}/config.json")
 
     np_seed, env, agents, keyboard_agent = config.setup()

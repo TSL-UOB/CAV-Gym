@@ -242,10 +242,7 @@ def analyse_episode(index, start_time, end_time, timesteps, env_info, run_config
     )
 
 
-episode_data = list()
-
-
-def analyse_run(start_time, end_time, run_config, env):  # can run_config and env be removed?
+def analyse_run(episode_data, start_time, end_time, run_config, env):  # can run_config and env be removed?
     interesting_test_data = [row for row in episode_data if row.interesting]
     interesting_test_data_timesteps = [row.time.timesteps for row in interesting_test_data]
     interesting_test_data_runtime = [row.time.runtime() for row in interesting_test_data]

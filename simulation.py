@@ -45,6 +45,7 @@ class Simulation:
                 self.env.unwrapped.viewer.window.on_key_press = self.keyboard_agent.key_press
 
     def run(self):
+        episode_data = list()
         run_start_time = timeit.default_timer()
         for previous_episode in range(self.config.episodes):  # initially previous_episode=0
             episode_start_time = timeit.default_timer()
@@ -92,13 +93,13 @@ class Simulation:
 
             episode_end_time = timeit.default_timer()
             episode_results = reporting.analyse_episode(episode, episode_start_time, episode_end_time, timestep, info, self.config, self.env)
-            reporting.episode_data.append(episode_results)
+            episode_data.append(episode_results)
             self.console.info(episode_results.console_message())
             if self.episode_file:
                 self.episode_file.info(episode_results.file_message())
         else:
             run_end_time = timeit.default_timer()
-            run_results = reporting.analyse_run(run_start_time, run_end_time, self.config, self.env)
+            run_results = reporting.analyse_run(episode_data, run_start_time, run_end_time, self.config, self.env)
             self.console.info(run_results.console_message())
             if self.run_file:
                 self.run_file.info(run_results.file_message())
