@@ -17,8 +17,8 @@
   },
   "agent_config": {
     "option": "q-learning",
-    "alpha": 0.5,
-    "gamma": 0.5,
+    "alpha": 0.1,
+    "gamma": 0.99,
     "epsilon": 0.01,
     "feature_config": {
       "distance_x": true,

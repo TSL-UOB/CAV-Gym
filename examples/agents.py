@@ -457,15 +457,13 @@ class QLearningAgent(RandomPedestrianAgent):
             unnormalised_values["inverse_distance"] = 1 - (x / self.x_max) ** self.n  # thanks to Ram Varadarajan
 
         normalised_values = {feature: normalise(feature_value, *self.feature_bounds[feature]) for feature, feature_value in unnormalised_values.items()}
-        # print(pretty_float_list(unnormalised_values), pretty_float_list(normalised_values))
         return normalised_values
 
     def q_value(self, state, action):  # if features do not depend on action, then the Q value will not either
         feature_values = self.features(state, action)
-        # assert len(feature_values) == self.num_featues
         q_value = sum(feature_value * self.feature_weights[feature] for feature, feature_value in feature_values.items())
         # assert math.isfinite(q_value)
-        # print(pretty_float_list(feature_values), pretty_float_list(self.feature_weights), pretty_float(q_value))
+        # print(reporting.pretty_float_list(list(feature_values.values())), reporting.pretty_float_list(list(self.feature_weights.values())), reporting.pretty_float(q_value))
         return q_value
 
     def choose_action(self, state, info=None):
@@ -488,11 +486,18 @@ class QLearningAgent(RandomPedestrianAgent):
             return action
 
     def process_feedback(self, previous_state, action, state, reward):  # agent executed action in previous_state, and then arrived in state where it received reward
+        # q_value = self.q_value(previous_state, action)
+        # new_q_value = reward + self.gamma * max(self.q_value(state, action_prime) for action_prime in self.available_actions)
+        # q_value_gain = new_q_value - q_value
+        # for feature, feature_value in self.features(previous_state, action).items():
+        #     self.feature_weights[feature] = self.feature_weights[feature] + self.alpha * q_value_gain * feature_value
+
         q_value = self.q_value(previous_state, action)
-        new_q_value = reward + self.gamma * max(self.q_value(state, action_prime) for action_prime in self.available_actions)
-        q_value_gain = new_q_value - q_value
+        difference = (reward + self.gamma * max(self.q_value(state, action_prime) for action_prime in self.available_actions)) - q_value
         for feature, feature_value in self.features(previous_state, action).items():
-            self.feature_weights[feature] = self.feature_weights[feature] + self.alpha * q_value_gain * feature_value
+            self.feature_weights[feature] = self.feature_weights[feature] + self.alpha * difference * feature_value
+
+        # print(reporting.pretty_float_list(list(self.feature_weights.values())))
 
 
 class DecayedQLearningAgent(QLearningAgent):
