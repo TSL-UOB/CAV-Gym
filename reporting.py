@@ -87,12 +87,9 @@ def get_console(verbosity):
     return console
 
 
-def make_file_logger(name, path):
-    logger = logging.getLogger(name)
-    if logger.handlers:
-        logger.handlers = list()
-        raise Exception("what is logger.handlers?")
-    else:
+def make_file_logger(path):
+    logger = logging.getLogger(path)
+    if not logger.handlers:  # logger has already been configured
         path_obj = pathlib.Path(path)
         directory_obj = path_obj.parent
         directory_obj.mkdir(parents=True, exist_ok=True)
@@ -104,15 +101,15 @@ def make_file_logger(name, path):
 
 
 def get_episode_file_logger(path):
-    return make_file_logger("cavgym.file.episodes", path)
+    return make_file_logger(path)
 
 
 def get_run_file_logger(path):
-    return make_file_logger("cavgym.file.run", path)
+    return make_file_logger(path)
 
 
 def get_agent_file_logger(path):
-    return make_file_logger("cavgym.file.agent", path)
+    return make_file_logger(path)
 
 
 class LogMessage:

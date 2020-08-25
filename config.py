@@ -1,3 +1,5 @@
+import json
+import pathlib
 from abc import ABC, abstractmethod
 from argparse import ArgumentParser, FileType
 from dataclasses import dataclass, asdict
@@ -12,7 +14,7 @@ from gym.utils import seeding
 from library.actors import DynamicActor, Pedestrian, TrafficLight, PelicanCrossing
 from examples.agents import RandomPedestrianAgent, RandomConstrainedPedestrianAgent, ElectionPedestrianAgent, \
     QLearningAgent, RandomVehicleAgent, RandomTrafficLightAgent, NoopAgent, ProximityPedestrianAgent, KeyboardAgent
-from reporting import Verbosity
+from reporting import Verbosity, get_console, pretty_str_list
 
 
 class Scenario(Enum):
@@ -217,7 +219,10 @@ class Config:
             raise ValueError("seed must be > 0")
 
     def setup(self):
+        console = get_console(self.verbosity)
+
         np_random, np_seed = seeding.np_random(self.seed)
+        console.info(f"seed={np_seed}")
 
         if self.scenario_config.scenario is Scenario.PELICAN_CROSSING:
             env = gym.make('PelicanCrossing-v0', env_config=self, np_random=np_random)
@@ -229,6 +234,8 @@ class Config:
             env = gym.make('Pedestrians-v0', env_config=self, num_pedestrians=self.scenario_config.actors, np_random=np_random)
         else:
             raise NotImplementedError
+
+        console.info(f"actors={pretty_str_list(actor.__class__.__name__ for actor in env.actors)}")
 
         keyboard_agent = KeyboardAgent(index=0) if self.mode_config.mode is Mode.RENDER and self.mode_config.keyboard else None
         agent = keyboard_agent if keyboard_agent is not None else NoopAgent(index=0)
@@ -281,7 +288,17 @@ class Config:
                 agent = RandomTrafficLightAgent(np_random=np_random)
             agents.append(agent)
 
+        console.info(f"agents={pretty_str_list(agent.__class__.__name__ for agent in agents)}")
+        console.info(f"ego=({env.actors[0].__class__.__name__}, {agents[0].__class__.__name__})")
+
         return np_seed, env, agents, keyboard_agent
+
+    def write_json(self, path):
+        path_obj = pathlib.Path(path)
+        directory_obj = path_obj.parent
+        directory_obj.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as json_file:
+            json.dump(self, json_file, ensure_ascii=False, indent=2, cls=ConfigJSONEncoder)
 
 
 class ConfigJSONEncoder(JSONEncoder):  # serialise Config to data
