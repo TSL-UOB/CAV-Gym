@@ -201,6 +201,9 @@ class Config:
     collisions: bool
     offroad: bool
     zone: bool
+    living_cost: float
+    road_cost: float
+    win_reward: float
     scenario_config: Union[BusStopConfig, CrossroadsConfig, PedestriansConfig, PelicanCrossingConfig]
     agent_config: Union[RandomConfig, RandomConstrainedConfig, ProximityConfig, ElectionConfig, QLearningConfig]
     mode_config: Union[HeadlessConfig, RenderConfig]

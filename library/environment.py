@@ -65,9 +65,6 @@ class CAVEnv(MarkovGameEnv):
         self.frequency = 30 if self.env_config.mode_config.mode is Mode.RENDER and self.env_config.mode_config.record else 60
         self.time_resolution = 1.0 / self.frequency
 
-        self.living_cost = 1 / self.frequency
-        self.on_road_cost = 5 / self.frequency
-
         console_logger.info(f"frequency={self.frequency}")
 
         def set_np_random(space):
@@ -129,17 +126,17 @@ class CAVEnv(MarkovGameEnv):
 
         state = self.state()
 
-        joint_reward = [-self.living_cost for _ in self.actors]
+        joint_reward = [-self.env_config.living_cost for _ in self.actors]
 
         for i, polygon in enumerate(actor_polygons):
             if any(polygon.mostly_intersects(road.bounding_box()) for road in self.constants.road_map.roads):  # on road
                 self.episode_liveness[i] += 1
                 self.run_liveness[i] += 1
                 if i > 0:  # not ego
-                    joint_reward[i] -= self.on_road_cost
+                    joint_reward[i] -= self.env_config.road_cost
             else:  # off road
                 if i == 0:  # ego
-                    joint_reward[i] -= self.on_road_cost
+                    joint_reward[i] -= self.env_config.road_cost
 
         terminate = False
 
@@ -197,7 +194,7 @@ class CAVEnv(MarkovGameEnv):
 
         if terminate:
             winner = pedestrian_in_reaction_zone if pedestrian_in_reaction_zone else 0  # index of winner
-            joint_reward[winner] += 100
+            joint_reward[winner] += self.env_config.win_reward
             # noinspection PyTypeChecker
             info['winner'] = winner
 

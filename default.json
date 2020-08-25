@@ -8,6 +8,9 @@
   "collisions": false,
   "offroad": true,
   "zone": true,
+  "living_cost": 1.0,
+  "road_cost": 5.0,
+  "win_reward": 6000.0,
   "scenario_config": {
     "option": "pedestrians",
     "actors": 1

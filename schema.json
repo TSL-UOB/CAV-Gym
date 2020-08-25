@@ -34,13 +34,12 @@
             "type": "integer",
             "minimum": 1
         },
-        "collisions": {
-            "type": "boolean"
-        },
-        "offroad": {
-            "type": "boolean"
-        },
+        "collisions": { "type": "boolean" },
+        "offroad": { "type": "boolean" },
         "zone": { "type": "boolean" },
+        "living_cost": { "type": "number" },
+        "road_cost": { "type": "number" },
+        "win_reward": { "type": "number" },
         "scenario_config": {
             "oneOf": [
                 { "$ref": "#/definitions/bus_stop_config" },
@@ -65,7 +64,7 @@
             ]
         }
     },
-    "required": [ "verbosity", "episode_log", "run_log", "seed", "episodes", "max_timesteps", "collisions", "offroad", "zone", "scenario_config", "agent_config", "mode_config" ],
+    "required": [ "verbosity", "episode_log", "run_log", "seed", "episodes", "max_timesteps", "collisions", "offroad", "zone", "living_cost", "road_cost", "win_reward", "scenario_config", "agent_config", "mode_config" ],
     "additionalProperties": false,
     "definitions": {
         "bus_stop_config": {
@@ -157,24 +156,12 @@
         "feature_config": {
             "type": "object",
             "properties": {
-                "distance_x": {
-                    "type": "boolean"
-                },
-                "distance_y": {
-                    "type": "boolean"
-                },
-                "distance": {
-                    "type": "boolean"
-                },
-                "on_road": {
-                    "type": "boolean"
-                },
-                "facing": {
-                    "type": "boolean"
-                },
-                "inverse_distance": {
-                    "type": "boolean"
-                }
+                "distance_x": { "type": "boolean" },
+                "distance_y": { "type": "boolean" },
+                "distance": { "type": "boolean" },
+                "on_road": { "type": "boolean" },
+                "facing": { "type": "boolean" },
+                "inverse_distance": { "type": "boolean" }
             },
             "required": [ "distance_x", "distance_y", "distance", "on_road", "facing", "inverse_distance" ],
             "additionalProperties": false
@@ -225,7 +212,10 @@
                 "option": { "const": "render" },
                 "keyboard": { "type": "boolean" },
                 "record": {
-                    "type": [ "string", "null" ]
+                    "oneOf": [
+                        { "type": "string" },
+                        { "type": "null" }
+                    ]
                 }
             },
             "required": [ "option", "keyboard", "record" ],
