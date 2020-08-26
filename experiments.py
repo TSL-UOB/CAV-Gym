@@ -1,3 +1,4 @@
+from argparse import ArgumentParser, ArgumentTypeError
 from multiprocessing import Pool
 
 from reporting import Verbosity
@@ -53,12 +54,30 @@ def run(alpha, gamma, epsilon):
     print(f"finished: alpha={alpha}, gamma={gamma}, epsilon={epsilon}")
 
 
+class PoolParser(ArgumentParser):
+    def __init__(self):
+        super().__init__()
+
+        def positive_int(value):
+            ivalue = int(value)
+            if ivalue < 1:
+                raise ArgumentTypeError(f"invalid positive int value: {value}")
+            return ivalue
+
+        self.add_argument("-p", "--processes", type=positive_int, default=10, metavar="N", help="set number of processes as %(metavar)s (default: %(default)s)")
+
+    def parse_pool(self):
+        args = self.parse_args()
+        return Pool(args.processes)
+
+
 if __name__ == '__main__':
     alphas = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-    gammas = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-    epsilons = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    gammas = [0.91, 0.92, 0.93, 0.94, 0.95, 0.96, 0.97, 0.98, 0.99]
+    epsilons = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09]
 
     parameters = [(alpha, gamma, epsilon) for alpha in alphas for gamma in gammas for epsilon in epsilons]
 
-    pool = Pool(10)
+    parser = PoolParser()
+    pool = parser.parse_pool()
     pool.starmap(run, parameters)
