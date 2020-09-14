@@ -1,9 +1,9 @@
 {
   "verbosity": "info",
-  "episode_log": "logs/episode.log",
-  "run_log": "logs/run.log",
+  "episode_log": null,
+  "run_log": null,
   "seed": 0,
-  "episodes": 100,
+  "episodes": 1,
   "max_timesteps": 1000,
   "collisions": false,
   "offroad": true,
@@ -28,9 +28,11 @@
       "facing": false,
       "inverse_distance": true
     },
-    "log": "logs/qlearning.log"
+    "log": null
   },
   "mode_config": {
-    "option": "headless"
+    "option": "render",
+    "keyboard": false,
+    "record": "record"
   }
 }
