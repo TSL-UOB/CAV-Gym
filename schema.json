@@ -90,6 +90,16 @@
                 "actors": {
                     "type": "integer",
                     "minimum": 1
+                },
+                "outbound_pavement": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                },
+                "inbound_pavement": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
                 }
             },
             "required": [ "option", "actors" ],

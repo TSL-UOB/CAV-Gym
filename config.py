@@ -83,12 +83,18 @@ class CrossroadsConfig(ScenarioConfig):
 @dataclass(frozen=True)
 class PedestriansConfig(ScenarioConfig):
     actors: int
+    outbound_pavement: float
+    inbound_pavement: float
 
     scenario = Scenario.PEDESTRIANS
 
     def __post_init__(self):
         if self.actors < 0:
             raise ValueError("actors must be >= 0")
+        if self.outbound_pavement < 0 or self.outbound_pavement > 1:
+            raise ValueError("outbound_pavement must be in [0,1]")
+        if self.inbound_pavement < 0 or self.inbound_pavement > 1:
+            raise ValueError("inbound_pavement must be in [0,1]")
 
 
 @enforce_types
@@ -231,7 +237,7 @@ class Config:
         elif self.scenario_config.scenario is Scenario.CROSSROADS:
             env = gym.make('Crossroads-v0', env_config=self, np_random=np_random)
         elif self.scenario_config.scenario is Scenario.PEDESTRIANS:
-            env = gym.make('Pedestrians-v0', env_config=self, num_pedestrians=self.scenario_config.actors, np_random=np_random)
+            env = gym.make('Pedestrians-v0', env_config=self, num_pedestrians=self.scenario_config.actors, outbound_percentage=self.scenario_config.outbound_pavement, inbound_percentage=self.scenario_config.inbound_pavement, np_random=np_random)
         else:
             raise NotImplementedError
 
