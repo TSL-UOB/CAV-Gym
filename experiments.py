@@ -6,14 +6,14 @@ from config import Config, PedestriansConfig, HeadlessConfig, QLearningConfig, F
 from simulation import Simulation
 
 
-def make_config(alpha, gamma, epsilon):
-    log_dir = f"logs/alpha={alpha}/gamma={gamma}/epsilon={epsilon}"
+def make_config(outbound_pavement, inbound_pavement):
+    log_dir = f"logs/outbound_pavement={outbound_pavement}/inbound_pavement={inbound_pavement}"
     return log_dir, Config(
         verbosity=Verbosity.SILENT,
         episode_log=f"{log_dir}/episode.log",
         run_log=f"{log_dir}/run.log",
         seed=0,
-        episodes=100,
+        episodes=1000,
         max_timesteps=1000,
         collisions=False,
         offroad=True,
@@ -21,11 +21,15 @@ def make_config(alpha, gamma, epsilon):
         living_cost=1.0,
         road_cost=5.0,
         win_reward=6000.0,
-        scenario_config=PedestriansConfig(actors=1),
+        scenario_config=PedestriansConfig(
+            actors=1,
+            outbound_pavement=outbound_pavement,
+            inbound_pavement=inbound_pavement
+        ),
         agent_config=QLearningConfig(
-            alpha=alpha,
-            gamma=gamma,
-            epsilon=epsilon,
+            alpha=0.18,
+            gamma=0.87,
+            epsilon=0.0005,
             features=FeatureConfig(
                 distance_x=True,
                 distance_y=True,
@@ -40,10 +44,10 @@ def make_config(alpha, gamma, epsilon):
     )
 
 
-def run(alpha, gamma, epsilon):
-    print(f"starting: alpha={alpha}, gamma={gamma}, epsilon={epsilon}")
+def run(outbound_pavement, inbound_pavement):
+    print(f"starting: outbound_pavement={outbound_pavement}, inbound_pavement={inbound_pavement}")
 
-    log_dir, config = make_config(alpha, gamma, epsilon)
+    log_dir, config = make_config(outbound_pavement, inbound_pavement)
     config.write_json(f"{log_dir}/config.json")
 
     np_seed, env, agents, keyboard_agent = config.setup()
@@ -51,7 +55,7 @@ def run(alpha, gamma, epsilon):
     simulation = Simulation(env, agents, config=config, keyboard_agent=keyboard_agent)
     simulation.run()
 
-    print(f"finished: alpha={alpha}, gamma={gamma}, epsilon={epsilon}")
+    print(f"finished: outbound_pavement={outbound_pavement}, inbound_pavement={inbound_pavement}")
 
 
 class PoolParser(ArgumentParser):
@@ -72,11 +76,10 @@ class PoolParser(ArgumentParser):
 
 
 if __name__ == '__main__':
-    alphas = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-    gammas = [0.91, 0.92, 0.93, 0.94, 0.95, 0.96, 0.97, 0.98, 0.99]
-    epsilons = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09]
+    outbound_pavements = [1.0, 0.75, 0.5, 0.25, 0.0]
+    inbound_pavements = [1.0, 0.75, 0.5, 0.25, 0.0]
 
-    parameters = [(alpha, gamma, epsilon) for alpha in alphas for gamma in gammas for epsilon in epsilons]
+    parameters = [(outbound_pavement, inbound_pavement) for outbound_pavement in outbound_pavements for inbound_pavement in inbound_pavements if outbound_pavement > 0 or inbound_pavement > 0]
 
     parser = PoolParser()
     pool = parser.parse_pool()
