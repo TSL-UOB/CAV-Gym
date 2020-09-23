@@ -1,6 +1,7 @@
 from argparse import ArgumentParser, ArgumentTypeError
 from multiprocessing import Pool
 
+from examples.constants import M2PX
 from reporting import Verbosity
 from config import Config, PedestriansConfig, HeadlessConfig, QLearningConfig, FeatureConfig, AgentType, RandomConfig, \
     RandomConstrainedConfig, ProximityConfig, ElectionConfig
@@ -35,8 +36,8 @@ def make_agent_config(agent_type, log_dir, **kwargs):
         raise NotImplementedError
 
 
-def make_config(agent_type, epsilon):
-    log_dir = f"logs/agent_type={agent_type}/epsilon={epsilon}"
+def make_config(agent_type, threshold):
+    log_dir = f"logs/agent_type={agent_type}/threshold={threshold}"
     return log_dir, Config(
         verbosity=Verbosity.SILENT,
         episode_log=f"{log_dir}/episode.log",
@@ -55,15 +56,15 @@ def make_config(agent_type, epsilon):
             outbound_pavement=1.0,
             inbound_pavement=1.0
         ),
-        agent_config=make_agent_config(agent_type, log_dir, epsilon=epsilon),
+        agent_config=make_agent_config(agent_type, log_dir, threshold=M2PX * threshold),
         mode_config=HeadlessConfig()
     )
 
 
-def run(agent_type, epsilon):
-    print(f"starting: agent_type={agent_type}, epsilon={epsilon}")
+def run(agent_type, threshold):
+    print(f"starting: agent_type={agent_type}, threshold={threshold}")
 
-    log_dir, config = make_config(agent_type, epsilon)
+    log_dir, config = make_config(agent_type, threshold)
     config.write_json(f"{log_dir}/config.json")
 
     np_seed, env, agents, keyboard_agent = config.setup()
@@ -71,7 +72,7 @@ def run(agent_type, epsilon):
     simulation = Simulation(env, agents, config=config, keyboard_agent=keyboard_agent)
     simulation.run()
 
-    print(f"finished: agent_type={agent_type}, epsilon={epsilon}")
+    print(f"finished: agent_type={agent_type}, threshold={threshold}")
 
 
 class PoolParser(ArgumentParser):
@@ -92,10 +93,10 @@ class PoolParser(ArgumentParser):
 
 
 if __name__ == '__main__':
-    agent_types = [AgentType.RANDOM]
-    epsilons = [i / 1000 for i in range(1, 100)]
+    agent_types = [AgentType.PROXIMITY]
+    thresholds = [i * 0.5 for i in range(1, 100)]
 
-    parameters = [(agent_type, epsilon) for agent_type in agent_types for epsilon in epsilons]
+    parameters = [(agent_type, threshold) for agent_type in agent_types for threshold in thresholds]
 
     parser = PoolParser()
     pool = parser.parse_pool()
