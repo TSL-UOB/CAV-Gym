@@ -14,9 +14,9 @@ def make_agent_config(agent_type, log_dir):
     elif agent_type is AgentType.RANDOM_CONSTRAINED:
         return RandomConstrainedConfig(epsilon=0.5)
     elif agent_type is AgentType.PROXIMITY:
-        return ProximityConfig(threshold=M2PX * 34)
+        return ProximityConfig(threshold=float(M2PX * 34))
     elif agent_type is AgentType.ELECTION:
-        return ElectionConfig(threshold=M2PX * 34)
+        return ElectionConfig(threshold=float(M2PX * 34))
     elif agent_type is AgentType.Q_LEARNING:
         return QLearningConfig(
             alpha=0.18,
