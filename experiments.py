@@ -92,8 +92,8 @@ class PoolParser(ArgumentParser):
 
 
 if __name__ == '__main__':
-    agent_types = [AgentType.RANDOM, AgentType.RANDOM_CONSTRAINED]
-    epsilons = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    agent_types = [AgentType.RANDOM_CONSTRAINED]
+    epsilons = [i / 100 for i in range(1, 100)]
 
     parameters = [(agent_type, epsilon) for agent_type in agent_types for epsilon in epsilons]
 
