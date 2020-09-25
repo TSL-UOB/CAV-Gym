@@ -409,8 +409,8 @@ class QLearningAgent(RandomPedestrianAgent):
                 position=Point(data[0], data[1]),
                 velocity=data[2],
                 orientation=data[3],
-                acceleration=data[4],
-                angular_velocity=data[5],
+                throttle=data[4],
+                steering_angle=data[5],
                 target_velocity=data[6],
                 target_orientation=data[7]
             )

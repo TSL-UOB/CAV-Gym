@@ -53,8 +53,8 @@ actors = [
             position=road_map.major_road.outbound.lanes[0].spawn,
             velocity=car_constants.target_fast_velocity,
             orientation=road_map.major_road.outbound.orientation,
-            acceleration=0.0,
-            angular_velocity=0.0,
+            throttle=0.0,
+            steering_angle=0.0,
             target_velocity=None,
             target_orientation=None
         ),
@@ -65,8 +65,8 @@ actors = [
             position=road_map.major_road.inbound.lanes[0].spawn,
             velocity=car_constants.target_fast_velocity,
             orientation=road_map.major_road.inbound.orientation,
-            acceleration=0.0,
-            angular_velocity=0.0,
+            throttle=0.0,
+            steering_angle=0.0,
             target_velocity=None,
             target_orientation=None
         ),
@@ -77,8 +77,8 @@ actors = [
             position=geometry.Point(160, -20).translate(road_map.intersection_bounding_boxes[0].front_left),
             velocity=0.0,
             orientation=road_map.major_road.inbound.orientation,
-            acceleration=0.0,
-            angular_velocity=0.0,
+            throttle=0.0,
+            steering_angle=0.0,
             target_velocity=None,
             target_orientation=None
         ),

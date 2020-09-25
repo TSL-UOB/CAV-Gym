@@ -49,20 +49,20 @@ class DynamicActorState:
     position: geometry.Point
     velocity: float
     orientation: float
-    acceleration: float
-    angular_velocity: float
+    throttle: float
+    steering_angle: float
     target_velocity: float or None
     target_orientation: float or None
 
     def __copy__(self):
-        return DynamicActorState(copy(self.position), self.velocity, self.orientation, self.acceleration, self.angular_velocity, self.target_velocity, self.target_orientation)
+        return DynamicActorState(copy(self.position), self.velocity, self.orientation, self.throttle, self.steering_angle, self.target_velocity, self.target_orientation)
 
     def __iter__(self):
         yield from self.position
         yield self.velocity
         yield self.orientation
-        yield self.acceleration
-        yield self.angular_velocity
+        yield self.throttle
+        yield self.steering_angle
         yield self.target_velocity
         yield self.target_orientation
 
@@ -77,10 +77,10 @@ class DynamicActorConstants:
     min_velocity: float
     max_velocity: float
 
-    acceleration_rate: float
-    deceleration_rate: float
-    left_turn_rate: float
-    right_turn_rate: float
+    throttle_up_rate: float
+    throttle_down_rate: float
+    steer_left_angle: float
+    steer_right_angle: float
 
     target_slow_velocity: float
     target_fast_velocity: float
@@ -107,8 +107,8 @@ class DynamicActor(Actor, Occlusion):
             spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),  # y
             spaces.Box(low=0.0, high=np.inf, shape=(1,), dtype=np.float32),  # velocity
             spaces.Box(low=-np.pi, high=np.pi, shape=(1,), dtype=np.float32),  # orientation
-            spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),  # acceleration
-            spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),  # angular_velocity
+            spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),  # throttle
+            spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),  # steering_angle
             spaces.Box(low=0.0, high=np.inf, shape=(1,), dtype=np.float32),  # target_velocity
             spaces.Box(low=-np.pi, high=np.pi, shape=(1,), dtype=np.float32)  # target_orientation
         ])
@@ -126,14 +126,14 @@ class DynamicActor(Actor, Occlusion):
         return self.wheels.transform(self.state.orientation, self.state.position)
 
     def stopping_zones(self):
-        braking_distance = (self.state.velocity ** 2) / (2 * -self.constants.deceleration_rate)
+        braking_distance = (self.state.velocity ** 2) / (2 * -self.constants.throttle_down_rate)
         reaction_distance = self.state.velocity * REACTION_TIME
         total_distance = braking_distance + reaction_distance
 
         if total_distance == 0:
             return None, None
 
-        if self.state.angular_velocity == 0:
+        if self.state.steering_angle == 0:
             zone = geometry.make_rectangle(total_distance, self.constants.width, rear_offset=0).transform(self.state.orientation, Point(self.constants.length * 0.5, 0).transform(self.state.orientation, self.state.position))
             braking_zone, reaction_zone = zone.split_longitudinally(braking_distance / total_distance)
             return braking_zone, reaction_zone
@@ -145,9 +145,9 @@ class DynamicActor(Actor, Occlusion):
             adjacent = opposite / opposite_to_adjacent_ratio
             return adjacent
 
-        radius = find_radius(self.state.angular_velocity, self.constants.wheelbase)  # distance from centre of rotation to centre of rear axle
+        radius = find_radius(self.state.steering_angle, self.constants.wheelbase)  # distance from centre of rotation to centre of rear axle
 
-        counter_clockwise = self.state.angular_velocity > 0
+        counter_clockwise = self.state.steering_angle > 0
 
         rear_axle_centre_point = self.wheel_positions().rear_centre()
         relative_rotation_angle = self.state.orientation + (math.pi / 2.0) if counter_clockwise else self.state.orientation - (math.pi / 2.0)
@@ -228,9 +228,9 @@ class DynamicActor(Actor, Occlusion):
         if self.state.target_velocity is not None:
             difference = self.state.target_velocity - self.state.velocity
             if difference < 0:
-                self.state.acceleration = self.constants.deceleration_rate
+                self.state.throttle = self.constants.throttle_down_rate
             elif difference > 0:
-                self.state.acceleration = self.constants.acceleration_rate
+                self.state.throttle = self.constants.throttle_up_rate
             else:
                 self.state.target_velocity = None
 
@@ -256,9 +256,9 @@ class DynamicActor(Actor, Occlusion):
         if orientation_action is not OrientationAction.NOOP and self.state.target_orientation is not None:
             difference = geometry.normalise_angle(self.state.target_orientation - self.state.orientation)
             if difference < 0:
-                self.state.angular_velocity = self.constants.right_turn_rate
+                self.state.steering_angle = self.constants.steer_right_angle
             elif difference > 0:
-                self.state.angular_velocity = self.constants.left_turn_rate
+                self.state.steering_angle = self.constants.steer_left_angle
             else:
                 self.state.target_orientation = None
 
@@ -268,7 +268,7 @@ class DynamicActor(Actor, Occlusion):
             self.constants.min_velocity,
             min(
                 self.constants.max_velocity,
-                self.state.velocity + (self.state.acceleration * time_resolution)
+                self.state.velocity + (self.state.throttle * time_resolution)
             )
         )
 
@@ -281,21 +281,21 @@ class DynamicActor(Actor, Occlusion):
             x=self.state.position.x + (self.wheelbase_offset_front * cos_orientation),
             y=self.state.position.y + (self.wheelbase_offset_front * sin_orientation)
         )
-        front_wheel_apply_angular_velocity = Point(
-            x=self.state.velocity * time_resolution * math.cos(self.state.orientation + self.state.angular_velocity),
-            y=self.state.velocity * time_resolution * math.sin(self.state.orientation + self.state.angular_velocity)
+        front_wheel_apply_steering_angle = Point(
+            x=self.state.velocity * time_resolution * math.cos(self.state.orientation + self.state.steering_angle),
+            y=self.state.velocity * time_resolution * math.sin(self.state.orientation + self.state.steering_angle)
         )
-        front_wheel_position = front_wheel_calculate_position + front_wheel_apply_angular_velocity
+        front_wheel_position = front_wheel_calculate_position + front_wheel_apply_steering_angle
 
         back_wheel_calculate_position = geometry.Point(
             x=self.state.position.x - (self.wheelbase_offset_rear * cos_orientation),
             y=self.state.position.y - (self.wheelbase_offset_rear * sin_orientation)
         )
-        back_wheel_apply_angular_velocity = Point(
+        back_wheel_apply_steering_angle = Point(
             x=self.state.velocity * time_resolution * cos_orientation,
             y=self.state.velocity * time_resolution * sin_orientation
         )
-        back_wheel_position = back_wheel_calculate_position + back_wheel_apply_angular_velocity
+        back_wheel_position = back_wheel_calculate_position + back_wheel_apply_steering_angle
 
         self.state.position = Point(
             x=(front_wheel_position.x + back_wheel_position.x) / 2.0,
@@ -313,7 +313,7 @@ class DynamicActor(Actor, Occlusion):
         ):
             self.state.velocity = self.state.target_velocity
             self.state.target_velocity = None
-            self.state.acceleration = 0
+            self.state.throttle = 0
 
         current_orientation_diff = geometry.normalise_angle(self.state.target_orientation - self.state.orientation) if self.state.target_orientation is not None else None
         if self.state.target_orientation is not None and (
@@ -323,7 +323,7 @@ class DynamicActor(Actor, Occlusion):
         ):
             self.state.orientation = self.state.target_orientation
             self.state.target_orientation = None
-            self.state.angular_velocity = 0
+            self.state.steering_angle = 0
 
 
 class Pedestrian(DynamicActor):
@@ -336,8 +336,8 @@ class SpawnPedestrianState:
     position_boxes: list
     velocity: float
     orientations: list
-    acceleration: float
-    angular_velocity: float
+    throttle: float
+    steering_angle: float
     target_velocity: float or None
     target_orientation: float or None
 
@@ -364,8 +364,8 @@ class SpawnPedestrian(Pedestrian):
             position=position,
             velocity=self.spawn_init_state.velocity,
             orientation=orientation,
-            acceleration=self.spawn_init_state.acceleration,
-            angular_velocity=self.spawn_init_state.angular_velocity,
+            throttle=self.spawn_init_state.throttle,
+            steering_angle=self.spawn_init_state.steering_angle,
             target_velocity=self.spawn_init_state.target_velocity,
             target_orientation=self.spawn_init_state.target_orientation
         )

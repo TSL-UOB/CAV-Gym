@@ -122,9 +122,9 @@ class VehicleView(DynamicActorView):
 
         left_indicator_state = BulbState.OFF
         right_indicator_state = BulbState.OFF
-        if vehicle.state.angular_velocity > 0:
+        if vehicle.state.steering_angle > 0:
             left_indicator_state = BulbState.FULL
-        elif vehicle.state.angular_velocity < 0:
+        elif vehicle.state.steering_angle < 0:
             right_indicator_state = BulbState.FULL
 
         indicator_bounding_box = vehicle.indicators()
@@ -133,9 +133,9 @@ class VehicleView(DynamicActorView):
 
         brake_lights_state = BulbState.OFF
         headlights_state = BulbState.OFF
-        if vehicle.state.acceleration < 0:
+        if vehicle.state.throttle < 0:
             brake_lights_state = BulbState.FULL
-        elif vehicle.state.acceleration > 0:
+        elif vehicle.state.throttle > 0:
             headlights_state = BulbState.FULL
 
         longitudinal_bounding_box = vehicle.longitudinal_lights()

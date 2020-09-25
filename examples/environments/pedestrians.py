@@ -76,8 +76,8 @@ class PedestriansEnv(CAVEnv):
                     position_boxes=make_spawn_position_boxes(outbound_percentage, inbound_percentage),
                     velocity=0.0,
                     orientations=spawn_orientations,
-                    acceleration=0.0,
-                    angular_velocity=0.0,
+                    throttle=0.0,
+                    steering_angle=0.0,
                     target_velocity=None,
                     target_orientation=None
                 ),
@@ -91,8 +91,8 @@ class PedestriansEnv(CAVEnv):
                     position=road_map.major_road.outbound.lanes[0].spawn,
                     velocity=car_constants.target_fast_velocity,
                     orientation=road_map.major_road.outbound.orientation,
-                    acceleration=0.0,
-                    angular_velocity=0.0,
+                    throttle=0.0,
+                    steering_angle=0.0,
                     target_velocity=None,
                     target_orientation=None
                 ),
