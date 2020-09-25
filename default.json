@@ -33,8 +33,6 @@
     "log": null
   },
   "mode_config": {
-    "option": "render",
-    "keyboard": false,
-    "record": "record"
+    "option": "headless"
   }
 }
