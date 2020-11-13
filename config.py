@@ -11,7 +11,7 @@ import gym
 from enforce_typing import enforce_types
 from gym.utils import seeding
 
-from library.actors import DynamicActor, Pedestrian, TrafficLight, PelicanCrossing
+from library.bodies import DynamicBody, Pedestrian, TrafficLight, PelicanCrossing
 from examples.agents import RandomPedestrianAgent, RandomConstrainedPedestrianAgent, ElectionPedestrianAgent, \
     QLearningAgent, RandomVehicleAgent, RandomTrafficLightAgent, NoopAgent, ProximityPedestrianAgent, KeyboardAgent
 from reporting import Verbosity, get_console, pretty_str_list
@@ -82,15 +82,15 @@ class CrossroadsConfig(ScenarioConfig):
 @enforce_types
 @dataclass(frozen=True)
 class PedestriansConfig(ScenarioConfig):
-    actors: int
+    bodies: int
     outbound_pavement: float
     inbound_pavement: float
 
     scenario = Scenario.PEDESTRIANS
 
     def __post_init__(self):
-        if self.actors < 0:
-            raise ValueError("actors must be >= 0")
+        if self.bodies < 0:
+            raise ValueError("bodies must be >= 0")
         if self.outbound_pavement < 0 or self.outbound_pavement > 1:
             raise ValueError("outbound_pavement must be in [0,1]")
         if self.inbound_pavement < 0 or self.inbound_pavement > 1:
@@ -237,18 +237,18 @@ class Config:
         elif self.scenario_config.scenario is Scenario.CROSSROADS:
             env = gym.make('Crossroads-v0', env_config=self, np_random=np_random)
         elif self.scenario_config.scenario is Scenario.PEDESTRIANS:
-            env = gym.make('Pedestrians-v0', env_config=self, num_pedestrians=self.scenario_config.actors, outbound_percentage=self.scenario_config.outbound_pavement, inbound_percentage=self.scenario_config.inbound_pavement, np_random=np_random)
+            env = gym.make('Pedestrians-v0', env_config=self, num_pedestrians=self.scenario_config.bodies, outbound_percentage=self.scenario_config.outbound_pavement, inbound_percentage=self.scenario_config.inbound_pavement, np_random=np_random)
         else:
             raise NotImplementedError
 
-        console.info(f"actors={pretty_str_list(actor.__class__.__name__ for actor in env.actors)}")
+        console.info(f"bodies={pretty_str_list(body.__class__.__name__ for body in env.bodies)}")
 
-        keyboard_agent = KeyboardAgent(actor=env.actors[0], time_resolution=env.time_resolution, index=0) if self.mode_config.mode is Mode.RENDER and self.mode_config.keyboard else None
+        keyboard_agent = KeyboardAgent(body=env.bodies[0], time_resolution=env.time_resolution, index=0) if self.mode_config.mode is Mode.RENDER and self.mode_config.keyboard else None
         agent = keyboard_agent if keyboard_agent is not None else NoopAgent(index=0)
         agents = [agent]
-        for i, actor in enumerate(env.actors[1:], start=1):
-            if isinstance(actor, DynamicActor):
-                if isinstance(actor, Pedestrian):
+        for i, body in enumerate(env.bodies[1:], start=1):
+            if isinstance(body, DynamicBody):
+                if isinstance(body, Pedestrian):
                     if self.agent_config.agent is AgentType.RANDOM:
                         agent = RandomPedestrianAgent(
                             index=i,
@@ -277,8 +277,8 @@ class Config:
                     elif self.agent_config.agent is AgentType.Q_LEARNING:
                         agent = QLearningAgent(
                             index=i,
-                            ego_constants=env.actors[0].constants,
-                            self_constants=env.actors[1].constants,
+                            ego_constants=env.bodies[0].constants,
+                            self_constants=env.bodies[1].constants,
                             road_polgon=env.constants.road_map.major_road.static_bounding_box,
                             time_resolution=env.time_resolution,
                             width=env.constants.viewer_width,
@@ -290,12 +290,12 @@ class Config:
                         raise NotImplementedError
                 else:
                     agent = RandomVehicleAgent(index=i, np_random=np_random)
-            elif isinstance(actor, TrafficLight) or isinstance(actor, PelicanCrossing):
+            elif isinstance(body, TrafficLight) or isinstance(body, PelicanCrossing):
                 agent = RandomTrafficLightAgent(np_random=np_random)
             agents.append(agent)
 
         console.info(f"agents={pretty_str_list(agent.__class__.__name__ for agent in agents)}")
-        console.info(f"ego=({env.actors[0].__class__.__name__}, {agents[0].__class__.__name__})")
+        console.info(f"ego=({env.bodies[0].__class__.__name__}, {agents[0].__class__.__name__})")
 
         return np_seed, env, agents, keyboard_agent
 

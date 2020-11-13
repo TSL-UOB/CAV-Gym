@@ -52,7 +52,7 @@ def make_config(agent_type, outbound_pavement, inbound_pavement):
         road_cost=5.0,
         win_reward=6000.0,
         scenario_config=PedestriansConfig(
-            actors=1,
+            bodies=1,
             outbound_pavement=outbound_pavement,
             inbound_pavement=inbound_pavement
         ),

@@ -93,7 +93,7 @@ def normalise_angle(radians):
     return radians + 0.0 if radians == 0 else radians  # avoid -0
 
 
-class Actor(ABC):
+class Body(ABC):
     def __init__(self, init_state, constants, **kwargs):
         super().__init__(**kwargs)  # important to pass on kwargs if class is used as superclass in multiple inheritance
 
@@ -113,13 +113,13 @@ class Actor(ABC):
 
 
 @dataclass
-class DynamicActorState:
+class DynamicBodyState:
     position: Point
     velocity: float
     orientation: float
 
     def __copy__(self):
-        return DynamicActorState(copy(self.position), self.velocity, self.orientation)
+        return DynamicBodyState(copy(self.position), self.velocity, self.orientation)
 
     def __iter__(self):
         yield from self.position
@@ -128,7 +128,7 @@ class DynamicActorState:
 
 
 @dataclass(frozen=True)
-class DynamicActorConstants:
+class DynamicBodyConstants:
     length: float
     width: float
     wheelbase: float
@@ -141,7 +141,7 @@ class DynamicActorConstants:
     max_steering_angle: float
 
 
-class DynamicActor(Actor):
+class DynamicBody(Body):
     def __init__(self, init_state, constants):
         super().__init__(init_state=init_state, constants=constants)
 

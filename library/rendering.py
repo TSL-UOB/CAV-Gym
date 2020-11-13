@@ -3,7 +3,7 @@ from enum import Enum
 from gym.envs.classic_control import rendering
 
 from library import mods
-from library.actors import TrafficLightState, Car, Bus, Bicycle, Pedestrian, PelicanCrossing
+from library.bodies import TrafficLightState, Car, Bus, Bicycle, Pedestrian, PelicanCrossing
 from library.geometry import Point
 
 
@@ -39,38 +39,38 @@ class OcclusionView:
             self.occlusion_zone.v = list(occlusion.occlusion_zone(ego.state.position))
 
 
-class ActorView:
+class BodyView:
     def __init__(self, **kwargs):
         super().__init__(**kwargs)  # important to pass on kwargs if class is used as superclass in multiple inheritance
 
-    def update(self, actor, ego):
+    def update(self, body, ego):
         raise NotImplementedError
 
 
-class DynamicActorView(ActorView, OcclusionView):
-    def __init__(self, dynamic_actor, ego, road):
-        super().__init__(occlusion=dynamic_actor, ego=ego)
+class DynamicBodyView(BodyView, OcclusionView):
+    def __init__(self, dynamic_body, ego, road):
+        super().__init__(occlusion=dynamic_body, ego=ego)
 
-        self.body = rendering.make_polygon(list(dynamic_actor.bounding_box()))
-        if dynamic_actor is ego:
+        self.body = rendering.make_polygon(list(dynamic_body.bounding_box()))
+        if dynamic_body is ego:
             self.body.set_color(*RGB.RED.value)
 
         self.focal_road = road
-        if dynamic_actor.bounding_box().intersects(self.focal_road.bounding_box()):
+        if dynamic_body.bounding_box().intersects(self.focal_road.bounding_box()):
             self.road_angle = rendering.make_polyline(list())
         else:
-            self.road_angle = rendering.make_polyline(list(dynamic_actor.line_anchor(self.focal_road)))
+            self.road_angle = rendering.make_polyline(list(dynamic_body.line_anchor(self.focal_road)))
         self.road_angle.set_color(*RGB.MAGENTA.value)
 
-    def update(self, dynamic_actor, ego):
-        self.body.v = list(dynamic_actor.bounding_box())
+    def update(self, dynamic_body, ego):
+        self.body.v = list(dynamic_body.bounding_box())
 
-        self.update_occlusion_zone(dynamic_actor, ego)
+        self.update_occlusion_zone(dynamic_body, ego)
 
-        if dynamic_actor.bounding_box().intersects(self.focal_road.bounding_box()):
+        if dynamic_body.bounding_box().intersects(self.focal_road.bounding_box()):
             self.road_angle.v = list()
         else:
-            self.road_angle.v = list(dynamic_actor.line_anchor(self.focal_road))
+            self.road_angle.v = list(dynamic_body.line_anchor(self.focal_road))
 
     def geoms(self):
         yield from [self.body, self.road_angle]
@@ -78,7 +78,7 @@ class DynamicActorView(ActorView, OcclusionView):
             yield self.occlusion_zone
 
 
-class VehicleView(DynamicActorView):
+class VehicleView(DynamicBodyView):
     def __init__(self, vehicle, ego, road):
         super().__init__(vehicle, ego, road)
 
@@ -165,13 +165,13 @@ class CarView(VehicleView):
         self.roof.v = list(car.roof())
 
 
-def make_head(actor):
-    head = mods.make_circle(*actor.state.position, actor.constants.width * 0.3)
+def make_head(body):
+    head = mods.make_circle(*body.state.position, body.constants.width * 0.3)
     head.set_color(0.5, 0.5, 0.5)
     return head
 
 
-class BicycleView(DynamicActorView):
+class BicycleView(DynamicBodyView):
     def __init__(self, bicycle, ego, road):
         super().__init__(bicycle, ego, road)
 
@@ -183,7 +183,7 @@ class BicycleView(DynamicActorView):
         self.head.v = make_head(bicycle).v
 
 
-class PedestrianView(DynamicActorView):
+class PedestrianView(DynamicBodyView):
     def __init__(self, pedestrian, ego, road):
         super().__init__(pedestrian, ego, road)
 
@@ -195,7 +195,7 @@ class PedestrianView(DynamicActorView):
         self.head.v = make_head(pedestrian).v
 
 
-class TrafficLightView(ActorView, OcclusionView):
+class TrafficLightView(BodyView, OcclusionView):
     def __init__(self, traffic_light, ego):
         super().__init__(occlusion=traffic_light, ego=ego)
 
@@ -236,7 +236,7 @@ class TrafficLightView(ActorView, OcclusionView):
         yield from [self.body, self.red_light, self.amber_light, self.green_light, self.occlusion_zone]
 
 
-class PelicanCrossingView(ActorView):
+class PelicanCrossingView(BodyView):
     def __init__(self, pelican_crossing, ego, **kwargs):
         super().__init__(**kwargs)
 
@@ -328,7 +328,7 @@ class ObstacleView(OcclusionView):
 
 
 class RoadMapView:
-    def __init__(self, road_map, actor):
+    def __init__(self, road_map, body):
         self.major_road_view = RoadView(road_map.major_road)
         self.minor_road_views = [RoadView(minor_road) for minor_road in road_map.minor_roads] if road_map.minor_roads is not None else list()
 
@@ -341,7 +341,7 @@ class RoadMapView:
 
         self.obstacle_view = None
         if road_map.obstacle is not None:
-            self.obstacle_view = ObstacleView(road_map.obstacle, actor)
+            self.obstacle_view = ObstacleView(road_map.obstacle, body)
 
     def geoms(self):
         for minor_road_view in self.minor_road_views:
@@ -354,7 +354,7 @@ class RoadMapView:
 
 
 class RoadEnvViewer(rendering.Viewer):
-    def __init__(self, width, height, road_map, actors, ego):
+    def __init__(self, width, height, road_map, bodies, ego):
         super().__init__(int(width), int(height))  # width and height must be integers
         self.road_map = road_map
 
@@ -365,35 +365,35 @@ class RoadEnvViewer(rendering.Viewer):
         for geom in self.road_map_view.geoms():
             self.add_geom(geom)
 
-        self.actor_views = list()
-        for actor in actors:
-            if isinstance(actor, Car):
-                car_view = CarView(actor, ego, road_map.major_road)
-                self.actor_views.append(car_view)
-            elif isinstance(actor, Bus):
-                bus_view = VehicleView(actor, ego, road_map.major_road)
-                self.actor_views.append(bus_view)
-            elif isinstance(actor, Bicycle):
-                bicycle_view = BicycleView(actor, ego, road_map.major_road)
-                self.actor_views.append(bicycle_view)
-            elif isinstance(actor, Pedestrian):
-                pedestrian_view = PedestrianView(actor, ego, road_map.major_road)
-                self.actor_views.append(pedestrian_view)
-            elif isinstance(actor, PelicanCrossing):
-                self.road_map_view.major_road_view.set_pelican_crossing(actor, ego)
-                self.actor_views.append(self.road_map_view.major_road_view.pelican_crossing_view)
+        self.body_views = list()
+        for body in bodies:
+            if isinstance(body, Car):
+                car_view = CarView(body, ego, road_map.major_road)
+                self.body_views.append(car_view)
+            elif isinstance(body, Bus):
+                bus_view = VehicleView(body, ego, road_map.major_road)
+                self.body_views.append(bus_view)
+            elif isinstance(body, Bicycle):
+                bicycle_view = BicycleView(body, ego, road_map.major_road)
+                self.body_views.append(bicycle_view)
+            elif isinstance(body, Pedestrian):
+                pedestrian_view = PedestrianView(body, ego, road_map.major_road)
+                self.body_views.append(pedestrian_view)
+            elif isinstance(body, PelicanCrossing):
+                self.road_map_view.major_road_view.set_pelican_crossing(body, ego)
+                self.body_views.append(self.road_map_view.major_road_view.pelican_crossing_view)
 
         if self.road_map_view.major_road_view.pelican_crossing_view is not None:
             for geom in self.road_map_view.major_road_view.pelican_crossing_view.geoms():
                 self.add_geom(geom)
 
-        self.dynamic_actor_views = [actor_view for actor_view in self.actor_views if isinstance(actor_view, DynamicActorView)]
+        self.dynamic_body_views = [body_view for body_view in self.body_views if isinstance(body_view, DynamicBodyView)]
 
-        for dynamic_actor_view in self.dynamic_actor_views:
-            for geom in dynamic_actor_view.geoms():
+        for dynamic_body_view in self.dynamic_body_views:
+            for geom in dynamic_body_view.geoms():
                 self.add_geom(geom)
 
-        self.vehicle_views = [dynamic_actor_view for dynamic_actor_view in self.dynamic_actor_views if isinstance(dynamic_actor_view, VehicleView)]
+        self.vehicle_views = [dynamic_body_view for dynamic_body_view in self.dynamic_body_views if isinstance(dynamic_body_view, VehicleView)]
 
         for vehicle_view in self.vehicle_views:
             self.add_geom(vehicle_view.right_indicators)
@@ -405,27 +405,27 @@ class RoadEnvViewer(rendering.Viewer):
         for vehicle_view in self.vehicle_views:
             self.add_geom(vehicle_view.headlights)
 
-        for dynamic_actor_view in self.dynamic_actor_views:
-            self.add_geom(dynamic_actor_view.body)
+        for dynamic_body_view in self.dynamic_body_views:
+            self.add_geom(dynamic_body_view.body)
 
         self.car_views = [vehicle_view for vehicle_view in self.vehicle_views if isinstance(vehicle_view, CarView)]
 
         for car_view in self.car_views:
             self.add_geom(car_view.roof)
 
-        self.bicycle_views = [dynamic_actor_view for dynamic_actor_view in self.dynamic_actor_views if isinstance(dynamic_actor_view, BicycleView)]
+        self.bicycle_views = [dynamic_body_view for dynamic_body_view in self.dynamic_body_views if isinstance(dynamic_body_view, BicycleView)]
 
         for bicycle_view in self.bicycle_views:
             self.add_geom(bicycle_view.head)
 
-        self.pedestrian_views = [dynamic_actor_view for dynamic_actor_view in self.dynamic_actor_views if isinstance(dynamic_actor_view, PedestrianView)]
+        self.pedestrian_views = [dynamic_body_view for dynamic_body_view in self.dynamic_body_views if isinstance(dynamic_body_view, PedestrianView)]
 
         for pedestrian_view in self.pedestrian_views:
             self.add_geom(pedestrian_view.head)
 
-    def update(self, actors, ego):
-        for actor_view, actor in zip(self.actor_views, actors):
-            actor_view.update(actor, ego)
+    def update(self, bodies, ego):
+        for body_view, body in zip(self.body_views, bodies):
+            body_view.update(body, ego)
 
         if self.road_map_view.obstacle_view is not None:
             self.road_map_view.obstacle_view.update(self.road_map.obstacle, ego)

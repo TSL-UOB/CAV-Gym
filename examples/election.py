@@ -4,7 +4,7 @@ from examples.agents import ElectionPedestrianAgent
 
 class Election:
     def __init__(self, env, agents):
-        assert len(env.actors) == len(agents)
+        assert len(env.bodies) == len(agents)
         self.env = env
         self.agents = agents
 
@@ -47,7 +47,7 @@ class Election:
             joint_winners = []
             winning_distance = float("inf")
             for i in voters:
-                distance = self.env.actors[i].state.position.distance(self.env.ego.state.position)
+                distance = self.env.bodies[i].state.position.distance(self.env.ego.state.position)
                 if distance < winning_distance:
                     joint_winners = [i]
                     winning_distance = distance

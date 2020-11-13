@@ -7,7 +7,7 @@ from gym.utils import seeding
 import reporting
 from library import geometry
 from library.actions import TargetOrientation, TargetVelocity, TrafficLightAction
-from library.actors import Car, Pedestrian, DynamicActorState
+from library.bodies import Car, Pedestrian, DynamicBodyState
 from library.geometry import Point
 from library.observations import RoadObservation
 from examples.constants import M2PX, car_constants
@@ -63,7 +63,7 @@ class RandomTrafficLightAgent(RandomAgent):
         pass
 
 
-class DynamicActorAgent(Agent):
+class DynamicBodyAgent(Agent):
     def __init__(self, index, **kwargs):
         super().__init__(**kwargs)
 
@@ -85,7 +85,7 @@ class DynamicActorAgent(Agent):
         raise NotImplementedError
 
 
-class NoopAgent(DynamicActorAgent):
+class NoopAgent(DynamicBodyAgent):
     def reset(self):
         pass
 
@@ -119,16 +119,16 @@ key_target_orientation = {
 }
 
 
-class KeyboardAgent(DynamicActorAgent):
-    def __init__(self, actor, time_resolution, **kwargs):
+class KeyboardAgent(DynamicBodyAgent):
+    def __init__(self, body, time_resolution, **kwargs):
         super().__init__(**kwargs)
 
-        self.actor = actor
+        self.body = body
         self.time_resolution = time_resolution
 
     def reset(self):
-        self.actor.target_velocity = None
-        self.actor.target_orientation = None
+        self.body.target_velocity = None
+        self.body.target_orientation = None
 
     def choose_action(self, state, action_space, info=None):
         self_state = state[self.index]
@@ -136,28 +136,28 @@ class KeyboardAgent(DynamicActorAgent):
         self_orientation = self_state[3]
 
         throttle_action = 0.0
-        if self.actor.target_velocity is not None:
-            diff = (self.actor.target_velocity - self_velocity) / self.time_resolution
+        if self.body.target_velocity is not None:
+            diff = (self.body.target_velocity - self_velocity) / self.time_resolution
 
-            if diff < self.actor.constants.min_throttle:
-                throttle_action = self.actor.constants.min_throttle
-            elif diff > self.actor.constants.max_throttle:
-                throttle_action = self.actor.constants.max_throttle
+            if diff < self.body.constants.min_throttle:
+                throttle_action = self.body.constants.min_throttle
+            elif diff > self.body.constants.max_throttle:
+                throttle_action = self.body.constants.max_throttle
             else:
                 throttle_action = diff
 
         steering_action = 0.0
-        if self_velocity != 0 and self.actor.target_orientation is not None:
-            turn_angle = math.atan2(math.sin(self.actor.target_orientation - self_orientation), math.cos(self.actor.target_orientation - self_orientation))
+        if self_velocity != 0 and self.body.target_orientation is not None:
+            turn_angle = math.atan2(math.sin(self.body.target_orientation - self_orientation), math.cos(self.body.target_orientation - self_orientation))
 
             def calc_T(v, e):
-                return (-1 if e < 0 else 1) * 2 * self.time_resolution * v / math.sqrt(self.actor.constants.wheelbase**2 * (1 + 4 / math.tan(e)**2))
+                return (-1 if e < 0 else 1) * 2 * self.time_resolution * v / math.sqrt(self.body.constants.wheelbase**2 * (1 + 4 / math.tan(e)**2))
 
-            constant_steering_action = self.actor.constants.min_steering_angle if turn_angle < 0 else self.actor.constants.max_steering_angle
+            constant_steering_action = self.body.constants.min_steering_angle if turn_angle < 0 else self.body.constants.max_steering_angle
             max_turn_angle = calc_T(self_velocity, constant_steering_action)
 
             def e(T):
-                return (-1 if T < 0 else 1) * math.atan(2 * self.actor.constants.wheelbase * math.sqrt(T**2 / (4 * self_velocity**2 * self.time_resolution**2 - self.actor.constants.wheelbase**2 * T**2)))
+                return (-1 if T < 0 else 1) * math.atan(2 * self.body.constants.wheelbase * math.sqrt(T**2 / (4 * self_velocity**2 * self.time_resolution**2 - self.body.constants.wheelbase**2 * T**2)))
 
             if turn_angle / max_turn_angle > 1:
                 steering_action = e(max_turn_angle)
@@ -172,21 +172,21 @@ class KeyboardAgent(DynamicActorAgent):
         self_orientation = self_state[3]
 
         error = 0.000000000000001
-        if self.actor.target_velocity is not None:
-            if abs(self.actor.target_velocity - self_velocity) < error:
-                self.actor.target_velocity = None
-        if self.actor.target_orientation is not None:
-            if abs(math.atan2(math.sin(self.actor.target_orientation - self_orientation), math.cos(self.actor.target_orientation - self_orientation))) < error:
-                self.actor.target_orientation = None
+        if self.body.target_velocity is not None:
+            if abs(self.body.target_velocity - self_velocity) < error:
+                self.body.target_velocity = None
+        if self.body.target_orientation is not None:
+            if abs(math.atan2(math.sin(self.body.target_orientation - self_orientation), math.cos(self.body.target_orientation - self_orientation))) < error:
+                self.body.target_orientation = None
 
     def key_press(self, key, _mod):
         if key in key_target_velocity:
-            self.actor.target_velocity = key_target_velocity[key]
+            self.body.target_velocity = key_target_velocity[key]
         elif key in key_target_orientation:
-            self.actor.target_orientation = key_target_orientation[key]
+            self.body.target_orientation = key_target_orientation[key]
 
 
-class RandomVehicleAgent(RandomAgent, DynamicActorAgent):
+class RandomVehicleAgent(RandomAgent, DynamicBodyAgent):
     def reset(self):
         pass
 
@@ -202,7 +202,7 @@ class RandomVehicleAgent(RandomAgent, DynamicActorAgent):
         pass
 
 
-class RandomPedestrianAgent(RandomAgent, DynamicActorAgent):
+class RandomPedestrianAgent(RandomAgent, DynamicBodyAgent):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -243,7 +243,7 @@ end_cross_road_action = {
 }
 
 
-class RoadCrossingPedestrianAgent(DynamicActorAgent):
+class RoadCrossingPedestrianAgent(DynamicBodyAgent):
     def __init__(self, road, **kwargs):
         super().__init__(**kwargs)
 
@@ -263,8 +263,8 @@ class RoadCrossingPedestrianAgent(DynamicActorAgent):
         self.reorient_count = 0
 
     def road_state(self, info):
-        actor_polygons = info['actor_polygons']
-        self_polygon = actor_polygons[self.index]
+        body_polygons = info['body_polygons']
+        self_polygon = body_polygons[self.index]
         road_polygon = self.road.bounding_box()
         if self_polygon.intersects(road_polygon):
             return RoadObservation.ON_ROAD
@@ -292,7 +292,7 @@ class RoadCrossingPedestrianAgent(DynamicActorAgent):
 
     def choose_crossing_orientation_action(self, state, condition, info):
         assert info
-        assert 'actor_polygons' in info
+        assert 'body_polygons' in info
         assert 'road_angles' in info
 
         active_orientation = self.active_orientation(state)
@@ -324,7 +324,7 @@ class RoadCrossingPedestrianAgent(DynamicActorAgent):
 
 class RandomConstrainedPedestrianAgent(RoadCrossingPedestrianAgent, RandomPedestrianAgent):  # base class order is important so that RoadCrossingPedestrianAgent.reset() is called rather than RandomPedestrianAgent.reset()
     def choose_action(self, state, action_space, info=None):
-        assert info and 'actor_polygons' in info
+        assert info and 'body_polygons' in info
 
         epsilon_valid = self.epsilon_valid()
 
@@ -357,7 +357,7 @@ class ProximityPedestrianAgent(RoadCrossingPedestrianAgent):
         return self_position.distance(ego_position) < self.distance_threshold
 
     def choose_action(self, state, action_space, info=None):
-        assert info and 'actor_polygons' in info
+        assert info and 'body_polygons' in info
 
         if not self.moving and not self.active_velocity(state):
             velocity_action = TargetVelocity.FAST
@@ -379,7 +379,7 @@ class ElectionPedestrianAgent(ProximityPedestrianAgent):
 
 class QLearningAgent(RandomPedestrianAgent):
     # self.alpha is learning rate (should decrease over time)
-    # self.gamma is discount factor (should be fixed over time?)
+    # self.gamma is discount fbody (should be fixed over time?)
     # self.epsilon is exploration probability (should decrease over time)
     def __init__(self, ego_constants, self_constants, road_polgon, time_resolution, width, height, q_learning_config, **kwargs):
         super().__init__(epsilon=q_learning_config.epsilon, **kwargs)  # self.epsilon is exploration probability (should decrease over time)
@@ -389,7 +389,7 @@ class QLearningAgent(RandomPedestrianAgent):
         self.road_polgon = road_polgon
         self.time_resolution = time_resolution
         self.alpha = q_learning_config.alpha  # learning rate (should decrease over time)
-        self.gamma = q_learning_config.gamma  # discount factor (should be fixed over time?)
+        self.gamma = q_learning_config.gamma  # discount fbody (should be fixed over time?)
         self.feature_config = q_learning_config.features
 
         self.log_file = None
@@ -426,28 +426,28 @@ class QLearningAgent(RandomPedestrianAgent):
             self.log_file.info(f"{','.join(map(str, [self.feature_weights[feature] for feature in self.enabled_features]))}")
 
     def features(self, state, action):  # question: what does it mean for a feature to depend on an action and/or what does a Q value mean if it does not depend on an action?
-        def make_actor_state(data):
+        def make_body_state(data):
             # assert len(data) == 8
-            return DynamicActorState(
+            return DynamicBodyState(
                 position=Point(data[0], data[1]),
                 velocity=data[2],
                 orientation=data[3]
             )
 
-        ego_state = make_actor_state(state[0])
-        self_state = make_actor_state(state[self.index])
+        ego_state = make_body_state(state[0])
+        self_state = make_body_state(state[self.index])
 
-        ego_actor = Car(ego_state, self.ego_constants)
-        self_actor = Pedestrian(self_state, self.self_constants)
+        ego_body = Car(ego_state, self.ego_constants)
+        self_body = Pedestrian(self_state, self.self_constants)
 
         joint_action = [(TargetVelocity.NOOP.value, TargetOrientation.NOOP.value), action]
 
-        spawn_actors = [ego_actor, self_actor]
-        for i, spawn_actor in enumerate(spawn_actors):
-            spawn_actor.step(joint_action[i], self.time_resolution)
+        spawn_bodies = [ego_body, self_body]
+        for i, spawn_body in enumerate(spawn_bodies):
+            spawn_body.step(joint_action[i], self.time_resolution)
 
-        ego_position = ego_actor.state.position
-        self_position = self_actor.state.position
+        ego_position = ego_body.state.position
+        self_position = self_body.state.position
 
         def normalise(value, min_bound, max_bound):
             if value < min_bound:
@@ -465,9 +465,9 @@ class QLearningAgent(RandomPedestrianAgent):
         if self.feature_config.distance:
             unnormalised_values["distance"] = self_position.distance(ego_position)
         if self.feature_config.on_road:
-            unnormalised_values["on_road"] = 1 if self_actor.bounding_box().intersects(self.road_polgon) else 0
+            unnormalised_values["on_road"] = 1 if self_body.bounding_box().intersects(self.road_polgon) else 0
         if self.feature_config.facing:
-            unnormalised_values["facing"] = abs(geometry.Line(start=ego_position, end=self_position).orientation() - ego_actor.state.orientation)
+            unnormalised_values["facing"] = abs(geometry.Line(start=ego_position, end=self_position).orientation() - ego_body.state.orientation)
         if self.feature_config.inverse_distance:
             x = unnormalised_values["distance"] if "distance" in unnormalised_values else self_position.distance(ego_position)
             unnormalised_values["inverse_distance"] = 1 - (x / self.x_max) ** self.n  # thanks to Ram Varadarajan

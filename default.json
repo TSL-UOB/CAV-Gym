@@ -13,7 +13,7 @@
   "win_reward": 6000.0,
   "scenario_config": {
     "option": "pedestrians",
-    "actors": 1,
+    "bodies": 1,
     "outbound_pavement": 1.0,
     "inbound_pavement": 1.0
   },

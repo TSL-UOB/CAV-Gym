@@ -87,7 +87,7 @@
             "type": "object",
             "properties": {
                 "option": { "const": "pedestrians" },
-                "actors": {
+                "bodies": {
                     "type": "integer",
                     "minimum": 1
                 },
@@ -102,7 +102,7 @@
                     "maximum": 1
                 }
             },
-            "required": [ "option", "actors" ],
+            "required": [ "option", "bodies" ],
             "additionalProperties": false
         },
         "pelican_crossing_config": {

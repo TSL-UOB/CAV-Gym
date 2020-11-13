@@ -1,10 +1,10 @@
 import math
 
-from library.actors import DynamicActorConstants
+from library.bodies import DynamicBodyConstants
 
 M2PX = 16  # pixels per metre
 
-car_constants = DynamicActorConstants(
+car_constants = DynamicBodyConstants(
     length=M2PX * 4.5,  # [4.5 m]
     width=M2PX * 1.75,  # [1.75 m]
     wheelbase=M2PX * 3,  # [3 m]
@@ -17,7 +17,7 @@ car_constants = DynamicActorConstants(
     max_steering_angle=math.pi * 0.2  # [35 degrees left]
 )
 
-pedestrian_constants = DynamicActorConstants(
+pedestrian_constants = DynamicBodyConstants(
     length=M2PX * 0.65625,
     width=M2PX * 0.875,
     wheelbase=M2PX * 0.328125,
@@ -30,7 +30,7 @@ pedestrian_constants = DynamicActorConstants(
     max_steering_angle=(math.pi * 0.5)
 )
 
-bus_constants = DynamicActorConstants(
+bus_constants = DynamicBodyConstants(
     length=M2PX * 12,
     width=M2PX * 2.55,
     wheelbase=M2PX * 16.875,
@@ -43,7 +43,7 @@ bus_constants = DynamicActorConstants(
     max_steering_angle=(math.pi * 0.16)
 )
 
-bicycle_constants = DynamicActorConstants(
+bicycle_constants = DynamicBodyConstants(
     length=M2PX * 2.25,
     width=M2PX * 0.875,
     wheelbase=M2PX * 2.025,

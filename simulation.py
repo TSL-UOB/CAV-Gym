@@ -9,7 +9,7 @@ from examples.election import Election
 
 class Simulation:
     def __init__(self, env, agents, config, keyboard_agent):
-        assert len(env.actors) == len(agents), "each actor must be assigned an agent and vice versa"
+        assert len(env.bodies) == len(agents), "each body must be assigned an agent and vice versa"
         self.env = env
         self.agents = agents
         self.config = config

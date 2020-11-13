@@ -22,7 +22,7 @@ import copy
 import math
 from matplotlib.ticker import MaxNLocator
 
-from cavgym import Point, DynamicActor, DynamicActorState, DynamicActorConstants
+from AV.refactored.cavgym import DynamicBodyState, DynamicBody, Point, DynamicBodyConstants
 
 SIM_LOOP = 500
 
@@ -430,9 +430,9 @@ def make_point(spline2d, state):
     return Point(x=fx, y=fy)
 
 
-def make_state(actor_state):
+def make_state(body_state):
     return State(
-        velocity=actor_state.velocity,
+        velocity=body_state.velocity,
         lateral_position=2.0,  # FrenetPath.d[0] == lat_qp.calc_point(0.0) == lat_qp.a0 + 0.0 + 0.0 + 0.0 + 0.0 == lat_qp.a0 == xs == state.lateral_position
         lateral_velocity=0.0,  # FrenetPath.d_d[0] == lat_qp.calc_first_derivative(0.0) == self.a1 + 0.0 + 0.0 + 0.0 + 0.0 == lat_qp.a1 == vxs == state.lateral_velocity
         lateral_acceleration=0.0,  # FrenetPath.d_dd[0] == lat_qp.calc_second_derivative(0.0) == 2 * lat_qp.a2 + 0.0 + 0.0 + 0.0 == 2 * lat_qp.a2 == axs == state.lateral_acceleration
@@ -440,10 +440,10 @@ def make_state(actor_state):
     )
 
 
-def test(path, actor_state):
-    print(path.points[0], actor_state.position)
-    print(path.s_d[0], actor_state.velocity)
-    print(path.yaw[0], actor_state.orientation)
+def test(path, body_state):
+    print(path.points[0], body_state.position)
+    print(path.s_d[0], body_state.velocity)
+    print(path.yaw[0], body_state.orientation)
 
 
 def main():
@@ -479,18 +479,18 @@ def main():
 
     area = 20.0  # animation area length [m]
 
-    # actor_state = DynamicActorState(
+    # body_state = DynamicBodyState(
     #     position=Point(x=1.3527664541170896, y=1.4730997660089002),
     #     velocity=10.0 / 3.6,
     #     orientation=-0.7444386098364741
     # )
-    actor_state = DynamicActorState(
+    body_state = DynamicBodyState(
         position=Point(x=0.0, y=0.0),
         velocity=10.0 / 3.6,
         orientation=0.0
     )
 
-    actor_constants = DynamicActorConstants(
+    body_constants = DynamicBodyConstants(
         length=4.5,
         width=1.75,
         wheelbase=3,
@@ -502,30 +502,30 @@ def main():
         max_steering_angle=math.pi * 0.2
     )
 
-    actor = DynamicActor(init_state=actor_state, constants=actor_constants)
+    body = DynamicBody(init_state=body_state, constants=body_constants)
 
     for i in range(SIM_LOOP):
         path = frenet_optimal_planning(target_spline2d, state, obstacles)
-        # path = frenet_optimal_planning(target_spline2d, make_state(actor.state), obstacles)
+        # path = frenet_optimal_planning(target_spline2d, make_state(body.state), obstacles)
 
-        actor.state = DynamicActorState(
+        body.state = DynamicBodyState(
             position=path.points[1],
             velocity=path.s_d[1],
             orientation=path.yaw[1]
         )
 
-        # test(path, actor_state)
+        # test(path, body_state)
         #
-        # actor_successor_state = DynamicActorState(
+        # body_successor_state = DynamicBodyState(
         #     position=path.points[1],
         #     velocity=path.s_d[1],
         #     orientation=path.yaw[1]
         # )
         #
-        # action = actor.action_translation(actor_successor_state, DT)
+        # action = body.action_translation(body_successor_state, DT)
         # throttle, steering_angle = action
         # print(f"action=({throttle}, {math.degrees(steering_angle)})")
-        # actor.step(action, DT)
+        # body.step(action, DT)
 
         state = State(
             velocity=path.s_d[1],
@@ -549,7 +549,7 @@ def main():
             plt.plot([point.x for point in path.points[1:]], [point.y for point in path.points[1:]], "-or")  # current path (red dotted line)
             plt.plot(path.points[1].x, path.points[1].y, "vc")  # current position (cyan triangle)
 
-            bb = actor.bounding_box()
+            bb = body.bounding_box()
             bbx, bby = zip(*[bb.rear_left, bb.front_left, bb.front_right, bb.rear_right, bb.rear_left])
             plt.plot(bbx, bby)
 

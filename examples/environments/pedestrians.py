@@ -3,7 +3,7 @@ import math
 from gym.utils import seeding
 
 from library import geometry
-from library.actors import DynamicActorState, Car, SpawnPedestrian, SpawnPedestrianState
+from library.bodies import DynamicBodyState, Car, SpawnPedestrian, SpawnPedestrianState
 from library.environment import CAVEnvConstants, RoadMap, CAVEnv
 from library.assets import Road, RoadConstants
 from examples.constants import car_constants, pedestrian_constants, M2PX
@@ -81,9 +81,9 @@ class PedestriansEnv(CAVEnv):
                 np_random=np_random
             )
 
-        actors = [
+        bodies = [
             Car(
-                init_state=DynamicActorState(
+                init_state=DynamicBodyState(
                     position=road_map.major_road.outbound.lanes[0].spawn,
                     velocity=car_constants.max_velocity,
                     orientation=road_map.major_road.outbound.orientation
@@ -91,6 +91,6 @@ class PedestriansEnv(CAVEnv):
                 constants=car_constants
             )
         ]
-        actors += [spawn_pedestrian() for _ in range(num_pedestrians)]
+        bodies += [spawn_pedestrian() for _ in range(num_pedestrians)]
 
-        super().__init__(actors=actors, constants=env_constants, np_random=np_random, **kwargs)
+        super().__init__(bodies=bodies, constants=env_constants, np_random=np_random, **kwargs)

@@ -1,7 +1,7 @@
 import math
 
 from library import geometry
-from library.actors import DynamicActorState, Car, Pedestrian
+from library.bodies import DynamicBodyState, Car, Pedestrian
 from library.environment import CAVEnvConstants, RoadMap, CAVEnv
 from library.assets import RoadConstants, Road
 from examples.constants import car_constants, pedestrian_constants, M2PX
@@ -49,9 +49,9 @@ env_constants = CAVEnvConstants(
     road_map=road_map
 )
 
-actors = [
+bodies = [
     Car(
-        init_state=DynamicActorState(
+        init_state=DynamicBodyState(
             position=road_map.major_road.outbound.lanes[0].spawn,
             velocity=car_constants.target_fast_velocity,
             orientation=road_map.major_road.outbound.orientation
@@ -59,7 +59,7 @@ actors = [
         constants=car_constants
     ),
     Car(
-        init_state=DynamicActorState(
+        init_state=DynamicBodyState(
             position=road_map.major_road.inbound.lanes[0].spawn,
             velocity=car_constants.target_fast_velocity,
             orientation=road_map.major_road.inbound.orientation
@@ -67,7 +67,7 @@ actors = [
         constants=car_constants
     ),
     Pedestrian(
-        init_state=DynamicActorState(
+        init_state=DynamicBodyState(
             position=geometry.Point(160, -20).translate(road_map.intersection_bounding_boxes[0].front_left),
             velocity=0.0,
             orientation=road_map.major_road.inbound.orientation
@@ -79,4 +79,4 @@ actors = [
 
 class CrossroadsEnv(CAVEnv):
     def __init__(self, **kwargs):
-        super().__init__(actors=actors, constants=env_constants, **kwargs)
+        super().__init__(bodies=bodies, constants=env_constants, **kwargs)

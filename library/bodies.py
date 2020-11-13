@@ -18,7 +18,7 @@ from library.geometry import Point
 REACTION_TIME = 0.675
 
 
-class Actor(ABC):
+class Body(ABC):
     def __init__(self, init_state, constants, **kwargs):
         super().__init__(**kwargs)  # important to pass on kwargs if class is used as superclass in multiple inheritance
 
@@ -44,13 +44,13 @@ class Actor(ABC):
 
 
 @dataclass
-class DynamicActorState:
+class DynamicBodyState:
     position: geometry.Point
     velocity: float
     orientation: float
 
     def __copy__(self):
-        return DynamicActorState(copy(self.position), self.velocity, self.orientation)
+        return DynamicBodyState(copy(self.position), self.velocity, self.orientation)
 
     def __iter__(self):
         yield from self.position
@@ -59,7 +59,7 @@ class DynamicActorState:
 
 
 @dataclass(frozen=True)
-class DynamicActorConstants:
+class DynamicBodyConstants:
     length: float
     width: float
     wheelbase: float
@@ -73,7 +73,7 @@ class DynamicActorConstants:
     max_steering_angle: float
 
 
-class DynamicActor(Actor, Occlusion):
+class DynamicBody(Body, Occlusion):
     def __init__(self, init_state, constants):
         super().__init__(init_state=init_state, constants=constants)
 
@@ -223,7 +223,7 @@ class DynamicActor(Actor, Occlusion):
         sin_orientation = math.sin(self.state.orientation)
 
         if self.steering_angle == 0:
-            self.state = DynamicActorState(
+            self.state = DynamicBodyState(
                 position=Point(
                     x=self.state.position.x + distance_velocity * cos_orientation,
                     y=self.state.position.y + distance_velocity * sin_orientation
@@ -253,7 +253,7 @@ class DynamicActor(Actor, Occlusion):
             sin_theta = math.sin(theta)
             orientation_theta = self.state.orientation + theta
 
-            self.state = DynamicActorState(
+            self.state = DynamicBodyState(
                 position=Point(
                     x=centre_of_rotation.x + diff_x * cos_theta - diff_y * sin_theta,
                     y=centre_of_rotation.y + diff_x * sin_theta + diff_y * cos_theta
@@ -263,7 +263,7 @@ class DynamicActor(Actor, Occlusion):
             )
 
 
-class Pedestrian(DynamicActor):
+class Pedestrian(DynamicBody):
     def __init__(self, init_state, constants):
         super().__init__(init_state, constants)
 
@@ -293,14 +293,14 @@ class SpawnPedestrian(Pedestrian):
         chosen_box = self.np_random.choice(self.spawn_init_state.position_boxes, p=[area / total_area for area in areas])
         position = chosen_box.random_point(self.np_random)
         orientation = self.np_random.choice(self.spawn_init_state.orientations)
-        return DynamicActorState(
+        return DynamicBodyState(
             position=position,
             velocity=self.spawn_init_state.velocity,
             orientation=orientation
         )
 
 
-class Vehicle(DynamicActor):
+class Vehicle(DynamicBody):
     def __init__(self, init_state, constants):
         super().__init__(init_state, constants)
 
@@ -329,7 +329,7 @@ class Bus(Vehicle):
         super().__init__(init_state, constants)
 
 
-class Bicycle(DynamicActor):
+class Bicycle(DynamicBody):
     def __init__(self, init_state, constants):
         super().__init__(init_state, constants)
 
@@ -354,7 +354,7 @@ class TrafficLightConstants:
     orientation: float
 
 
-class TrafficLight(Actor, Occlusion):
+class TrafficLight(Body, Occlusion):
     def __init__(self, init_state, constants):
         super().__init__(init_state=init_state, constants=constants)
 
@@ -394,7 +394,7 @@ class PelicanCrossingConstants:
     x_position: int
 
 
-class PelicanCrossing(Actor):
+class PelicanCrossing(Body):
     def __init__(self, init_state, constants):
         super().__init__(init_state, constants)
 

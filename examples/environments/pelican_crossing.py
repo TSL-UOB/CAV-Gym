@@ -1,7 +1,7 @@
 import math
 
 from library import geometry
-from library.actors import DynamicActorState, TrafficLightState, PelicanCrossingConstants, Car, Pedestrian
+from library.bodies import DynamicBodyState, TrafficLightState, PelicanCrossingConstants, Car, Pedestrian
 from library.environment import CAVEnvConstants, RoadMap, CAVEnv, PelicanCrossing
 from library.assets import Road, RoadConstants, Obstacle, ObstacleConstants
 from examples.constants import car_constants, pedestrian_constants, M2PX
@@ -45,9 +45,9 @@ road_map.set_obstacle(
     )
 )
 
-actors = [
+bodies = [
     Car(
-        init_state=DynamicActorState(
+        init_state=DynamicBodyState(
             position=road_map.major_road.outbound.lanes[0].spawn,
             velocity=car_constants.target_fast_velocity,
             orientation=road_map.major_road.outbound.orientation
@@ -55,7 +55,7 @@ actors = [
         constants=car_constants
     ),
     Car(
-        init_state=DynamicActorState(
+        init_state=DynamicBodyState(
             position=road_map.major_road.inbound.lanes[0].spawn,
             velocity=0.0,
             orientation=road_map.major_road.inbound.orientation
@@ -64,7 +64,7 @@ actors = [
     ),
     pelican_crossing,
     Pedestrian(
-        init_state=DynamicActorState(
+        init_state=DynamicBodyState(
             position=pelican_crossing.inbound_spawn,
             velocity=0.0,
             orientation=road_map.major_road.outbound.orientation + (math.radians(90.0))
@@ -72,7 +72,7 @@ actors = [
         constants=pedestrian_constants
     ),
     Pedestrian(
-        init_state=DynamicActorState(
+        init_state=DynamicBodyState(
             position=pelican_crossing.outbound_spawn,
             velocity=0.0,
             orientation=road_map.major_road.outbound.orientation + (math.radians(270.0))
@@ -84,4 +84,4 @@ actors = [
 
 class PelicanCrossingEnv(CAVEnv):
     def __init__(self, **kwargs):
-        super().__init__(actors=actors, constants=env_constants, **kwargs)
+        super().__init__(bodies=bodies, constants=env_constants, **kwargs)
