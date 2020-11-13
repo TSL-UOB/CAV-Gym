@@ -1,3 +1,5 @@
+import math
+
 from library import geometry
 from library.actors import DynamicActorState, TrafficLightState, PelicanCrossingConstants, Car, Pedestrian
 from library.environment import CAVEnvConstants, RoadMap, CAVEnv, PelicanCrossing
@@ -12,7 +14,7 @@ road_map = RoadMap(
             num_inbound_lanes=1,
             lane_width=M2PX * 3.65,
             position=geometry.Point(0.0, 0.0),
-            orientation=geometry.DEG2RAD * 0.0
+            orientation=0.0
         )
     )
 )
@@ -65,7 +67,7 @@ actors = [
         init_state=DynamicActorState(
             position=pelican_crossing.inbound_spawn,
             velocity=0.0,
-            orientation=road_map.major_road.outbound.orientation + (geometry.DEG2RAD * 90.0)
+            orientation=road_map.major_road.outbound.orientation + (math.radians(90.0))
         ),
         constants=pedestrian_constants
     ),
@@ -73,7 +75,7 @@ actors = [
         init_state=DynamicActorState(
             position=pelican_crossing.outbound_spawn,
             velocity=0.0,
-            orientation=road_map.major_road.outbound.orientation + (geometry.DEG2RAD * 270.0)
+            orientation=road_map.major_road.outbound.orientation + (math.radians(270.0))
         ),
         constants=pedestrian_constants
     )

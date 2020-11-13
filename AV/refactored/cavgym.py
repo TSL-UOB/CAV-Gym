@@ -5,9 +5,6 @@ import math
 from dataclasses import dataclass
 
 
-RAD2DEG = 57.29577951308232
-
-
 @dataclass(frozen=True)
 class Point:
     x: float

@@ -8,7 +8,7 @@ import reporting
 from library import geometry
 from library.actions import TargetOrientation, TargetVelocity, TrafficLightAction
 from library.actors import Car, Pedestrian, DynamicActorState
-from library.geometry import Point, RAD2DEG, DEG2RAD
+from library.geometry import Point
 from library.observations import RoadObservation
 from examples.constants import M2PX, car_constants
 
@@ -278,21 +278,21 @@ class RoadCrossingPedestrianAgent(DynamicActorAgent):
         else:
             road_angles = info['road_angles']
             self_angle = road_angles[self.index]
-            if geometry.DEG2RAD * -157.5 <= self_angle < geometry.DEG2RAD * -112.5:
+            if math.radians(-157.5) <= self_angle < math.radians(-112.5):
                 return RoadObservation.ROAD_REAR_RIGHT
-            elif geometry.DEG2RAD * -112.5 <= self_angle < geometry.DEG2RAD * -67.5:
+            elif math.radians(-112.5) <= self_angle < math.radians(-67.5):
                 return RoadObservation.ROAD_RIGHT
-            elif geometry.DEG2RAD * -67.5 <= self_angle < geometry.DEG2RAD * -22.5:
+            elif math.radians(-67.5) <= self_angle < math.radians(-22.5):
                 return RoadObservation.ROAD_FRONT_RIGHT
-            elif geometry.DEG2RAD * -22.5 <= self_angle < geometry.DEG2RAD * 22.5:
+            elif math.radians(-22.5) <= self_angle < math.radians(22.5):
                 return RoadObservation.ROAD_FRONT
-            elif geometry.DEG2RAD * 22.5 <= self_angle < geometry.DEG2RAD * 67.5:
+            elif math.radians(22.5) <= self_angle < math.radians(67.5):
                 return RoadObservation.ROAD_FRONT_LEFT
-            elif geometry.DEG2RAD * 67.5 <= self_angle < geometry.DEG2RAD * 112.5:
+            elif math.radians(67.5) <= self_angle < math.radians(112.5):
                 return RoadObservation.ROAD_LEFT
-            elif geometry.DEG2RAD * 112.5 <= self_angle < geometry.DEG2RAD * 157.5:
+            elif math.radians(112.5) <= self_angle < math.radians(157.5):
                 return RoadObservation.ROAD_REAR_LEFT
-            elif geometry.DEG2RAD * 157.5 <= self_angle <= geometry.DEG2RAD * 180 or geometry.DEG2RAD * -180 < self_angle < geometry.DEG2RAD * -157.5:
+            elif math.radians(157.5) <= self_angle <= math.radians(180) or math.radians(-180) < self_angle < math.radians(-157.5):
                 return RoadObservation.ROAD_REAR
             else:
                 raise Exception("relative angle is not in the interval (-math.pi, math.pi]")

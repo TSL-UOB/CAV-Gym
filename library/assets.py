@@ -1,3 +1,4 @@
+import math
 from abc import ABC
 
 import itertools
@@ -93,7 +94,7 @@ class Road:
 
         left, right = self.static_bounding_box.split_laterally(left_percentage=self.constants.num_outbound_lanes / self.num_lanes)
         self.outbound = Direction(left, self.constants.num_outbound_lanes, self.constants.lane_width, self.constants.orientation)
-        self.inbound = Direction(right.flip(), self.constants.num_inbound_lanes, self.constants.lane_width, self.constants.orientation + (geometry.DEG2RAD * 180.0))
+        self.inbound = Direction(right.flip(), self.constants.num_inbound_lanes, self.constants.lane_width, self.constants.orientation + (math.radians(180.0)))
 
     def spawn_position(self, relative_position):
         return relative_position.rotate(self.constants.orientation).translate(self.constants.position)

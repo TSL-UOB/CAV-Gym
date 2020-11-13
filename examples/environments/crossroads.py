@@ -1,3 +1,5 @@
+import math
+
 from library import geometry
 from library.actors import DynamicActorState, Car, Pedestrian
 from library.environment import CAVEnvConstants, RoadMap, CAVEnv
@@ -11,7 +13,7 @@ major_road = Road(
         num_inbound_lanes=1,
         lane_width=M2PX * 3.65,
         position=geometry.Point(0.0, 0.0),
-        orientation=geometry.DEG2RAD * 0.0
+        orientation=0.0
     )
 )
 
@@ -25,7 +27,7 @@ road_map = RoadMap(
                 num_inbound_lanes=1,
                 lane_width=M2PX * 3.65,
                 position=major_road.spawn_position_inbound((major_road.constants.length * 0.5) - (major_road.constants.lane_width * 0.25)),
-                orientation=major_road.spawn_orientation(geometry.DEG2RAD * 270.0)
+                orientation=major_road.spawn_orientation(math.radians(270.0))
             )
         ),
         Road(
@@ -35,7 +37,7 @@ road_map = RoadMap(
                 num_inbound_lanes=1,
                 lane_width=M2PX * 3.65,
                 position=major_road.spawn_position_outbound((major_road.constants.length * 0.5) + (major_road.constants.lane_width * 0.25)),
-                orientation=major_road.spawn_orientation(geometry.DEG2RAD * 90.0)
+                orientation=major_road.spawn_orientation(math.radians(90.0))
             )
         )
     ]

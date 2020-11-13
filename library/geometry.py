@@ -3,9 +3,6 @@ from dataclasses import dataclass
 
 from shapely.geometry import Point as ShapelyPoint, Polygon as ShapelyPolygon
 
-DEG2RAD = 0.017453292519943295
-RAD2DEG = 57.29577951308232
-
 
 @dataclass(frozen=True)
 class Point:
@@ -281,7 +278,7 @@ class CircleSegment(Shape):
 
 
 def make_circle_segment(radius, angle, anchor=Point(0, 0), angle_left_offset=0.5):
-    assert 0 < angle < DEG2RAD * 180
+    assert 0 < angle < math.radians(180)
     assert 0 <= angle_left_offset <= 1
 
     def make_arc(start, end, resolution=30):

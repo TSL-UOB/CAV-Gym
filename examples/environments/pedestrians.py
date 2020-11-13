@@ -16,7 +16,7 @@ road_map = RoadMap(
             num_inbound_lanes=1,
             lane_width=M2PX * 3.65,
             position=geometry.Point(0.0, 0.0),
-            orientation=geometry.DEG2RAD * 0.0
+            orientation=0.0
         )
     )
 )

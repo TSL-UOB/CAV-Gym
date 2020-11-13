@@ -13,7 +13,7 @@ from gym.utils import seeding
 from library import geometry
 from library.actions import TrafficLightAction
 from library.assets import Road, Occlusion
-from library.geometry import Point, RAD2DEG
+from library.geometry import Point
 
 REACTION_TIME = 0.675
 
