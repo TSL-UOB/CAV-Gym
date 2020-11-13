@@ -1,21 +1,23 @@
+from abc import ABC
+
 import math
 
 from gym.utils import seeding
 
 import reporting
 from library import geometry
-from library.actions import OrientationAction, VelocityAction, TrafficLightAction
+from library.actions import TargetOrientation, TargetVelocity, TrafficLightAction
 from library.actors import Car, Pedestrian, DynamicActorState
-from library.geometry import Point
+from library.geometry import Point, RAD2DEG, DEG2RAD
 from library.observations import RoadObservation
-from examples.constants import M2PX
+from examples.constants import M2PX, car_constants
 
 
-class Agent:
+class Agent(ABC):
     def reset(self):
         raise NotImplementedError
 
-    def choose_action(self, state, info=None):
+    def choose_action(self, state, action_space, info=None):
         raise NotImplementedError
 
     def process_feedback(self, previous_state, action, state, reward):
@@ -35,7 +37,7 @@ class RandomAgent(Agent):
     def reset(self):
         raise NotImplementedError
 
-    def choose_action(self, state, info=None):
+    def choose_action(self, state, action_space, info=None):
         raise NotImplementedError
 
     def process_feedback(self, previous_state, action, state, reward):
@@ -49,7 +51,7 @@ class RandomTrafficLightAgent(RandomAgent):
     def reset(self):
         pass
 
-    def choose_action(self, observation, info=None):
+    def choose_action(self, state, action_space, info=None):
         if self.epsilon_valid():
             action = self.np_random.choice([value for value in TrafficLightAction])
         else:
@@ -57,7 +59,7 @@ class RandomTrafficLightAgent(RandomAgent):
 
         return action.value
 
-    def process_feedback(self, previous_observation, action, observation, reward):
+    def process_feedback(self, previous_state, action, state, reward):
         pass
 
 
@@ -71,17 +73,15 @@ class DynamicActorAgent(Agent):
         raise NotImplementedError
 
     def active_velocity(self, state):
-        target_velocity = state[self.index][6]
-        return target_velocity is not None
+        return None
 
     def active_orientation(self, state):
-        target_orientation = state[self.index][7]
-        return target_orientation is not None
+        return None
 
-    def choose_action(self, state, info=None):
+    def choose_action(self, state, action_space, info=None):
         raise NotImplementedError
 
-    def process_feedback(self, previous_observation, action, observation, reward):
+    def process_feedback(self, previous_state, action, state, reward):
         raise NotImplementedError
 
 
@@ -89,31 +89,33 @@ class NoopAgent(DynamicActorAgent):
     def reset(self):
         pass
 
-    def choose_action(self, state, info=None):
-        return VelocityAction.NOOP.value, OrientationAction.NOOP.value
+    def choose_action(self, state, action_space, info=None):
+        return [0.0, 0.0]
 
     def process_feedback(self, previous_state, action, state, reward):
         pass
 
 
-key_velocity_actions = {
-    65365: VelocityAction.FAST,  # page up
-    65366: VelocityAction.SLOW,  # page down
-    65367: VelocityAction.STOP,  # end
+key_target_velocity = {
+    65365: float(car_constants.max_velocity),  # page up
+    65366: float((car_constants.max_velocity - car_constants.min_velocity) / 2),  # page down
+    65367: float(car_constants.min_velocity),  # end
 }
 
-key_orientation_actions = {
-    65361: OrientationAction.LEFT,  # arrow left
-    65363: OrientationAction.RIGHT,  # arrow right
-    65364: OrientationAction.REAR,  # arrow down
+key_target_orientation = {
+    65361: math.pi,  # arrow left
+    65362: math.pi * 0.5,  # arrow up
+    65363: 0.0,  # arrow right
+    65364: -(math.pi * 0.5),  # arrow down
 
-    65457: OrientationAction.REAR_LEFT,  # numpad 1
-    65458: OrientationAction.REAR,  # numpad 2
-    65459: OrientationAction.REAR_RIGHT,  # numpad 3
-    65460: OrientationAction.LEFT,  # numpad 4
-    65462: OrientationAction.RIGHT,  # numpad 6
-    65463: OrientationAction.FORWARD_LEFT,  # numpad 7
-    65465: OrientationAction.FORWARD_RIGHT  # numpad 9
+    65457: -(math.pi * 0.75),  # numpad 1
+    65458: -(math.pi * 0.5),  # numpad 2
+    65459: -(math.pi * 0.25),  # numpad 3
+    65460: math.pi,  # numpad 4
+    65462: 0.0,  # numpad 6
+    65463: math.pi * 0.75,  # numpad 7
+    65464: math.pi * 0.5,  # numpad 8
+    65465: math.pi * 0.25  # numpad 9
 }
 
 
@@ -121,102 +123,130 @@ class KeyboardAgent(DynamicActorAgent):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self.pending_velocity_action = VelocityAction.NOOP
-        self.pending_orientation_action = OrientationAction.NOOP
+        self.time_resolution = 1 / 60
+        self.wheelbase = car_constants.wheelbase
+        self.min_steering_angle = car_constants.min_steering_angle
+        self.max_steering_angle = car_constants.max_steering_angle
+        self.min_throttle = car_constants.min_throttle
+        self.max_throttle = car_constants.max_throttle
+
+        self.target_velocity = None
+        self.target_orientation = None
 
     def reset(self):
-        self.pending_velocity_action = VelocityAction.NOOP
-        self.pending_orientation_action = OrientationAction.NOOP
+        self.target_velocity = None
+        self.target_orientation = None
 
-    def choose_action(self, state, info=None):
-        if not self.active_velocity(state):
-            velocity_action = self.pending_velocity_action
-            self.pending_velocity_action = VelocityAction.NOOP
-        else:
-            velocity_action = VelocityAction.NOOP
+    def choose_action(self, state, action_space, info=None):
+        self_state = state[self.index]
+        self_velocity = self_state[2]
+        self_orientation = self_state[3]
 
-        if not self.active_orientation(state):
-            orientation_action = self.pending_orientation_action
-            self.pending_orientation_action = OrientationAction.NOOP
-        else:
-            orientation_action = OrientationAction.NOOP
+        throttle_action = 0.0
+        if self.target_velocity is not None:
+            diff = (self.target_velocity - self_velocity) / self.time_resolution
 
-        return velocity_action.value, orientation_action.value
+            if diff < self.min_throttle:
+                throttle_action = self.min_throttle
+            elif diff > self.max_throttle:
+                throttle_action = self.max_throttle
+            else:
+                throttle_action = diff
 
-    def process_feedback(self, previous_observation, action, observation, reward):
-        pass
+        steering_action = 0.0
+        if self_velocity != 0 and self.target_orientation is not None:
+            turn_angle = math.atan2(math.sin(self.target_orientation - self_orientation), math.cos(self.target_orientation - self_orientation))
+
+            def calc_T(v, e):
+                return (-1 if e < 0 else 1) * 2 * self.time_resolution * v / math.sqrt(self.wheelbase**2 * (1 + 4 / math.tan(e)**2))
+
+            constant_steering_action = self.min_steering_angle if turn_angle < 0 else self.max_steering_angle
+            max_turn_angle = calc_T(self_velocity, constant_steering_action)
+
+            def e(T):
+                return (-1 if T < 0 else 1) * math.atan(2 * self.wheelbase * math.sqrt(T**2 / (4 * self_velocity**2 * self.time_resolution**2 - self.wheelbase**2 * T**2)))
+
+            if turn_angle / max_turn_angle > 1:
+                steering_action = e(max_turn_angle)
+            else:
+                steering_action = e(turn_angle)
+
+        return [throttle_action, steering_action]
+
+    def process_feedback(self, previous_state, action, state, reward):
+        self_state = state[self.index]
+        self_velocity = self_state[2]
+        self_orientation = self_state[3]
+
+        error = 0.000000000000001
+        if self.target_velocity is not None:
+            if abs(self.target_velocity - self_velocity) < error:
+                self.target_velocity = None
+        if self.target_orientation is not None:
+            if abs(math.atan2(math.sin(self.target_orientation - self_orientation), math.cos(self.target_orientation - self_orientation))) < error:
+                self.target_orientation = None
 
     def key_press(self, key, _mod):
-        if key in key_velocity_actions:
-            self.pending_velocity_action = key_velocity_actions[key]
-        if key in key_orientation_actions:
-            self.pending_orientation_action = key_orientation_actions[key]
+        if key in key_target_velocity:
+            self.target_velocity = key_target_velocity[key]
+        elif key in key_target_orientation:
+            self.target_orientation = key_target_orientation[key]
 
 
 class RandomVehicleAgent(RandomAgent, DynamicActorAgent):
     def reset(self):
         pass
 
-    def choose_action(self, state, info=None):
+    def choose_action(self, state, action_space, info=None):
         if not self.active_velocity(state) and self.epsilon_valid():
-            velocity_action = self.np_random.choice([value for value in VelocityAction if value is not VelocityAction.STOP])
+            velocity_action = self.np_random.choice([value for value in TargetVelocity if value is not TargetVelocity.STOP])
         else:
-            velocity_action = VelocityAction.NOOP
+            velocity_action = TargetVelocity.NOOP
 
-        return velocity_action.value, OrientationAction.NOOP.value
+        return velocity_action.value, TargetOrientation.NOOP.value
 
-    def process_feedback(self, previous_observation, action, observation, reward):
+    def process_feedback(self, previous_state, action, state, reward):
         pass
 
 
 class RandomPedestrianAgent(RandomAgent, DynamicActorAgent):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self.current_action = [0.0, 0.0]
+
     def reset(self):
         pass
 
-    def choose_random_velocity_action(self, state, condition):
-        if not self.active_velocity(state) and condition:
-            return self.np_random.choice([action for action in VelocityAction])
-        else:
-            return VelocityAction.NOOP
+    def choose_action(self, state, action_space, info=None):
+        if self.epsilon_valid():
+            self.current_action = list(action_space.sample())
+        return self.current_action
 
-    def choose_random_orientation_action(self, state, condition):
-        if not self.active_orientation(state) and condition:
-            return self.np_random.choice([action for action in OrientationAction])
-        else:
-            return OrientationAction.NOOP
-
-    def choose_action(self, state, info=None):
-        epsilon_valid = self.epsilon_valid()
-
-        velocity_action = self.choose_random_velocity_action(state, epsilon_valid)
-        orientation_action = self.choose_random_orientation_action(state, epsilon_valid)
-
-        return velocity_action.value, orientation_action.value
-
-    def process_feedback(self, previous_observation, action, observation, reward):
+    def process_feedback(self, previous_state, action, state, reward):
         pass
 
 
 cross_road_action = {
-    RoadObservation.ROAD_FRONT: OrientationAction.NOOP,
-    RoadObservation.ROAD_FRONT_LEFT: OrientationAction.FORWARD_LEFT,
-    RoadObservation.ROAD_LEFT: OrientationAction.LEFT,
-    RoadObservation.ROAD_REAR_LEFT: OrientationAction.REAR_LEFT,
-    RoadObservation.ROAD_REAR: OrientationAction.REAR,
-    RoadObservation.ROAD_REAR_RIGHT: OrientationAction.REAR_RIGHT,
-    RoadObservation.ROAD_RIGHT: OrientationAction.RIGHT,
-    RoadObservation.ROAD_FRONT_RIGHT: OrientationAction.FORWARD_RIGHT
+    RoadObservation.ROAD_FRONT: TargetOrientation.NOOP,
+    RoadObservation.ROAD_FRONT_LEFT: TargetOrientation.FORWARD_LEFT,
+    RoadObservation.ROAD_LEFT: TargetOrientation.LEFT,
+    RoadObservation.ROAD_REAR_LEFT: TargetOrientation.REAR_LEFT,
+    RoadObservation.ROAD_REAR: TargetOrientation.REAR,
+    RoadObservation.ROAD_REAR_RIGHT: TargetOrientation.REAR_RIGHT,
+    RoadObservation.ROAD_RIGHT: TargetOrientation.RIGHT,
+    RoadObservation.ROAD_FRONT_RIGHT: TargetOrientation.FORWARD_RIGHT
 }
 
 end_cross_road_action = {
-    OrientationAction.NOOP: OrientationAction.LEFT,
-    OrientationAction.FORWARD_LEFT: OrientationAction.RIGHT,
-    OrientationAction.LEFT: OrientationAction.RIGHT,
-    OrientationAction.REAR_LEFT: OrientationAction.RIGHT,
-    OrientationAction.REAR: OrientationAction.LEFT,
-    OrientationAction.REAR_RIGHT: OrientationAction.LEFT,
-    OrientationAction.RIGHT: OrientationAction.LEFT,
-    OrientationAction.FORWARD_RIGHT: OrientationAction.LEFT
+    TargetOrientation.NOOP: TargetOrientation.LEFT,
+    TargetOrientation.FORWARD_LEFT: TargetOrientation.RIGHT,
+    TargetOrientation.LEFT: TargetOrientation.RIGHT,
+    TargetOrientation.REAR_LEFT: TargetOrientation.RIGHT,
+    TargetOrientation.REAR: TargetOrientation.LEFT,
+    TargetOrientation.REAR_RIGHT: TargetOrientation.LEFT,
+    TargetOrientation.RIGHT: TargetOrientation.LEFT,
+    TargetOrientation.FORWARD_RIGHT: TargetOrientation.LEFT
 }
 
 
@@ -239,7 +269,7 @@ class RoadCrossingPedestrianAgent(DynamicActorAgent):
         self.pavement_count = 0
         self.reorient_count = 0
 
-    def road_observation(self, info):
+    def road_state(self, info):
         actor_polygons = info['actor_polygons']
         self_polygon = actor_polygons[self.index]
         road_polygon = self.road.bounding_box()
@@ -273,10 +303,10 @@ class RoadCrossingPedestrianAgent(DynamicActorAgent):
         assert 'road_angles' in info
 
         active_orientation = self.active_orientation(state)
-        road_observation = self.road_observation(info)
-        on_road = road_observation is RoadObservation.ON_ROAD
+        road_state = self.road_state(info)
+        on_road = road_state is RoadObservation.ON_ROAD
 
-        orientation_action = OrientationAction.NOOP
+        orientation_action = TargetOrientation.NOOP
         if self.crossing_action is not None and not active_orientation and not self.entered_road and not on_road:  # crossing, not turning, and on origin pavement
             self.pavement_count += 1
         elif self.crossing_action is not None and not active_orientation and not self.entered_road and on_road:  # crossing and on road
@@ -287,20 +317,20 @@ class RoadCrossingPedestrianAgent(DynamicActorAgent):
                 orientation_action = end_cross_road_action[self.crossing_action]
                 self.reset()
         elif self.crossing_action is None and not active_orientation and not on_road and condition:  # not crossing and decided to cross
-            self.crossing_action = cross_road_action[road_observation]
+            self.crossing_action = cross_road_action[road_state]
             orientation_action = self.crossing_action
 
         return orientation_action
 
-    def choose_action(self, observation, info=None):
+    def choose_action(self, state, action_space, info=None):
         raise NotImplementedError
 
-    def process_feedback(self, previous_observation, action, observation, reward):
+    def process_feedback(self, previous_state, action, state, reward):
         raise NotImplementedError
 
 
 class RandomConstrainedPedestrianAgent(RoadCrossingPedestrianAgent, RandomPedestrianAgent):  # base class order is important so that RoadCrossingPedestrianAgent.reset() is called rather than RandomPedestrianAgent.reset()
-    def choose_action(self, state, info=None):
+    def choose_action(self, state, action_space, info=None):
         assert info and 'actor_polygons' in info
 
         epsilon_valid = self.epsilon_valid()
@@ -310,7 +340,7 @@ class RandomConstrainedPedestrianAgent(RoadCrossingPedestrianAgent, RandomPedest
 
         return velocity_action.value, orientation_action.value
 
-    def process_feedback(self, previous_observation, action, observation, reward):
+    def process_feedback(self, previous_state, action, state, reward):
         pass
 
 
@@ -333,20 +363,20 @@ class ProximityPedestrianAgent(RoadCrossingPedestrianAgent):
         ego_position = Point(ego_state[0], ego_state[1])
         return self_position.distance(ego_position) < self.distance_threshold
 
-    def choose_action(self, state, info=None):
+    def choose_action(self, state, action_space, info=None):
         assert info and 'actor_polygons' in info
 
         if not self.moving and not self.active_velocity(state):
-            velocity_action = VelocityAction.FAST
+            velocity_action = TargetVelocity.FAST
             self.moving = True
         else:
-            velocity_action = VelocityAction.NOOP
+            velocity_action = TargetVelocity.NOOP
 
         orientation_action = self.choose_crossing_orientation_action(state, self.proximity_satisfied(state), info)
 
         return velocity_action.value, orientation_action.value
 
-    def process_feedback(self, previous_observation, action, observation, reward):
+    def process_feedback(self, previous_state, action, state, reward):
         pass
 
 
@@ -396,7 +426,7 @@ class QLearningAgent(RandomPedestrianAgent):
             self.enabled_features = sorted(self.feature_bounds.keys())
             self.log_file.info(f"{','.join(map(str, self.enabled_features))}")
 
-        self.available_actions = [(velocity_action.value, orientation_action.value) for velocity_action in VelocityAction for orientation_action in OrientationAction]
+        self.available_actions = [(velocity_action.value, orientation_action.value) for velocity_action in TargetVelocity for orientation_action in TargetOrientation]
 
     def reset(self):
         if self.log_file:
@@ -408,11 +438,7 @@ class QLearningAgent(RandomPedestrianAgent):
             return DynamicActorState(
                 position=Point(data[0], data[1]),
                 velocity=data[2],
-                orientation=data[3],
-                throttle=data[4],
-                steering_angle=data[5],
-                target_velocity=data[6],
-                target_orientation=data[7]
+                orientation=data[3]
             )
 
         ego_state = make_actor_state(state[0])
@@ -421,14 +447,11 @@ class QLearningAgent(RandomPedestrianAgent):
         ego_actor = Car(ego_state, self.ego_constants)
         self_actor = Pedestrian(self_state, self.self_constants)
 
-        joint_action = [(VelocityAction.NOOP.value, OrientationAction.NOOP.value), action]
+        joint_action = [(TargetVelocity.NOOP.value, TargetOrientation.NOOP.value), action]
 
         spawn_actors = [ego_actor, self_actor]
         for i, spawn_actor in enumerate(spawn_actors):
-            spawn_actor.step_action(joint_action, i)
-
-        for i, spawn_actor in enumerate(spawn_actors):
-            spawn_actor.step_dynamics(self.time_resolution)
+            spawn_actor.step(joint_action[i], self.time_resolution)
 
         ego_position = ego_actor.state.position
         self_position = self_actor.state.position
@@ -466,7 +489,7 @@ class QLearningAgent(RandomPedestrianAgent):
         # print(reporting.pretty_float_list(list(feature_values.values())), reporting.pretty_float_list(list(self.feature_weights.values())), reporting.pretty_float(q_value))
         return q_value
 
-    def choose_action(self, state, info=None):
+    def choose_action(self, state, action_space, info=None):
         if self.epsilon_valid():
             velocity_action = self.choose_random_velocity_action(state, True)
             orientation_action = self.choose_random_orientation_action(state, True)
@@ -524,4 +547,4 @@ class DecayedQLearningAgent(QLearningAgent):
         self.epsilon = decayed_value(self.epsilon_start, self.epsilon_end)
         self.decay_updates += 1
 
-        print(f"alpha={self.alpha}, epsilon={self.epsilon}, gamma={self.gamma}")
+        # print(f"alpha={self.alpha}, epsilon={self.epsilon}, gamma={self.gamma}")

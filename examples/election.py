@@ -1,4 +1,4 @@
-from library.actions import OrientationAction
+from library.actions import TargetOrientation
 from examples.agents import ElectionPedestrianAgent
 
 
@@ -17,7 +17,7 @@ class Election:
             if i != focal_player:  # only the winner gets to cross
                 self.agents[i].reset()  # tell the agent their orientation action will not be executed
                 velocity_action_id, _ = joint_action_vote[i]  # allow the agent's velocity action to be executed
-                joint_action_vote[i] = velocity_action_id, OrientationAction.NOOP.value  # reset the agent's orientation action
+                joint_action_vote[i] = velocity_action_id, TargetOrientation.NOOP.value  # reset the agent's orientation action
         return joint_action_vote
 
     def result(self, previous_state, joint_action_vote):
@@ -39,8 +39,8 @@ class Election:
         voters = []
         for i in self.electorate:
             _, orientation_action_id = joint_action_vote[i]
-            orientation_action = OrientationAction(orientation_action_id)
-            if orientation_action is not OrientationAction.NOOP:  # agent has voted to cross
+            orientation_action = TargetOrientation(orientation_action_id)
+            if orientation_action is not TargetOrientation.NOOP:  # agent has voted to cross
                 voters.append(i)
 
         if voters:

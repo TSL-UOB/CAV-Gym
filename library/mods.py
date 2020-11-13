@@ -23,7 +23,7 @@ class JointStatsRecorder(object):
         self.agents = agents
         self.episode_lengths = []
         self.episode_rewards = []
-        self.episode_types = [] # experimental addition
+        self.episode_types = []  # experimental addition
         self._type = 't'
         self.timestamps = []
         self.steps = None
@@ -41,10 +41,10 @@ class JointStatsRecorder(object):
         return self._type
 
     @type.setter
-    def type(self, type):
-        if type not in ['t', 'e']:
-            raise error.Error('Invalid episode type {}: must be t for training or e for evaluation', type)
-        self._type = type
+    def type(self, _type):
+        if _type not in ['t', 'e']:
+            raise error.Error('Invalid episode type {}: must be t for training or e for evaluation', _type)
+        self._type = _type
 
     def before_step(self, action):
         assert not self.closed

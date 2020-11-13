@@ -177,7 +177,8 @@ def confidence_interval(data, alpha=0.05):  # 95% confidence interval
         nan = float("nan")
         return Interval(value=nan, error=nan)
     else:
-        from scipy import stats
+        # noinspection PyPackageRequirements
+        from scipy import stats  # dependency of gym
         data_mean = sum(data) / data_length
         # data_sem = statistics.stdev(data) / math.sqrt(data_length)  # use data_sem = statistics.pstdev(data) if data is population
         # data_sem = np.std(data, ddof=1) / math.sqrt(data_length)  # use data_sem = np.std(data) / math.sqrt(data_length) if data is population

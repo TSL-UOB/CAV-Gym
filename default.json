@@ -18,19 +18,8 @@
     "inbound_pavement": 1.0
   },
   "agent_config": {
-    "option": "q-learning",
-    "alpha": 0.18,
-    "gamma": 0.87,
-    "epsilon": 0.0005,
-    "feature_config": {
-      "distance_x": true,
-      "distance_y": true,
-      "distance": true,
-      "on_road": false,
-      "facing": false,
-      "inverse_distance": true
-    },
-    "log": null
+    "option": "random",
+    "epsilon": 0.01
   },
   "mode_config": {
     "option": "headless"

@@ -1,22 +1,24 @@
+from abc import ABC
+
 import math
 from copy import copy
 from dataclasses import dataclass
 from enum import Enum
 
-import numpy as np
+# noinspection PyPackageRequirements
+import numpy as np  # dependency of gym
 from gym import spaces
 from gym.utils import seeding
 
 from library import geometry
-from library.actions import TrafficLightAction, OrientationAction, VelocityAction
+from library.actions import TrafficLightAction
 from library.assets import Road, Occlusion
-from library.geometry import Point
-
+from library.geometry import Point, RAD2DEG
 
 REACTION_TIME = 0.675
 
 
-class Actor:
+class Actor(ABC):
     def __init__(self, init_state, constants, **kwargs):
         super().__init__(**kwargs)  # important to pass on kwargs if class is used as superclass in multiple inheritance
 
@@ -31,10 +33,7 @@ class Actor:
     def bounding_box(self):
         raise NotImplementedError
 
-    def step_action(self, joint_action, index):
-        raise NotImplementedError
-
-    def step_dynamics(self, time_resolution):
+    def step(self, action, time_resolution):
         raise NotImplementedError
 
     def observation_space(self):
@@ -49,22 +48,14 @@ class DynamicActorState:
     position: geometry.Point
     velocity: float
     orientation: float
-    throttle: float
-    steering_angle: float
-    target_velocity: float or None
-    target_orientation: float or None
 
     def __copy__(self):
-        return DynamicActorState(copy(self.position), self.velocity, self.orientation, self.throttle, self.steering_angle, self.target_velocity, self.target_orientation)
+        return DynamicActorState(copy(self.position), self.velocity, self.orientation)
 
     def __iter__(self):
         yield from self.position
         yield self.velocity
         yield self.orientation
-        yield self.throttle
-        yield self.steering_angle
-        yield self.target_velocity
-        yield self.target_orientation
 
 
 @dataclass(frozen=True)
@@ -76,18 +67,10 @@ class DynamicActorConstants:
 
     min_velocity: float
     max_velocity: float
-
-    throttle_up_rate: float
-    throttle_down_rate: float
-    steer_left_angle: float
-    steer_right_angle: float
-
-    target_slow_velocity: float
-    target_fast_velocity: float
-
-    def __post_init__(self):
-        assert self.min_velocity <= self.target_slow_velocity <= self.max_velocity
-        assert self.min_velocity <= self.target_fast_velocity <= self.max_velocity
+    min_throttle: float
+    max_throttle: float
+    min_steering_angle: float
+    max_steering_angle: float
 
 
 class DynamicActor(Actor, Occlusion):
@@ -96,28 +79,32 @@ class DynamicActor(Actor, Occlusion):
 
         self.shape = geometry.make_rectangle(self.constants.length, self.constants.width)
 
-        self.wheelbase_offset_front = self.constants.wheelbase / 2.0
-        self.wheelbase_offset_rear = self.constants.wheelbase / 2.0
+        self.wheelbase_offset = self.constants.wheelbase / 2.0
 
         self.wheels = geometry.make_rectangle(self.constants.wheelbase, self.constants.track)
 
+        self.throttle = 0.0
+        self.steering_angle = 0.0
+
     def observation_space(self):
-        return spaces.Tuple([
-            spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),  # x
-            spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),  # y
-            spaces.Box(low=0.0, high=np.inf, shape=(1,), dtype=np.float32),  # velocity
-            spaces.Box(low=-np.pi, high=np.pi, shape=(1,), dtype=np.float32),  # orientation
-            spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),  # throttle
-            spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32),  # steering_angle
-            spaces.Box(low=0.0, high=np.inf, shape=(1,), dtype=np.float32),  # target_velocity
-            spaces.Box(low=-np.pi, high=np.pi, shape=(1,), dtype=np.float32)  # target_orientation
-        ])
+        return spaces.Box(
+            low=np.array([-math.inf, -math.inf, self.constants.min_velocity, -math.pi], dtype=np.float32),
+            high=np.array([math.inf, math.inf, self.constants.max_velocity, math.pi], dtype=np.float32),
+            dtype=np.float32
+        )  # x, y, velocity, orientation
 
     def action_space(self):
-        return spaces.Tuple([spaces.Discrete(VelocityAction.__len__()), spaces.Discrete(OrientationAction.__len__())])
+        return spaces.Box(
+            low=np.array([self.constants.min_throttle, self.constants.min_steering_angle], dtype=np.float32),
+            high=np.array([self.constants.max_throttle, self.constants.max_steering_angle], dtype=np.float32),
+            dtype=np.float32
+        )  # throttle, steering_angle
 
     def reset(self):
         super().reset()
+
+        self.throttle = 0.0
+        self.steering_angle = 0.0
 
     def bounding_box(self):
         return self.shape.transform(self.state.orientation, self.state.position)
@@ -126,84 +113,88 @@ class DynamicActor(Actor, Occlusion):
         return self.wheels.transform(self.state.orientation, self.state.position)
 
     def stopping_zones(self):
-        braking_distance = (self.state.velocity ** 2) / (2 * -self.constants.throttle_down_rate)
-        reaction_distance = self.state.velocity * REACTION_TIME
-        total_distance = braking_distance + reaction_distance
-
-        if total_distance == 0:
-            return None, None
-
-        if self.state.steering_angle == 0:
-            zone = geometry.make_rectangle(total_distance, self.constants.width, rear_offset=0).transform(self.state.orientation, Point(self.constants.length * 0.5, 0).transform(self.state.orientation, self.state.position))
-            braking_zone, reaction_zone = zone.split_longitudinally(braking_distance / total_distance)
-            return braking_zone, reaction_zone
-
-        front_remaining_length = (self.constants.length - self.constants.wheelbase) / 2.0
-
-        def find_radius(angle, opposite):
-            opposite_to_adjacent_ratio = abs(math.tan(angle))
-            adjacent = opposite / opposite_to_adjacent_ratio
-            return adjacent
-
-        radius = find_radius(self.state.steering_angle, self.constants.wheelbase)  # distance from centre of rotation to centre of rear axle
-
-        counter_clockwise = self.state.steering_angle > 0
-
-        rear_axle_centre_point = self.wheel_positions().rear_centre()
-        relative_rotation_angle = self.state.orientation + (math.pi / 2.0) if counter_clockwise else self.state.orientation - (math.pi / 2.0)
-        rotation_point = Point(radius, 0).transform(relative_rotation_angle, rear_axle_centre_point)
-
-        circle_motion = geometry.Circle(centre=rotation_point, radius=radius)
-        current_angle = self.state.orientation - (math.pi / 2.0) if counter_clockwise else self.state.orientation + (math.pi / 2.0)
-
-        radius_min = radius - (self.constants.width / 2.0)
-        radius_mid = math.sqrt((radius_min ** 2) + ((self.constants.wheelbase + front_remaining_length) ** 2))
-        radius_max = math.sqrt(((radius_min + self.constants.width) ** 2) + ((self.constants.wheelbase + front_remaining_length) ** 2))
-        radius_front_centre = math.sqrt((radius ** 2) + ((self.constants.wheelbase + front_remaining_length) ** 2))
-
-        circle_min = geometry.Circle(centre=rotation_point, radius=radius_min)
-        circle_mid = geometry.Circle(centre=rotation_point, radius=radius_mid)
-        circle_max = geometry.Circle(centre=rotation_point, radius=radius_max)
-        circle_front_centre = geometry.Circle(centre=rotation_point, radius=radius_front_centre)
-
-        mid_corner = self.bounding_box().front_left if counter_clockwise else self.bounding_box().front_right
-        max_corner = self.bounding_box().front_right if counter_clockwise else self.bounding_box().front_left
-
-        angle_mid = geometry.Triangle(rear=rotation_point, front_left=mid_corner, front_right=rear_axle_centre_point).angle()
-        angle_max = geometry.Triangle(rear=rotation_point, front_left=max_corner, front_right=rear_axle_centre_point).angle()
-        angle_front_centre = geometry.Triangle(rear=rotation_point, front_left=self.bounding_box().front_centre(), front_right=rear_axle_centre_point).angle()
-
-        target_angle = geometry.normalise_angle(self.state.target_orientation - (math.pi / 2.0) if counter_clockwise else self.state.target_orientation + (math.pi / 2.0))
-        target_arc = circle_motion.arc_from_angle(current_angle, geometry.normalise_angle(target_angle - current_angle))
-        target_arc_length = target_arc.arc_length()
-
-        zone_arc = circle_motion.arc_from_length(current_angle, min(total_distance, target_arc_length) if counter_clockwise else -min(total_distance, target_arc_length))
-
-        zone_min_arc = circle_min.arc_from_angle(current_angle, zone_arc.arc_angle)
-        zone_mid_arc = circle_mid.arc_from_angle(geometry.normalise_angle(current_angle + angle_mid), zone_arc.arc_angle)
-        zone_max_arc = circle_max.arc_from_angle(geometry.normalise_angle(current_angle + angle_max), zone_arc.arc_angle)
-        zone_front_centre_arc = circle_front_centre.arc_from_angle(geometry.normalise_angle(current_angle + angle_front_centre), zone_arc.arc_angle)
-
-        zone_arrow = geometry.Arrow(left_arc=zone_min_arc if counter_clockwise else zone_max_arc, centre_arc=zone_mid_arc, right_arc=zone_max_arc if counter_clockwise else zone_min_arc)
-        zone_arrow_length = zone_arc.arc_length()
-        zone_straight_length = total_distance - zone_arrow_length
-
-        if zone_straight_length > 0:
-            zone_straight_orientation = geometry.normalise_angle(target_angle + (math.pi / 2.0) if counter_clockwise else target_angle - (math.pi / 2.0))
-            zone_straight = geometry.make_rectangle(zone_straight_length, self.constants.width, rear_offset=0).transform(zone_straight_orientation, zone_front_centre_arc.end_point())
-
-            if braking_distance < zone_arrow_length:  # braking zone entirely witin curve
-                braking_zone_arrow, reaction_zone_arrow = zone_arrow.split_longitudinally(braking_distance / zone_arrow_length)
-                braking_zone = braking_zone_arrow
-                reaction_zone = geometry.Zone(curve=reaction_zone_arrow, straight=zone_straight)
-            else:  # reaction zone entirely witin straight
-                braking_zone_straight, reaction_zone_straight = zone_straight.split_longitudinally((braking_distance - zone_arrow_length) / zone_straight_length)
-                braking_zone = geometry.Zone(curve=zone_arrow, straight=braking_zone_straight)
-                reaction_zone = reaction_zone_straight
-        else:
-            braking_zone, reaction_zone = zone_arrow.split_longitudinally(braking_distance / total_distance)
-
-        return braking_zone, reaction_zone
+        return None, None
+        #
+        # braking_distance = (self.state.velocity ** 2) / (2 * -self.constants.min_throttle)
+        # reaction_distance = self.state.velocity * REACTION_TIME
+        # total_distance = braking_distance + reaction_distance
+        #
+        # if total_distance == 0:
+        #     return None, None
+        #
+        # if self.steering_angle == 0:
+        #     zone = geometry.make_rectangle(total_distance, self.constants.width, rear_offset=0).transform(self.state.orientation, Point(self.constants.length * 0.5, 0).transform(self.state.orientation, self.state.position))
+        #     braking_zone, reaction_zone = zone.split_longitudinally(braking_distance / total_distance)
+        #     return braking_zone, reaction_zone
+        #
+        # front_remaining_length = (self.constants.length - self.constants.wheelbase) / 2.0
+        #
+        # def find_radius(angle, opposite):
+        #     opposite_to_adjacent_ratio = abs(math.tan(angle))
+        #     adjacent = opposite / opposite_to_adjacent_ratio
+        #     return adjacent
+        #
+        # radius = find_radius(self.steering_angle, self.constants.wheelbase)  # distance from centre of rotation to centre of rear axle
+        #
+        # counter_clockwise = self.steering_angle > 0
+        #
+        # rear_axle_centre_point = self.wheel_positions().rear_centre()
+        # relative_rotation_angle = self.state.orientation + (math.pi / 2.0) if counter_clockwise else self.state.orientation - (math.pi / 2.0)
+        # rotation_point = Point(radius, 0).transform(relative_rotation_angle, rear_axle_centre_point)
+        #
+        # circle_motion = geometry.Circle(centre=rotation_point, radius=radius)
+        # current_angle = self.state.orientation - (math.pi / 2.0) if counter_clockwise else self.state.orientation + (math.pi / 2.0)
+        #
+        # radius_min = radius - (self.constants.width / 2.0)
+        # radius_mid = math.sqrt((radius_min ** 2) + ((self.constants.wheelbase + front_remaining_length) ** 2))
+        # radius_max = math.sqrt(((radius_min + self.constants.width) ** 2) + ((self.constants.wheelbase + front_remaining_length) ** 2))
+        # radius_front_centre = math.sqrt((radius ** 2) + ((self.constants.wheelbase + front_remaining_length) ** 2))
+        #
+        # circle_min = geometry.Circle(centre=rotation_point, radius=radius_min)
+        # circle_mid = geometry.Circle(centre=rotation_point, radius=radius_mid)
+        # circle_max = geometry.Circle(centre=rotation_point, radius=radius_max)
+        # circle_front_centre = geometry.Circle(centre=rotation_point, radius=radius_front_centre)
+        #
+        # mid_corner = self.bounding_box().front_left if counter_clockwise else self.bounding_box().front_right
+        # max_corner = self.bounding_box().front_right if counter_clockwise else self.bounding_box().front_left
+        #
+        # angle_mid = geometry.Triangle(rear=rotation_point, front_left=mid_corner, front_right=rear_axle_centre_point).angle()
+        # angle_max = geometry.Triangle(rear=rotation_point, front_left=max_corner, front_right=rear_axle_centre_point).angle()
+        # angle_front_centre = geometry.Triangle(rear=rotation_point, front_left=self.bounding_box().front_centre(), front_right=rear_axle_centre_point).angle()
+        #
+        # target_orientation = math.degrees(90)  # test
+        #
+        # target_angle = geometry.normalise_angle(target_orientation - (math.pi / 2.0) if counter_clockwise else target_orientation + (math.pi / 2.0))
+        # target_arc = circle_motion.arc_from_angle(current_angle, geometry.normalise_angle(target_angle - current_angle))
+        # target_arc_length = target_arc.arc_length()
+        #
+        # zone_arc = circle_motion.arc_from_length(current_angle, min(total_distance, target_arc_length) if counter_clockwise else -min(total_distance, target_arc_length))
+        #
+        # zone_min_arc = circle_min.arc_from_angle(current_angle, zone_arc.arc_angle)
+        # zone_mid_arc = circle_mid.arc_from_angle(geometry.normalise_angle(current_angle + angle_mid), zone_arc.arc_angle)
+        # zone_max_arc = circle_max.arc_from_angle(geometry.normalise_angle(current_angle + angle_max), zone_arc.arc_angle)
+        # zone_front_centre_arc = circle_front_centre.arc_from_angle(geometry.normalise_angle(current_angle + angle_front_centre), zone_arc.arc_angle)
+        #
+        # zone_arrow = geometry.Arrow(left_arc=zone_min_arc if counter_clockwise else zone_max_arc, centre_arc=zone_mid_arc, right_arc=zone_max_arc if counter_clockwise else zone_min_arc)
+        # zone_arrow_length = zone_arc.arc_length()
+        # zone_straight_length = total_distance - zone_arrow_length
+        #
+        # if zone_straight_length > 0:
+        #     zone_straight_orientation = geometry.normalise_angle(target_angle + (math.pi / 2.0) if counter_clockwise else target_angle - (math.pi / 2.0))
+        #     zone_straight = geometry.make_rectangle(zone_straight_length, self.constants.width, rear_offset=0).transform(zone_straight_orientation, zone_front_centre_arc.end_point())
+        #
+        #     if braking_distance < zone_arrow_length:  # braking zone entirely witin curve
+        #         braking_zone_arrow, reaction_zone_arrow = zone_arrow.split_longitudinally(braking_distance / zone_arrow_length)
+        #         braking_zone = braking_zone_arrow
+        #         reaction_zone = geometry.Zone(curve=reaction_zone_arrow, straight=zone_straight)
+        #     else:  # reaction zone entirely witin straight
+        #         braking_zone_straight, reaction_zone_straight = zone_straight.split_longitudinally((braking_distance - zone_arrow_length) / zone_straight_length)
+        #         braking_zone = geometry.Zone(curve=zone_arrow, straight=braking_zone_straight)
+        #         reaction_zone = reaction_zone_straight
+        # else:
+        #     braking_zone, reaction_zone = zone_arrow.split_longitudinally(braking_distance / total_distance)
+        #
+        # return braking_zone, reaction_zone
 
     def line_anchor(self, road):
         closest = road.bounding_box().longitudinal_line().closest_point_from(self.state.position)
@@ -213,117 +204,60 @@ class DynamicActor(Actor, Occlusion):
         angle = self.line_anchor(road).orientation()
         return geometry.normalise_angle(angle - self.state.orientation)
 
-    def step_action(self, joint_action, index_self):
-        velocity_action_id, orientation_action_id = joint_action[index_self]
-        velocity_action = VelocityAction(velocity_action_id) if self.state.target_velocity is None else VelocityAction.NOOP
-        orientation_action = OrientationAction(orientation_action_id) if self.state.target_orientation is None else OrientationAction.NOOP
+    def step(self, action, time_resolution):
+        self.throttle, self.steering_angle = action
 
-        if velocity_action is VelocityAction.STOP:
-            self.state.target_velocity = 0
-        elif velocity_action is VelocityAction.SLOW:
-            self.state.target_velocity = self.constants.target_slow_velocity
-        elif velocity_action is VelocityAction.FAST:
-            self.state.target_velocity = self.constants.target_fast_velocity
-
-        if self.state.target_velocity is not None:
-            difference = self.state.target_velocity - self.state.velocity
-            if difference < 0:
-                self.state.throttle = self.constants.throttle_down_rate
-            elif difference > 0:
-                self.state.throttle = self.constants.throttle_up_rate
-            else:
-                self.state.target_velocity = None
-
-        if orientation_action is OrientationAction.FORWARD_LEFT:
-            self.state.target_orientation = self.state.orientation + (geometry.DEG2RAD * 45)
-        elif orientation_action is OrientationAction.LEFT:
-            self.state.target_orientation = self.state.orientation + (geometry.DEG2RAD * 90)
-        elif orientation_action is OrientationAction.REAR_LEFT:
-            self.state.target_orientation = self.state.orientation + (geometry.DEG2RAD * 135)
-        elif orientation_action is OrientationAction.REAR:
-            self.state.target_orientation = self.state.orientation + (geometry.DEG2RAD * 180)
-        elif orientation_action is OrientationAction.REAR_RIGHT:
-            self.state.target_orientation = self.state.orientation - (geometry.DEG2RAD * 135)
-        elif orientation_action is OrientationAction.RIGHT:
-            self.state.target_orientation = self.state.orientation - (geometry.DEG2RAD * 90)
-        elif orientation_action is OrientationAction.FORWARD_RIGHT:
-            self.state.target_orientation = self.state.orientation - (geometry.DEG2RAD * 45)
-
-        if self.state.target_orientation is not None:
-            self.state.target_orientation = geometry.normalise_angle(self.state.target_orientation)
-            assert -math.pi < self.state.target_orientation <= math.pi
-
-        if orientation_action is not OrientationAction.NOOP and self.state.target_orientation is not None:
-            difference = geometry.normalise_angle(self.state.target_orientation - self.state.orientation)
-            if difference < 0:
-                self.state.steering_angle = self.constants.steer_right_angle
-            elif difference > 0:
-                self.state.steering_angle = self.constants.steer_left_angle
-            else:
-                self.state.target_orientation = None
-
-    def step_dynamics(self, time_resolution):
-        previous_velocity = self.state.velocity
-        self.state.velocity = max(
+        successor_velocity = max(
             self.constants.min_velocity,
             min(
                 self.constants.max_velocity,
-                self.state.velocity + (self.state.throttle * time_resolution)
+                self.state.velocity + (self.throttle * time_resolution)
             )
         )
 
-        """Simple vehicle dynamics: http://engineeringdotnet.blogspot.com/2010/04/simple-2d-car-physics-in-games.html"""
-
+        distance_velocity = self.state.velocity * time_resolution
         cos_orientation = math.cos(self.state.orientation)
         sin_orientation = math.sin(self.state.orientation)
 
-        front_wheel_calculate_position = geometry.Point(
-            x=self.state.position.x + (self.wheelbase_offset_front * cos_orientation),
-            y=self.state.position.y + (self.wheelbase_offset_front * sin_orientation)
-        )
-        front_wheel_apply_steering_angle = Point(
-            x=self.state.velocity * time_resolution * math.cos(self.state.orientation + self.state.steering_angle),
-            y=self.state.velocity * time_resolution * math.sin(self.state.orientation + self.state.steering_angle)
-        )
-        front_wheel_position = front_wheel_calculate_position + front_wheel_apply_steering_angle
+        if self.steering_angle == 0:
+            self.state = DynamicActorState(
+                position=Point(
+                    x=self.state.position.x + distance_velocity * cos_orientation,
+                    y=self.state.position.y + distance_velocity * sin_orientation
+                ),
+                velocity=successor_velocity,
+                orientation=self.state.orientation
+            )
+        else:
+            rear_position = Point(
+                x=self.state.position.x - self.wheelbase_offset * cos_orientation,
+                y=self.state.position.y - self.wheelbase_offset * sin_orientation
+            )
 
-        back_wheel_calculate_position = geometry.Point(
-            x=self.state.position.x - (self.wheelbase_offset_rear * cos_orientation),
-            y=self.state.position.y - (self.wheelbase_offset_rear * sin_orientation)
-        )
-        back_wheel_apply_steering_angle = Point(
-            x=self.state.velocity * time_resolution * cos_orientation,
-            y=self.state.velocity * time_resolution * sin_orientation
-        )
-        back_wheel_position = back_wheel_calculate_position + back_wheel_apply_steering_angle
+            wheelbase_tan_steering_angle = self.constants.wheelbase / math.tan(self.steering_angle)
 
-        self.state.position = Point(
-            x=(front_wheel_position.x + back_wheel_position.x) / 2.0,
-            y=(front_wheel_position.y + back_wheel_position.y) / 2.0
-        )
+            centre_of_rotation = Point(
+                x=rear_position.x - wheelbase_tan_steering_angle * sin_orientation,
+                y=rear_position.y + wheelbase_tan_steering_angle * cos_orientation
+            )
 
-        previous_orientation_diff = geometry.normalise_angle(self.state.target_orientation - self.state.orientation) if self.state.target_orientation is not None else None
-        self.state.orientation = math.atan2(front_wheel_position.y - back_wheel_position.y, front_wheel_position.x - back_wheel_position.x)  # range is [-math.pi, math.pi] (min or max may be exclusive)
-        assert -math.pi < self.state.orientation <= math.pi
+            diff_x = self.state.position.x - centre_of_rotation.x
+            diff_y = self.state.position.y - centre_of_rotation.y
 
-        if self.state.target_velocity is not None and (
-                (self.state.velocity == self.state.target_velocity)  # actor has reached target velocity
-                or (previous_velocity < self.state.target_velocity < self.state.velocity)  # actor has accelerated too far
-                or (previous_velocity > self.state.target_velocity > self.state.velocity)  # actor has decelerated too far
-        ):
-            self.state.velocity = self.state.target_velocity
-            self.state.target_velocity = None
-            self.state.throttle = 0
+            theta = (-1 if self.steering_angle < 0 else 1) * (distance_velocity / math.sqrt(diff_x ** 2 + diff_y ** 2))
 
-        current_orientation_diff = geometry.normalise_angle(self.state.target_orientation - self.state.orientation) if self.state.target_orientation is not None else None
-        if self.state.target_orientation is not None and (
-                (self.state.orientation == self.state.target_orientation)  # actor has reached target orientation
-                or (previous_orientation_diff < 0 < current_orientation_diff)  # actor has turned too far left
-                or (previous_orientation_diff > 0 > current_orientation_diff)  # actor has turned too far right
-        ):
-            self.state.orientation = self.state.target_orientation
-            self.state.target_orientation = None
-            self.state.steering_angle = 0
+            cos_theta = math.cos(theta)
+            sin_theta = math.sin(theta)
+            orientation_theta = self.state.orientation + theta
+
+            self.state = DynamicActorState(
+                position=Point(
+                    x=centre_of_rotation.x + diff_x * cos_theta - diff_y * sin_theta,
+                    y=centre_of_rotation.y + diff_x * sin_theta + diff_y * cos_theta
+                ),
+                velocity=successor_velocity,
+                orientation=math.atan2(math.sin(orientation_theta), math.cos(orientation_theta))
+            )
 
 
 class Pedestrian(DynamicActor):
@@ -336,10 +270,6 @@ class SpawnPedestrianState:
     position_boxes: list
     velocity: float
     orientations: list
-    throttle: float
-    steering_angle: float
-    target_velocity: float or None
-    target_orientation: float or None
 
 
 class SpawnPedestrian(Pedestrian):
@@ -363,11 +293,7 @@ class SpawnPedestrian(Pedestrian):
         return DynamicActorState(
             position=position,
             velocity=self.spawn_init_state.velocity,
-            orientation=orientation,
-            throttle=self.spawn_init_state.throttle,
-            steering_angle=self.spawn_init_state.steering_angle,
-            target_velocity=self.spawn_init_state.target_velocity,
-            target_orientation=self.spawn_init_state.target_orientation
+            orientation=orientation
         )
 
 
@@ -447,8 +373,8 @@ class TrafficLight(Actor, Occlusion):
     def bounding_box(self):
         return self.static_bounding_box
 
-    def step_action(self, joint_action, index):
-        traffic_light_action = TrafficLightAction(joint_action[index])
+    def step(self, action, time_resolution):
+        traffic_light_action = TrafficLightAction(action)
 
         if traffic_light_action is TrafficLightAction.TURN_RED:
             self.state = TrafficLightState.RED
@@ -456,9 +382,6 @@ class TrafficLight(Actor, Occlusion):
             self.state = TrafficLightState.AMBER
         elif traffic_light_action is TrafficLightAction.TURN_GREEN:
             self.state = TrafficLightState.GREEN
-
-    def step_dynamics(self, time_resolution):
-        pass
 
 
 @dataclass(frozen=True)
@@ -509,8 +432,8 @@ class PelicanCrossing(Actor):
     def bounding_box(self):
         return self.static_bounding_box
 
-    def step_action(self, joint_action, index):
-        pelican_crossing_action = TrafficLightAction(joint_action[index])
+    def step(self, action, time_resolution):
+        pelican_crossing_action = TrafficLightAction(action)
 
         if pelican_crossing_action is TrafficLightAction.TURN_RED:
             self.state = TrafficLightState.RED
@@ -519,8 +442,5 @@ class PelicanCrossing(Actor):
         elif pelican_crossing_action is TrafficLightAction.TURN_GREEN:
             self.state = TrafficLightState.GREEN
 
-        self.outbound_traffic_light.step_action(joint_action, index)
-        self.inbound_traffic_light.step_action(joint_action, index)
-
-    def step_dynamics(self, time_resolution):
-        pass
+        self.outbound_traffic_light.step(action, time_resolution)
+        self.inbound_traffic_light.step(action, time_resolution)

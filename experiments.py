@@ -62,7 +62,7 @@ def make_config(agent_type, outbound_pavement, inbound_pavement):
 
 
 def run(agent_type, outbound_pavement, inbound_pavement):
-    print(f"starting: agent_type={agent_type}, outbound_pavement={outbound_pavement}, inbound_pavement={inbound_pavement}")
+    # print(f"starting: agent_type={agent_type}, outbound_pavement={outbound_pavement}, inbound_pavement={inbound_pavement}")
 
     log_dir, config = make_config(agent_type, outbound_pavement, inbound_pavement)
     config.write_json(f"{log_dir}/config.json")
@@ -72,7 +72,7 @@ def run(agent_type, outbound_pavement, inbound_pavement):
     simulation = Simulation(env, agents, config=config, keyboard_agent=keyboard_agent)
     simulation.run()
 
-    print(f"finished: agent_type={agent_type}, outbound_pavement={outbound_pavement}, inbound_pavement={inbound_pavement}")
+    # print(f"finished: agent_type={agent_type}, outbound_pavement={outbound_pavement}, inbound_pavement={inbound_pavement}")
 
 
 class PoolParser(ArgumentParser):

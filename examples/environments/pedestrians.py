@@ -75,11 +75,7 @@ class PedestriansEnv(CAVEnv):
                 spawn_init_state=SpawnPedestrianState(
                     position_boxes=make_spawn_position_boxes(outbound_percentage, inbound_percentage),
                     velocity=0.0,
-                    orientations=spawn_orientations,
-                    throttle=0.0,
-                    steering_angle=0.0,
-                    target_velocity=None,
-                    target_orientation=None
+                    orientations=spawn_orientations
                 ),
                 constants=pedestrian_constants,
                 np_random=np_random
@@ -89,12 +85,8 @@ class PedestriansEnv(CAVEnv):
             Car(
                 init_state=DynamicActorState(
                     position=road_map.major_road.outbound.lanes[0].spawn,
-                    velocity=car_constants.target_fast_velocity,
-                    orientation=road_map.major_road.outbound.orientation,
-                    throttle=0.0,
-                    steering_angle=0.0,
-                    target_velocity=None,
-                    target_orientation=None
+                    velocity=car_constants.max_velocity,
+                    orientation=road_map.major_road.outbound.orientation
                 ),
                 constants=car_constants
             )

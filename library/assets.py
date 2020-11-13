@@ -1,3 +1,5 @@
+from abc import ABC
+
 import itertools
 from dataclasses import dataclass
 
@@ -5,7 +7,7 @@ from library import geometry
 from library.geometry import Point
 
 
-class Occlusion:
+class Occlusion(ABC):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)  # important to pass on kwargs if class is used as superclass in multiple inheritance
 
@@ -147,7 +149,9 @@ class ObstacleConstants:
 
 
 class Obstacle(Occlusion):
-    def __init__(self, constants):
+    def __init__(self, constants, **kwargs):
+        super().__init__(**kwargs)
+
         self.constants = constants
 
         self.static_bounding_box = geometry.make_rectangle(self.constants.width, self.constants.height).transform(self.constants.orientation, self.constants.position)

@@ -96,7 +96,7 @@ class CAVEnv(MarkovGameEnv):
         return entities
 
     def state(self):
-        return [tuple(actor.state) for actor in self.actors]
+        return [list(actor.state) for actor in self.actors]
 
     def info(self):
         actor_polygons = [actor.bounding_box() for actor in self.actors]
@@ -115,10 +115,7 @@ class CAVEnv(MarkovGameEnv):
         assert self.action_space.contains(joint_action), f"{joint_action} ({type(joint_action)}) invalid"
 
         for index, actor in enumerate(self.actors):
-            actor.step_action(joint_action, index)
-
-        for actor in self.actors:
-            actor.step_dynamics(self.time_resolution)
+            actor.step(joint_action[index], self.time_resolution)
 
         info = self.info()
 

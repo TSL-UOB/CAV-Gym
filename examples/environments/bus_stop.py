@@ -38,11 +38,7 @@ actors = [
         init_state=DynamicActorState(
             position=geometry.Point(200, 0).rotate(road_map.major_road.outbound.orientation).translate(road_map.major_road.outbound.lanes[0].spawn),
             velocity=car_constants.target_fast_velocity,
-            orientation=road_map.major_road.outbound.orientation,
-            throttle=0.0,
-            steering_angle=0.0,
-            target_velocity=None,
-            target_orientation=None
+            orientation=road_map.major_road.outbound.orientation
         ),
         constants=car_constants
     ),
@@ -50,11 +46,7 @@ actors = [
         init_state=DynamicActorState(
             position=geometry.Point(400, 0).rotate(road_map.major_road.outbound.orientation).translate(road_map.major_road.outbound.lanes[0].spawn),
             velocity=bus_constants.target_fast_velocity,
-            orientation=road_map.major_road.outbound.orientation,
-            throttle=0.0,
-            steering_angle=0.0,
-            target_velocity=None,
-            target_orientation=None
+            orientation=road_map.major_road.outbound.orientation
         ),
         constants=bus_constants
     ),
@@ -62,11 +54,7 @@ actors = [
         init_state=DynamicActorState(
             position=road_map.major_road.outbound.lanes[0].spawn,
             velocity=car_constants.target_fast_velocity,
-            orientation=road_map.major_road.outbound.orientation,
-            throttle=0.0,
-            steering_angle=0.0,
-            target_velocity=None,
-            target_orientation=None
+            orientation=road_map.major_road.outbound.orientation
         ),
         constants=car_constants
     ),
@@ -74,11 +62,7 @@ actors = [
         init_state=DynamicActorState(
             position=road_map.major_road.outbound.lanes[1].spawn,
             velocity=car_constants.target_fast_velocity,
-            orientation=road_map.major_road.outbound.orientation,
-            throttle=0.0,
-            steering_angle=0.0,
-            target_velocity=None,
-            target_orientation=None
+            orientation=road_map.major_road.outbound.orientation
         ),
         constants=car_constants
     ),
@@ -86,11 +70,7 @@ actors = [
         init_state=DynamicActorState(
             position=road_map.major_road.outbound.lanes[2].spawn,
             velocity=bicycle_constants.target_fast_velocity,
-            orientation=road_map.major_road.outbound.orientation,
-            throttle=0.0,
-            steering_angle=0.0,
-            target_velocity=None,
-            target_orientation=None
+            orientation=road_map.major_road.outbound.orientation
         ),
         constants=bicycle_constants
     )

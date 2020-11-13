@@ -13,14 +13,14 @@ class TrafficLightAction(Action):
     TURN_GREEN = 3
 
 
-class VelocityAction(Action):
+class TargetVelocity(Action):
     NOOP = 0
     STOP = 1
     SLOW = 2
     FAST = 3
 
 
-class OrientationAction(Action):
+class TargetOrientation(Action):
     NOOP = 0
     FORWARD_LEFT = 1
     LEFT = 2

@@ -122,10 +122,11 @@ class VehicleView(DynamicActorView):
 
         left_indicator_state = BulbState.OFF
         right_indicator_state = BulbState.OFF
-        if vehicle.state.steering_angle > 0:
-            left_indicator_state = BulbState.FULL
-        elif vehicle.state.steering_angle < 0:
-            right_indicator_state = BulbState.FULL
+        if vehicle.steering_angle is not None:
+            if vehicle.steering_angle > 0:
+                left_indicator_state = BulbState.FULL
+            elif vehicle.steering_angle < 0:
+                right_indicator_state = BulbState.FULL
 
         indicator_bounding_box = vehicle.indicators()
         self.left_indicators.gs = self.make_lights(indicator_bounding_box.rear_left, indicator_bounding_box.front_left, left_indicator_state).gs
@@ -133,10 +134,11 @@ class VehicleView(DynamicActorView):
 
         brake_lights_state = BulbState.OFF
         headlights_state = BulbState.OFF
-        if vehicle.state.throttle < 0:
-            brake_lights_state = BulbState.FULL
-        elif vehicle.state.throttle > 0:
-            headlights_state = BulbState.FULL
+        if vehicle.throttle is not None:
+            if vehicle.throttle < 0:
+                brake_lights_state = BulbState.FULL
+            elif vehicle.throttle > 0:
+                headlights_state = BulbState.FULL
 
         longitudinal_bounding_box = vehicle.longitudinal_lights()
         self.brake_lights.gs = self.make_lights(longitudinal_bounding_box.rear_left, longitudinal_bounding_box.rear_right, brake_lights_state).gs
@@ -235,7 +237,9 @@ class TrafficLightView(ActorView, OcclusionView):
 
 
 class PelicanCrossingView(ActorView):
-    def __init__(self, pelican_crossing, ego):
+    def __init__(self, pelican_crossing, ego, **kwargs):
+        super().__init__(**kwargs)
+
         coordinates = pelican_crossing.bounding_box()
         self.area = rendering.make_polygon(list(coordinates))
         self.area.set_color(*RGB.WHITE.value)

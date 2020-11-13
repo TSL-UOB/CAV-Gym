@@ -385,7 +385,7 @@ def normalise_angle(radians):
         radians += 2 * math.pi
     while radians > math.pi:
         radians -= 2 * math.pi
-    return radians
+    return radians + 0.0 if radians == 0 else radians  # avoid -0
 
 
 @dataclass(frozen=True)

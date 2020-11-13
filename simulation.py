@@ -65,7 +65,7 @@ class Simulation:
             for previous_timestep in range(self.config.max_timesteps):  # initially previous_timestep=0
                 timestep = previous_timestep + 1
 
-                joint_action = [agent.choose_action(state, info) for agent in self.agents]
+                joint_action = [agent.choose_action(state, action_space, info) for agent, action_space in zip(self.agents, self.env.action_space)]
 
                 if self.election:
                     joint_action = self.election.result(state, joint_action)

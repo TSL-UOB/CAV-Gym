@@ -1,21 +1,20 @@
-from library import geometry
+import math
+
 from library.actors import DynamicActorConstants
 
 M2PX = 16  # pixels per metre
 
 car_constants = DynamicActorConstants(
-    length=M2PX * 4.5,
-    width=M2PX * 1.75,
-    wheelbase=M2PX * 3,
-    track=M2PX * 1.75,
-    min_velocity=0,
-    max_velocity=M2PX * 9,
-    throttle_up_rate=M2PX * 9,
-    throttle_down_rate=M2PX * -9,
-    steer_left_angle=geometry.DEG2RAD * 35,
-    steer_right_angle=geometry.DEG2RAD * -35,
-    target_slow_velocity=M2PX * 4.5,
-    target_fast_velocity=M2PX * 9
+    length=M2PX * 4.5,  # [4.5 m]
+    width=M2PX * 1.75,  # [1.75 m]
+    wheelbase=M2PX * 3,  # [3 m]
+    track=M2PX * 1.75,  # [1.75 m]
+    min_velocity=0,  # [0 m/s]
+    max_velocity=M2PX * 9,  # [0 m/s]
+    min_throttle=M2PX * -9,  # [-9 m/ss]
+    max_throttle=M2PX * 9,  # [9 m/ss]
+    min_steering_angle=-(math.pi * 0.2),  # [35 degrees right]
+    max_steering_angle=math.pi * 0.2  # [35 degrees left]
 )
 
 pedestrian_constants = DynamicActorConstants(
@@ -25,12 +24,10 @@ pedestrian_constants = DynamicActorConstants(
     track=M2PX * 0.875,
     min_velocity=0,
     max_velocity=M2PX * 1.4,
-    throttle_up_rate=M2PX * 1.4,
-    throttle_down_rate=M2PX * -1.4,
-    steer_left_angle=geometry.DEG2RAD * 90,
-    steer_right_angle=geometry.DEG2RAD * -90,
-    target_slow_velocity=M2PX * 0.7,
-    target_fast_velocity=M2PX * 1.4
+    min_throttle=-(M2PX * 1.4),
+    max_throttle=M2PX * 1.4,
+    min_steering_angle=-(math.pi * 0.5),
+    max_steering_angle=(math.pi * 0.5)
 )
 
 bus_constants = DynamicActorConstants(
@@ -40,12 +37,10 @@ bus_constants = DynamicActorConstants(
     track=M2PX * 2.55,
     min_velocity=0,
     max_velocity=M2PX * 6.75,
-    throttle_up_rate=M2PX * 6.75,
-    throttle_down_rate=-M2PX * 6.75,
-    steer_left_angle=geometry.DEG2RAD * 30,
-    steer_right_angle=geometry.DEG2RAD * -30,
-    target_slow_velocity=M2PX * 3.375,
-    target_fast_velocity=M2PX * 6.75
+    min_throttle=-(M2PX * 6.75),
+    max_throttle=M2PX * 6.75,
+    min_steering_angle=-(math.pi * 0.16),
+    max_steering_angle=(math.pi * 0.16)
 )
 
 bicycle_constants = DynamicActorConstants(
@@ -55,10 +50,8 @@ bicycle_constants = DynamicActorConstants(
     track=M2PX * 0.875,
     min_velocity=0,
     max_velocity=M2PX * 4.5,
-    throttle_up_rate=M2PX * 4.5,
-    throttle_down_rate=-M2PX * 4.5,
-    steer_left_angle=geometry.DEG2RAD * 90,
-    steer_right_angle=geometry.DEG2RAD * -90,
-    target_slow_velocity=M2PX * 2.25,
-    target_fast_velocity=M2PX * 4.5
+    min_throttle=-(M2PX * 4.5),
+    max_throttle=M2PX * 4.5,
+    min_steering_angle=-(math.pi * 0.5),
+    max_steering_angle=(math.pi * 0.5)
 )

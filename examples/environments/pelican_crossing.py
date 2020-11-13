@@ -48,11 +48,7 @@ actors = [
         init_state=DynamicActorState(
             position=road_map.major_road.outbound.lanes[0].spawn,
             velocity=car_constants.target_fast_velocity,
-            orientation=road_map.major_road.outbound.orientation,
-            throttle=0.0,
-            steering_angle=0.0,
-            target_velocity=None,
-            target_orientation=None
+            orientation=road_map.major_road.outbound.orientation
         ),
         constants=car_constants
     ),
@@ -60,11 +56,7 @@ actors = [
         init_state=DynamicActorState(
             position=road_map.major_road.inbound.lanes[0].spawn,
             velocity=0.0,
-            orientation=road_map.major_road.inbound.orientation,
-            throttle=0.0,
-            steering_angle=0.0,
-            target_velocity=None,
-            target_orientation=None
+            orientation=road_map.major_road.inbound.orientation
         ),
         constants=car_constants
     ),
@@ -73,11 +65,7 @@ actors = [
         init_state=DynamicActorState(
             position=pelican_crossing.inbound_spawn,
             velocity=0.0,
-            orientation=road_map.major_road.outbound.orientation + (geometry.DEG2RAD * 90.0),
-            throttle=0.0,
-            steering_angle=0.0,
-            target_velocity=None,
-            target_orientation=None
+            orientation=road_map.major_road.outbound.orientation + (geometry.DEG2RAD * 90.0)
         ),
         constants=pedestrian_constants
     ),
@@ -85,11 +73,7 @@ actors = [
         init_state=DynamicActorState(
             position=pelican_crossing.outbound_spawn,
             velocity=0.0,
-            orientation=road_map.major_road.outbound.orientation + (geometry.DEG2RAD * 270.0),
-            throttle=0.0,
-            steering_angle=0.0,
-            target_velocity=None,
-            target_orientation=None
+            orientation=road_map.major_road.outbound.orientation + (geometry.DEG2RAD * 270.0)
         ),
         constants=pedestrian_constants
     )
