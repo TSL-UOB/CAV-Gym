@@ -86,6 +86,9 @@ class DynamicActor(Actor, Occlusion):
         self.throttle = 0.0
         self.steering_angle = 0.0
 
+        self.target_velocity = None
+        self.target_orientation = None
+
     def observation_space(self):
         return spaces.Box(
             low=np.array([-math.inf, -math.inf, self.constants.min_velocity, -math.pi], dtype=np.float32),

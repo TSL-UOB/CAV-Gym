@@ -243,7 +243,7 @@ class Config:
 
         console.info(f"actors={pretty_str_list(actor.__class__.__name__ for actor in env.actors)}")
 
-        keyboard_agent = KeyboardAgent(index=0) if self.mode_config.mode is Mode.RENDER and self.mode_config.keyboard else None
+        keyboard_agent = KeyboardAgent(actor=env.actors[0], time_resolution=env.time_resolution, index=0) if self.mode_config.mode is Mode.RENDER and self.mode_config.keyboard else None
         agent = keyboard_agent if keyboard_agent is not None else NoopAgent(index=0)
         agents = [agent]
         for i, actor in enumerate(env.actors[1:], start=1):

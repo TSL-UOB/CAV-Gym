@@ -120,22 +120,15 @@ key_target_orientation = {
 
 
 class KeyboardAgent(DynamicActorAgent):
-    def __init__(self, **kwargs):
+    def __init__(self, actor, time_resolution, **kwargs):
         super().__init__(**kwargs)
 
-        self.time_resolution = 1 / 60
-        self.wheelbase = car_constants.wheelbase
-        self.min_steering_angle = car_constants.min_steering_angle
-        self.max_steering_angle = car_constants.max_steering_angle
-        self.min_throttle = car_constants.min_throttle
-        self.max_throttle = car_constants.max_throttle
-
-        self.target_velocity = None
-        self.target_orientation = None
+        self.actor = actor
+        self.time_resolution = time_resolution
 
     def reset(self):
-        self.target_velocity = None
-        self.target_orientation = None
+        self.actor.target_velocity = None
+        self.actor.target_orientation = None
 
     def choose_action(self, state, action_space, info=None):
         self_state = state[self.index]
@@ -143,28 +136,28 @@ class KeyboardAgent(DynamicActorAgent):
         self_orientation = self_state[3]
 
         throttle_action = 0.0
-        if self.target_velocity is not None:
-            diff = (self.target_velocity - self_velocity) / self.time_resolution
+        if self.actor.target_velocity is not None:
+            diff = (self.actor.target_velocity - self_velocity) / self.time_resolution
 
-            if diff < self.min_throttle:
-                throttle_action = self.min_throttle
-            elif diff > self.max_throttle:
-                throttle_action = self.max_throttle
+            if diff < self.actor.constants.min_throttle:
+                throttle_action = self.actor.constants.min_throttle
+            elif diff > self.actor.constants.max_throttle:
+                throttle_action = self.actor.constants.max_throttle
             else:
                 throttle_action = diff
 
         steering_action = 0.0
-        if self_velocity != 0 and self.target_orientation is not None:
-            turn_angle = math.atan2(math.sin(self.target_orientation - self_orientation), math.cos(self.target_orientation - self_orientation))
+        if self_velocity != 0 and self.actor.target_orientation is not None:
+            turn_angle = math.atan2(math.sin(self.actor.target_orientation - self_orientation), math.cos(self.actor.target_orientation - self_orientation))
 
             def calc_T(v, e):
-                return (-1 if e < 0 else 1) * 2 * self.time_resolution * v / math.sqrt(self.wheelbase**2 * (1 + 4 / math.tan(e)**2))
+                return (-1 if e < 0 else 1) * 2 * self.time_resolution * v / math.sqrt(self.actor.constants.wheelbase**2 * (1 + 4 / math.tan(e)**2))
 
-            constant_steering_action = self.min_steering_angle if turn_angle < 0 else self.max_steering_angle
+            constant_steering_action = self.actor.constants.min_steering_angle if turn_angle < 0 else self.actor.constants.max_steering_angle
             max_turn_angle = calc_T(self_velocity, constant_steering_action)
 
             def e(T):
-                return (-1 if T < 0 else 1) * math.atan(2 * self.wheelbase * math.sqrt(T**2 / (4 * self_velocity**2 * self.time_resolution**2 - self.wheelbase**2 * T**2)))
+                return (-1 if T < 0 else 1) * math.atan(2 * self.actor.constants.wheelbase * math.sqrt(T**2 / (4 * self_velocity**2 * self.time_resolution**2 - self.actor.constants.wheelbase**2 * T**2)))
 
             if turn_angle / max_turn_angle > 1:
                 steering_action = e(max_turn_angle)
@@ -179,18 +172,18 @@ class KeyboardAgent(DynamicActorAgent):
         self_orientation = self_state[3]
 
         error = 0.000000000000001
-        if self.target_velocity is not None:
-            if abs(self.target_velocity - self_velocity) < error:
-                self.target_velocity = None
-        if self.target_orientation is not None:
-            if abs(math.atan2(math.sin(self.target_orientation - self_orientation), math.cos(self.target_orientation - self_orientation))) < error:
-                self.target_orientation = None
+        if self.actor.target_velocity is not None:
+            if abs(self.actor.target_velocity - self_velocity) < error:
+                self.actor.target_velocity = None
+        if self.actor.target_orientation is not None:
+            if abs(math.atan2(math.sin(self.actor.target_orientation - self_orientation), math.cos(self.actor.target_orientation - self_orientation))) < error:
+                self.actor.target_orientation = None
 
     def key_press(self, key, _mod):
         if key in key_target_velocity:
-            self.target_velocity = key_target_velocity[key]
+            self.actor.target_velocity = key_target_velocity[key]
         elif key in key_target_orientation:
-            self.target_orientation = key_target_orientation[key]
+            self.actor.target_orientation = key_target_orientation[key]
 
 
 class RandomVehicleAgent(RandomAgent, DynamicActorAgent):
