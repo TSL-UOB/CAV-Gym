@@ -74,7 +74,7 @@ class PedestriansEnv(CAVEnv):
             return SpawnPedestrian(
                 spawn_init_state=SpawnPedestrianState(
                     position_boxes=make_spawn_position_boxes(outbound_percentage, inbound_percentage),
-                    velocity=0.0,
+                    velocity=M2PX * 1.4,
                     orientations=spawn_orientations
                 ),
                 constants=pedestrian_constants,

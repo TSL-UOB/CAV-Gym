@@ -259,6 +259,8 @@ class Config:
                         agent = RandomConstrainedPedestrianAgent(
                             index=i,
                             epsilon=self.agent_config.epsilon,
+                            body=body,
+                            time_resolution=env.time_resolution,
                             road=env.constants.road_map.major_road,
                             np_random=np_random
                         )
