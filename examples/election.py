@@ -1,4 +1,3 @@
-from library.actions import TargetOrientation
 from examples.agents import ElectionPedestrianAgent
 
 
@@ -11,25 +10,22 @@ class Election:
         self.electorate = [i for i, agent in enumerate(self.agents) if isinstance(agent, ElectionPedestrianAgent)]
         self.active_player = None
 
+        self.previous_joint_action = None
+
     def focal_joint_action(self, joint_action_vote, focal_player):
         assert focal_player in self.electorate
         for i in self.electorate:
             if i != focal_player:  # only the winner gets to cross
                 self.agents[i].reset()  # tell the agent their orientation action will not be executed
-                velocity_action_id, _ = joint_action_vote[i]  # allow the agent's velocity action to be executed
-                joint_action_vote[i] = velocity_action_id, TargetOrientation.NOOP.value  # reset the agent's orientation action
+                velocity_action, _ = joint_action_vote[i]  # allow the agent's velocity action to be executed
+                joint_action_vote[i] = [velocity_action, 0.0]  # reset the agent's orientation action
         return joint_action_vote
 
     def result(self, previous_state, joint_action_vote):
         assert len(self.agents) == len(previous_state) == len(joint_action_vote)
 
-        if self.active_player and not self.agents[self.active_player].crossing_action:
-            target_orientation = previous_state[self.active_player][7]
-            active_orientation = target_orientation is not None
-            if not active_orientation:
-                previous_active_player = self.active_player
-                self.active_player = None  # previous winner has finished crossing
-                return self.focal_joint_action(joint_action_vote, previous_active_player)  # previous_active_player needs to execute final action
+        if self.active_player and not self.agents[self.active_player].crossing:
+            self.active_player = None
 
         if self.active_player:
             return self.focal_joint_action(joint_action_vote, self.active_player)
@@ -38,9 +34,7 @@ class Election:
 
         voters = []
         for i in self.electorate:
-            _, orientation_action_id = joint_action_vote[i]
-            orientation_action = TargetOrientation(orientation_action_id)
-            if orientation_action is not TargetOrientation.NOOP:  # agent has voted to cross
+            if self.agents[i].voting:  # agent has voted to cross
                 voters.append(i)
 
         if voters:

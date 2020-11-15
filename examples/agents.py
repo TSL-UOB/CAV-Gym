@@ -377,8 +377,92 @@ class ProximityPedestrianAgent(DynamicBodyAgent):  # (RoadCrossingPedestrianAgen
                 self.target_orientation = None
 
 
-class ElectionPedestrianAgent(ProximityPedestrianAgent):
-    pass
+class ElectionPedestrianAgent(DynamicBodyAgent):  # (ProximityPedestrianAgent):
+    def __init__(self, body, time_resolution, road, distance_threshold, **kwargs):
+        super().__init__(**kwargs)
+
+        self.body = body
+        self.time_resolution = time_resolution
+        self.road_centre = road.bounding_box().longitudinal_line()
+        self.distance_threshold = distance_threshold
+
+        self.initial_distance = None
+        self.waypoint = None
+        self.target_orientation = None
+        self.prior_orientation = None
+        self.crossing = False
+
+    def reset(self):
+        self.initial_distance = None
+        self.waypoint = None
+        self.target_orientation = None
+        self.prior_orientation = None
+        self.voting = False
+        self.crossing = False
+
+    def choose_action(self, state, action_space, info=None):
+        self_state = DynamicBodyState(
+            position=Point(x=float(state[self.index][0]), y=float(state[self.index][1])),
+            velocity=float(state[self.index][2]),
+            orientation=float(state[self.index][3])
+        )
+        ego_position = Point(x=state[0][0], y=state[0][1])
+
+        if self.waypoint is None and self.target_orientation is None and self_state.position.distance(ego_position) < self.distance_threshold:
+            closest_point = self.road_centre.closest_point_from(self_state.position)
+            relative_angle = math.atan2(closest_point.y - self_state.position.y, closest_point.x - self_state.position.x)
+            if self.initial_distance is None:
+                self.initial_distance = self_state.position.distance(closest_point)
+            self.waypoint = Point(
+                x=closest_point.x + self.initial_distance * math.cos(relative_angle),
+                y=closest_point.y + self.initial_distance * math.sin(relative_angle),
+            )
+            self.target_orientation = math.atan2(self.waypoint.y - self_state.position.y, self.waypoint.x - self_state.position.x)
+            self.prior_orientation = self_state.orientation
+            self.voting = True
+            self.crossing = True
+        else:
+            self.voting = False
+
+        if self.target_orientation is None or self_state.velocity == 0:
+            steering_action = 0.0
+        else:
+            turn_angle = math.atan2(math.sin(self.target_orientation - self_state.orientation), math.cos(self.target_orientation - self_state.orientation))
+
+            def calc_T(v, e):
+                return (-1 if e < 0 else 1) * 2 * self.time_resolution * v / math.sqrt(self.body.constants.wheelbase**2 * (1 + 4 / math.tan(e)**2))
+
+            constant_steering_action = self.body.constants.min_steering_angle if turn_angle < 0 else self.body.constants.max_steering_angle
+            max_turn_angle = calc_T(self_state.velocity, constant_steering_action)
+
+            def e(T):
+                return (-1 if T < 0 else 1) * math.atan(2 * self.body.constants.wheelbase * math.sqrt(T**2 / (4 * self_state.velocity**2 * self.time_resolution**2 - self.body.constants.wheelbase**2 * T**2)))
+
+            if turn_angle / max_turn_angle > 1:
+                steering_action = e(max_turn_angle)
+            else:
+                steering_action = e(turn_angle)
+
+        return [0.0, steering_action]
+
+    def process_feedback(self, previous_state, action, state, reward):
+        self_state = DynamicBodyState(
+            position=Point(x=float(state[self.index][0]), y=float(state[self.index][1])),
+            velocity=float(state[self.index][2]),
+            orientation=float(state[self.index][3])
+        )
+
+        if self.waypoint is not None:
+            distance = self_state.position.distance(self.waypoint)
+            if distance < 1:
+                self.waypoint = None
+                self.target_orientation = self.prior_orientation
+                self.prior_orientation = None
+        if self.target_orientation is not None:
+            if abs(math.atan2(math.sin(self.target_orientation - self_state.orientation), math.cos(self.target_orientation - self_state.orientation))) < 0.000000000000001:
+                self.target_orientation = None
+        if self.waypoint is None and self.target_orientation is None:
+            self.crossing = False
 
 
 class QLearningAgent(RandomPedestrianAgent):
