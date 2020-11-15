@@ -9,8 +9,7 @@ from library import geometry
 from library.actions import TargetOrientation, TargetVelocity, TrafficLightAction
 from library.bodies import Car, Pedestrian, DynamicBodyState
 from library.geometry import Point
-from library.observations import RoadObservation
-from examples.constants import M2PX, car_constants, pedestrian_constants
+from examples.constants import M2PX, car_constants
 
 
 class Agent(ABC):
@@ -187,16 +186,18 @@ class KeyboardAgent(DynamicBodyAgent):
 
 
 class RandomVehicleAgent(RandomAgent, DynamicBodyAgent):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self.action = [0.0, 0.0]
+
     def reset(self):
-        pass
+        self.action = [0.0, 0.0]
 
     def choose_action(self, state, action_space, info=None):
-        if not self.active_velocity(state) and self.epsilon_valid():
-            velocity_action = self.np_random.choice([value for value in TargetVelocity if value is not TargetVelocity.STOP])
-        else:
-            velocity_action = TargetVelocity.NOOP
-
-        return velocity_action.value, TargetOrientation.NOOP.value
+        if self.epsilon_valid():
+            self.action = list(action_space.sample())
+        return self.action
 
     def process_feedback(self, previous_state, action, state, reward):
         pass
@@ -218,108 +219,6 @@ class RandomPedestrianAgent(RandomAgent, DynamicBodyAgent):
 
     def process_feedback(self, previous_state, action, state, reward):
         pass
-
-
-cross_road_action = {
-    RoadObservation.ROAD_FRONT: TargetOrientation.NOOP,
-    RoadObservation.ROAD_FRONT_LEFT: TargetOrientation.FORWARD_LEFT,
-    RoadObservation.ROAD_LEFT: TargetOrientation.LEFT,
-    RoadObservation.ROAD_REAR_LEFT: TargetOrientation.REAR_LEFT,
-    RoadObservation.ROAD_REAR: TargetOrientation.REAR,
-    RoadObservation.ROAD_REAR_RIGHT: TargetOrientation.REAR_RIGHT,
-    RoadObservation.ROAD_RIGHT: TargetOrientation.RIGHT,
-    RoadObservation.ROAD_FRONT_RIGHT: TargetOrientation.FORWARD_RIGHT
-}
-
-end_cross_road_action = {
-    TargetOrientation.NOOP: TargetOrientation.LEFT,
-    TargetOrientation.FORWARD_LEFT: TargetOrientation.RIGHT,
-    TargetOrientation.LEFT: TargetOrientation.RIGHT,
-    TargetOrientation.REAR_LEFT: TargetOrientation.RIGHT,
-    TargetOrientation.REAR: TargetOrientation.LEFT,
-    TargetOrientation.REAR_RIGHT: TargetOrientation.LEFT,
-    TargetOrientation.RIGHT: TargetOrientation.LEFT,
-    TargetOrientation.FORWARD_RIGHT: TargetOrientation.LEFT
-}
-
-
-class RoadCrossingPedestrianAgent(DynamicBodyAgent):
-    def __init__(self, road, **kwargs):
-        super().__init__(**kwargs)
-
-        self.road = road
-
-        self.delay = 15  # defined by experimentation
-
-        self.crossing_action = None
-        self.entered_road = False
-        self.pavement_count = 0
-        self.reorient_count = 0
-
-    def reset(self):
-        self.crossing_action = None
-        self.entered_road = False
-        self.pavement_count = 0
-        self.reorient_count = 0
-
-    def road_state(self, info):
-        body_polygons = info['body_polygons']
-        self_polygon = body_polygons[self.index]
-        road_polygon = self.road.bounding_box()
-        if self_polygon.intersects(road_polygon):
-            return RoadObservation.ON_ROAD
-        else:
-            road_angles = info['road_angles']
-            self_angle = road_angles[self.index]
-            if math.radians(-157.5) <= self_angle < math.radians(-112.5):
-                return RoadObservation.ROAD_REAR_RIGHT
-            elif math.radians(-112.5) <= self_angle < math.radians(-67.5):
-                return RoadObservation.ROAD_RIGHT
-            elif math.radians(-67.5) <= self_angle < math.radians(-22.5):
-                return RoadObservation.ROAD_FRONT_RIGHT
-            elif math.radians(-22.5) <= self_angle < math.radians(22.5):
-                return RoadObservation.ROAD_FRONT
-            elif math.radians(22.5) <= self_angle < math.radians(67.5):
-                return RoadObservation.ROAD_FRONT_LEFT
-            elif math.radians(67.5) <= self_angle < math.radians(112.5):
-                return RoadObservation.ROAD_LEFT
-            elif math.radians(112.5) <= self_angle < math.radians(157.5):
-                return RoadObservation.ROAD_REAR_LEFT
-            elif math.radians(157.5) <= self_angle <= math.radians(180) or math.radians(-180) < self_angle < math.radians(-157.5):
-                return RoadObservation.ROAD_REAR
-            else:
-                raise Exception("relative angle is not in the interval (-math.pi, math.pi]")
-
-    def choose_crossing_orientation_action(self, state, condition, info):
-        assert info
-        assert 'body_polygons' in info
-        assert 'road_angles' in info
-
-        active_orientation = self.active_orientation(state)
-        road_state = self.road_state(info)
-        on_road = road_state is RoadObservation.ON_ROAD
-
-        orientation_action = TargetOrientation.NOOP
-        if self.crossing_action is not None and not active_orientation and not self.entered_road and not on_road:  # crossing, not turning, and on origin pavement
-            self.pavement_count += 1
-        elif self.crossing_action is not None and not active_orientation and not self.entered_road and on_road:  # crossing and on road
-            self.entered_road = True
-        elif self.crossing_action is not None and self.entered_road and not on_road:  # crossing and on destination pavement
-            self.reorient_count += 1
-            if self.reorient_count >= self.pavement_count + self.delay:  # crossed on destination pavement for at least as long as origin pavement
-                orientation_action = end_cross_road_action[self.crossing_action]
-                self.reset()
-        elif self.crossing_action is None and not active_orientation and not on_road and condition:  # not crossing and decided to cross
-            self.crossing_action = cross_road_action[road_state]
-            orientation_action = self.crossing_action
-
-        return orientation_action
-
-    def choose_action(self, state, action_space, info=None):
-        raise NotImplementedError
-
-    def process_feedback(self, previous_state, action, state, reward):
-        raise NotImplementedError
 
 
 class RandomConstrainedPedestrianAgent(RandomPedestrianAgent):  # (RoadCrossingPedestrianAgent, RandomPedestrianAgent):  # base class order is important so that RoadCrossingPedestrianAgent.reset() is called rather than RandomPedestrianAgent.reset()
@@ -379,8 +278,7 @@ class RandomConstrainedPedestrianAgent(RandomPedestrianAgent):  # (RoadCrossingP
             else:
                 steering_action = e(turn_angle)
 
-        self.action = [0.0, steering_action]
-        return self.action
+        return [0.0, steering_action]
 
     def process_feedback(self, previous_state, action, state, reward):
         self_state = DynamicBodyState(
@@ -400,40 +298,83 @@ class RandomConstrainedPedestrianAgent(RandomPedestrianAgent):  # (RoadCrossingP
                 self.target_orientation = None
 
 
-class ProximityPedestrianAgent(RoadCrossingPedestrianAgent):
-    def __init__(self, distance_threshold, **kwargs):
+class ProximityPedestrianAgent(DynamicBodyAgent):  # (RoadCrossingPedestrianAgent):
+    def __init__(self, body, time_resolution, road, distance_threshold, **kwargs):
         super().__init__(**kwargs)
 
+        self.body = body
+        self.time_resolution = time_resolution
+        self.road_centre = road.bounding_box().longitudinal_line()
         self.distance_threshold = distance_threshold
 
-        self.moving = False
+        self.initial_distance = None
+        self.waypoint = None
+        self.target_orientation = None
+        self.prior_orientation = None
 
     def reset(self):
-        super().reset()
-        self.moving = False
-
-    def proximity_satisfied(self, state):
-        self_state = state[self.index]
-        self_position = Point(self_state[0], self_state[1])
-        ego_state = state[0]
-        ego_position = Point(ego_state[0], ego_state[1])
-        return self_position.distance(ego_position) < self.distance_threshold
+        self.initial_distance = None
+        self.waypoint = None
+        self.target_orientation = None
+        self.prior_orientation = None
 
     def choose_action(self, state, action_space, info=None):
-        assert info and 'body_polygons' in info
+        self_state = DynamicBodyState(
+            position=Point(x=float(state[self.index][0]), y=float(state[self.index][1])),
+            velocity=float(state[self.index][2]),
+            orientation=float(state[self.index][3])
+        )
+        ego_position = Point(x=state[0][0], y=state[0][1])
 
-        if not self.moving and not self.active_velocity(state):
-            velocity_action = TargetVelocity.FAST
-            self.moving = True
+        if self.waypoint is None and self.target_orientation is None and self_state.position.distance(ego_position) < self.distance_threshold:
+            closest_point = self.road_centre.closest_point_from(self_state.position)
+            relative_angle = math.atan2(closest_point.y - self_state.position.y, closest_point.x - self_state.position.x)
+            if self.initial_distance is None:
+                self.initial_distance = self_state.position.distance(closest_point)
+            self.waypoint = Point(
+                x=closest_point.x + self.initial_distance * math.cos(relative_angle),
+                y=closest_point.y + self.initial_distance * math.sin(relative_angle),
+            )
+            self.target_orientation = math.atan2(self.waypoint.y - self_state.position.y, self.waypoint.x - self_state.position.x)
+            self.prior_orientation = self_state.orientation
+
+        if self.target_orientation is None or self_state.velocity == 0:
+            steering_action = 0.0
         else:
-            velocity_action = TargetVelocity.NOOP
+            turn_angle = math.atan2(math.sin(self.target_orientation - self_state.orientation), math.cos(self.target_orientation - self_state.orientation))
 
-        orientation_action = self.choose_crossing_orientation_action(state, self.proximity_satisfied(state), info)
+            def calc_T(v, e):
+                return (-1 if e < 0 else 1) * 2 * self.time_resolution * v / math.sqrt(self.body.constants.wheelbase**2 * (1 + 4 / math.tan(e)**2))
 
-        return velocity_action.value, orientation_action.value
+            constant_steering_action = self.body.constants.min_steering_angle if turn_angle < 0 else self.body.constants.max_steering_angle
+            max_turn_angle = calc_T(self_state.velocity, constant_steering_action)
+
+            def e(T):
+                return (-1 if T < 0 else 1) * math.atan(2 * self.body.constants.wheelbase * math.sqrt(T**2 / (4 * self_state.velocity**2 * self.time_resolution**2 - self.body.constants.wheelbase**2 * T**2)))
+
+            if turn_angle / max_turn_angle > 1:
+                steering_action = e(max_turn_angle)
+            else:
+                steering_action = e(turn_angle)
+
+        return [0.0, steering_action]
 
     def process_feedback(self, previous_state, action, state, reward):
-        pass
+        self_state = DynamicBodyState(
+            position=Point(x=float(state[self.index][0]), y=float(state[self.index][1])),
+            velocity=float(state[self.index][2]),
+            orientation=float(state[self.index][3])
+        )
+
+        if self.waypoint is not None:
+            distance = self_state.position.distance(self.waypoint)
+            if distance < 1:
+                self.waypoint = None
+                self.target_orientation = self.prior_orientation
+                self.prior_orientation = None
+        if self.target_orientation is not None:
+            if abs(math.atan2(math.sin(self.target_orientation - self_state.orientation), math.cos(self.target_orientation - self_state.orientation))) < 0.000000000000001:
+                self.target_orientation = None
 
 
 class ElectionPedestrianAgent(ProximityPedestrianAgent):

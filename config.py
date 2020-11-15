@@ -267,12 +267,16 @@ class Config:
                     elif self.agent_config.agent is AgentType.PROXIMITY:
                         agent = ProximityPedestrianAgent(
                             index=i,
+                            body=body,
+                            time_resolution=env.time_resolution,
                             road=env.constants.road_map.major_road,
                             distance_threshold=self.agent_config.threshold
                         )
                     elif self.agent_config.agent is AgentType.ELECTION:
                         agent = ElectionPedestrianAgent(
                             index=i,
+                            body=body,
+                            time_resolution=env.time_resolution,
                             road=env.constants.road_map.major_road,
                             distance_threshold=self.agent_config.threshold
                         )
