@@ -26,8 +26,8 @@ pedestrian_constants = DynamicBodyConstants(
     max_velocity=M2PX * 1.4,
     min_throttle=-(M2PX * 1.4),
     max_throttle=M2PX * 1.4,
-    min_steering_angle=-(math.pi * 0.5),
-    max_steering_angle=(math.pi * 0.5)
+    min_steering_angle=-(math.pi * 0.4),
+    max_steering_angle=(math.pi * 0.4)
 )
 
 bus_constants = DynamicBodyConstants(

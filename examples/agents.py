@@ -322,9 +322,6 @@ class RoadCrossingPedestrianAgent(DynamicBodyAgent):
         raise NotImplementedError
 
 
-# Outstanding issues:
-# - Occassionally they will rotate at (-)45 rather than (-)90 degree angle
-# - Occassionally they may reorient while still on road
 class RandomConstrainedPedestrianAgent(RandomPedestrianAgent):  # (RoadCrossingPedestrianAgent, RandomPedestrianAgent):  # base class order is important so that RoadCrossingPedestrianAgent.reset() is called rather than RandomPedestrianAgent.reset()
     def __init__(self, body, time_resolution, road, **kwargs):
         super().__init__(**kwargs)
@@ -333,14 +330,16 @@ class RandomConstrainedPedestrianAgent(RandomPedestrianAgent):  # (RoadCrossingP
         self.time_resolution = time_resolution
         self.road_centre = road.bounding_box().longitudinal_line()
 
+        self.initial_distance = None
         self.waypoint = None
-        self.prior_orientation = None
         self.target_orientation = None
+        self.prior_orientation = None
 
     def reset(self):
+        self.initial_distance = None
         self.waypoint = None
-        self.prior_orientation = None
         self.target_orientation = None
+        self.prior_orientation = None
 
     def choose_action(self, state, action_space, info=None):
         self_state = DynamicBodyState(
@@ -349,16 +348,17 @@ class RandomConstrainedPedestrianAgent(RandomPedestrianAgent):  # (RoadCrossingP
             orientation=float(state[self.index][3])
         )
 
-        if self.waypoint is None and self.epsilon_valid():
+        if self.waypoint is None and self.target_orientation is None and self.epsilon_valid():
             closest_point = self.road_centre.closest_point_from(self_state.position)
-            sin_pi = math.sin(math.pi)
-            cos_pi = math.cos(math.pi)
+            relative_angle = math.atan2(closest_point.y - self_state.position.y, closest_point.x - self_state.position.x)
+            if self.initial_distance is None:
+                self.initial_distance = self_state.position.distance(closest_point)
             self.waypoint = Point(
-                x=closest_point.x + (self_state.position.x - closest_point.x) * cos_pi - (self_state.position.y - closest_point.y) * sin_pi,
-                y=closest_point.y + (self_state.position.x - closest_point.x) * sin_pi + (self_state.position.y - closest_point.y) * cos_pi
+                x=closest_point.x + self.initial_distance * math.cos(relative_angle),
+                y=closest_point.y + self.initial_distance * math.sin(relative_angle),
             )
-            self.prior_orientation = self_state.orientation
             self.target_orientation = math.atan2(self.waypoint.y - self_state.position.y, self.waypoint.x - self_state.position.x)
+            self.prior_orientation = self_state.orientation
 
         if self.target_orientation is None or self_state.velocity == 0:
             steering_action = 0.0
@@ -379,11 +379,6 @@ class RandomConstrainedPedestrianAgent(RandomPedestrianAgent):  # (RoadCrossingP
             else:
                 steering_action = e(turn_angle)
 
-        if self.target_orientation is not None:
-            error = 0.00000000001
-            if abs(math.degrees(90) - self.target_orientation) < error or abs(math.degrees(-90) - self.target_orientation) < error:
-                print(math.degrees(self.target_orientation))
-
         self.action = [0.0, steering_action]
         return self.action
 
@@ -396,9 +391,10 @@ class RandomConstrainedPedestrianAgent(RandomPedestrianAgent):  # (RoadCrossingP
 
         if self.waypoint is not None:
             distance = self_state.position.distance(self.waypoint)
-            if distance < 3:
+            if distance < 1:
                 self.waypoint = None
                 self.target_orientation = self.prior_orientation
+                self.prior_orientation = None
         if self.target_orientation is not None:
             if abs(math.atan2(math.sin(self.target_orientation - self_state.orientation), math.cos(self.target_orientation - self_state.orientation))) < 0.000000000000001:
                 self.target_orientation = None
