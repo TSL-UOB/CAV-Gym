@@ -6,7 +6,7 @@ from gym.utils import seeding
 
 import reporting
 from library import geometry
-from library.actions import TargetOrientation, TargetVelocity, TrafficLightAction
+from library.actions import TrafficLightAction
 from library.bodies import Car, Pedestrian, DynamicBodyState
 from library.geometry import Point
 from examples.constants import M2PX, car_constants
@@ -469,11 +469,12 @@ class QLearningAgent(RandomPedestrianAgent):
     # self.alpha is learning rate (should decrease over time)
     # self.gamma is discount fbody (should be fixed over time?)
     # self.epsilon is exploration probability (should decrease over time)
-    def __init__(self, ego_constants, self_constants, road_polgon, time_resolution, width, height, q_learning_config, **kwargs):
+    def __init__(self, body, ego_constants, road_polgon, time_resolution, width, height, q_learning_config, **kwargs):
         super().__init__(epsilon=q_learning_config.epsilon, **kwargs)  # self.epsilon is exploration probability (should decrease over time)
 
+        self.body = body
         self.ego_constants = ego_constants
-        self.self_constants = self_constants
+        # self.self_constants = self_constants
         self.road_polgon = road_polgon
         self.time_resolution = time_resolution
         self.alpha = q_learning_config.alpha  # learning rate (should decrease over time)
@@ -507,13 +508,19 @@ class QLearningAgent(RandomPedestrianAgent):
             self.enabled_features = sorted(self.feature_bounds.keys())
             self.log_file.info(f"{','.join(map(str, self.enabled_features))}")
 
-        self.available_actions = [(velocity_action.value, orientation_action.value) for velocity_action in TargetVelocity for orientation_action in TargetOrientation]
+        target_velocities = [float(self.body.constants.max_velocity), float((self.body.constants.max_velocity - self.body.constants.min_velocity) / 2)]
+        target_orientations = [math.pi, math.pi * 0.5, 0.0, -(math.pi * 0.5)]
+        self.available_targets = [(target_velocity, target_orientation) for target_velocity in target_velocities for target_orientation in target_orientations]
+        self.target_velocity = None
+        self.target_orientation = None
 
     def reset(self):
+        self.target_velocity = None
+        self.target_orientation = None
         if self.log_file:
             self.log_file.info(f"{','.join(map(str, [self.feature_weights[feature] for feature in self.enabled_features]))}")
 
-    def features(self, state, action):  # question: what does it mean for a feature to depend on an action and/or what does a Q value mean if it does not depend on an action?
+    def features(self, state, target):  # question: what does it mean for a feature to depend on an action and/or what does a Q value mean if it does not depend on an action?
         def make_body_state(data):
             # assert len(data) == 8
             return DynamicBodyState(
@@ -526,9 +533,37 @@ class QLearningAgent(RandomPedestrianAgent):
         self_state = make_body_state(state[self.index])
 
         ego_body = Car(ego_state, self.ego_constants)
-        self_body = Pedestrian(self_state, self.self_constants)
+        self_body = Pedestrian(self_state, self.body.constants)
 
-        joint_action = [(TargetVelocity.NOOP.value, TargetOrientation.NOOP.value), action]
+        target_velocity, target_orientation = target
+
+        if target_velocity is None:
+            throttle_action = 0.0
+        else:
+            diff = (target_velocity - self_state.velocity) / self.time_resolution
+            throttle_action = min(self.body.constants.max_throttle, max(self.body.constants.min_throttle, diff))
+
+        if target_orientation is None or self_state.velocity == 0:
+            steering_action = 0.0
+        else:
+            turn_angle = math.atan2(math.sin(target_orientation - self_state.orientation), math.cos(target_orientation - self_state.orientation))
+
+            def calc_T(v, e):
+                return (-1 if e < 0 else 1) * 2 * self.time_resolution * v / math.sqrt(self.body.constants.wheelbase**2 * (1 + 4 / math.tan(e)**2))
+
+            constant_steering_action = self.body.constants.min_steering_angle if turn_angle < 0 else self.body.constants.max_steering_angle
+            max_turn_angle = calc_T(self_state.velocity, constant_steering_action)
+
+            def e(T):
+                return (-1 if T < 0 else 1) * math.atan(2 * self.body.constants.wheelbase * math.sqrt(T**2 / (4 * self_state.velocity**2 * self.time_resolution**2 - self.body.constants.wheelbase**2 * T**2)))
+
+            if turn_angle / max_turn_angle > 1:
+                steering_action = e(max_turn_angle)
+            else:
+                steering_action = e(turn_angle)
+
+        action = [throttle_action, steering_action]
+        joint_action = [(0.0, 0.0), action]
 
         spawn_bodies = [ego_body, self_body]
         for i, spawn_body in enumerate(spawn_bodies):
@@ -563,45 +598,101 @@ class QLearningAgent(RandomPedestrianAgent):
         normalised_values = {feature: normalise(feature_value, *self.feature_bounds[feature]) for feature, feature_value in unnormalised_values.items()}
         return normalised_values
 
-    def q_value(self, state, action):  # if features do not depend on action, then the Q value will not either
-        feature_values = self.features(state, action)
+    def q_value(self, state, target):  # if features do not depend on target, then the Q value will not either
+        feature_values = self.features(state, target)
         q_value = sum(feature_value * self.feature_weights[feature] for feature, feature_value in feature_values.items())
         # assert math.isfinite(q_value)
         # print(reporting.pretty_float_list(list(feature_values.values())), reporting.pretty_float_list(list(self.feature_weights.values())), reporting.pretty_float(q_value))
         return q_value
 
     def choose_action(self, state, action_space, info=None):
-        if self.epsilon_valid():
-            velocity_action = self.choose_random_velocity_action(state, True)
-            orientation_action = self.choose_random_orientation_action(state, True)
-            return velocity_action.value, orientation_action.value
+        self_state = DynamicBodyState(
+            position=Point(x=float(state[self.index][0]), y=float(state[self.index][1])),
+            velocity=float(state[self.index][2]),
+            orientation=float(state[self.index][3])
+        )
+
+        if self.target_velocity is None and self.target_orientation is None:
+            if self.epsilon_valid():
+                self.target_velocity, self.target_orientation = self.np_random.choice(self.available_targets)
+            else:
+                best_targets = list()  # there may be multiple targets with max Q value
+                max_q_value = -math.inf
+                for target in self.available_targets:
+                    q_value = self.q_value(state, target)
+                    if q_value > max_q_value:
+                        best_targets = [target]
+                        max_q_value = q_value
+                    elif q_value == max_q_value:
+                        best_targets.append(target)
+                assert best_targets, "no best target(s) found"
+                self.target_velocity, self.target_orientation = best_targets[0] if len(best_targets) == 1 else best_targets[self.np_random.choice(range(len(best_targets)))]
+
+        if self.target_velocity is None:
+            throttle_action = 0.0
         else:
-            best_actions = list()  # there may be multiple actions with max Q value
-            max_q_value = -math.inf
-            for action in self.available_actions:
-                q_value = self.q_value(state, action)
-                if q_value > max_q_value:
-                    best_actions = [action]
-                    max_q_value = q_value
-                elif q_value == max_q_value:
-                    best_actions.append(action)
-            assert best_actions, "no best action(s) found"
-            action = best_actions[0] if len(best_actions) == 1 else best_actions[self.np_random.choice(range(len(best_actions)))]
-            return action
+            diff = (self.target_velocity - self_state.velocity) / self.time_resolution
+            min_throttle = self.body.constants.min_throttle  # action_space.low[0]
+            max_throttle = self.body.constants.max_throttle  # action_space.high[0]
+            throttle_action = min(max_throttle, max(min_throttle, diff))
+
+        if self.target_orientation is None or self_state.velocity == 0:
+            steering_action = 0.0
+        else:
+            turn_angle = math.atan2(math.sin(self.target_orientation - self_state.orientation), math.cos(self.target_orientation - self_state.orientation))
+
+            def calc_T(v, e):
+                return (-1 if e < 0 else 1) * 2 * self.time_resolution * v / math.sqrt(self.body.constants.wheelbase**2 * (1 + 4 / math.tan(e)**2))
+
+            constant_steering_action = self.body.constants.min_steering_angle if turn_angle < 0 else self.body.constants.max_steering_angle
+            max_turn_angle = calc_T(self_state.velocity, constant_steering_action)
+
+            def e(T):
+                return (-1 if T < 0 else 1) * math.atan(2 * self.body.constants.wheelbase * math.sqrt(T**2 / (4 * self_state.velocity**2 * self.time_resolution**2 - self.body.constants.wheelbase**2 * T**2)))
+
+            if turn_angle / max_turn_angle > 1:
+                steering_action = e(max_turn_angle)
+            else:
+                steering_action = e(turn_angle)
+
+        error = 0.000000000000001  # account for minor (precision) error only: large error indicates issue with logic
+        if throttle_action < action_space.low[0] or throttle_action > action_space.high[0]:
+            assert abs(action_space.low[0] - throttle_action) < error or abs(action_space.high[0] - throttle_action) < error
+        if steering_action < action_space.low[1] or steering_action > action_space.high[1]:
+            assert abs(action_space.low[0] - throttle_action) < error or abs(action_space.high[0] - throttle_action) < error
+        throttle_action = min(self.body.constants.max_throttle, max(self.body.constants.min_throttle, throttle_action))
+        steering_action = min(self.body.constants.max_steering_angle, max(self.body.constants.min_steering_angle, steering_action))
+
+        return [throttle_action, steering_action]
 
     def process_feedback(self, previous_state, action, state, reward):  # agent executed action in previous_state, and then arrived in state where it received reward
+        self_state = DynamicBodyState(
+            position=Point(x=float(state[self.index][0]), y=float(state[self.index][1])),
+            velocity=float(state[self.index][2]),
+            orientation=float(state[self.index][3])
+        )
+
         # q_value = self.q_value(previous_state, action)
         # new_q_value = reward + self.gamma * max(self.q_value(state, action_prime) for action_prime in self.available_actions)
         # q_value_gain = new_q_value - q_value
         # for feature, feature_value in self.features(previous_state, action).items():
         #     self.feature_weights[feature] = self.feature_weights[feature] + self.alpha * q_value_gain * feature_value
 
-        q_value = self.q_value(previous_state, action)
-        difference = (reward + self.gamma * max(self.q_value(state, action_prime) for action_prime in self.available_actions)) - q_value
-        for feature, feature_value in self.features(previous_state, action).items():
+        target = self.target_velocity, self.target_orientation
+        q_value = self.q_value(previous_state, target)
+        difference = (reward + self.gamma * max(self.q_value(state, target_prime) for target_prime in self.available_targets)) - q_value
+        for feature, feature_value in self.features(previous_state, target).items():
             self.feature_weights[feature] = self.feature_weights[feature] + self.alpha * difference * feature_value
 
         # print(reporting.pretty_float_list(list(self.feature_weights.values())))
+
+        error = 0.000000000000001
+        if self.target_velocity is not None:
+            if abs(self.target_velocity - self_state.velocity) < error:
+                self.target_velocity = None
+        if self.target_orientation is not None:
+            if abs(math.atan2(math.sin(self.target_orientation - self_state.orientation), math.cos(self.target_orientation - self_state.orientation))) < error:
+                self.target_orientation = None
 
 
 class DecayedQLearningAgent(QLearningAgent):

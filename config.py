@@ -283,8 +283,8 @@ class Config:
                     elif self.agent_config.agent is AgentType.Q_LEARNING:
                         agent = QLearningAgent(
                             index=i,
+                            body=body,
                             ego_constants=env.bodies[0].constants,
-                            self_constants=env.bodies[1].constants,
                             road_polgon=env.constants.road_map.major_road.static_bounding_box,
                             time_resolution=env.time_resolution,
                             width=env.constants.viewer_width,

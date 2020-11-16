@@ -91,16 +91,16 @@ class DynamicBody(Body, Occlusion):
 
     def observation_space(self):
         return spaces.Box(
-            low=np.array([-math.inf, -math.inf, self.constants.min_velocity, -math.pi], dtype=np.float32),
-            high=np.array([math.inf, math.inf, self.constants.max_velocity, math.pi], dtype=np.float32),
-            dtype=np.float32
+            low=np.array([-math.inf, -math.inf, self.constants.min_velocity, -math.pi], dtype=np.float),
+            high=np.array([math.inf, math.inf, self.constants.max_velocity, math.pi], dtype=np.float),
+            dtype=np.float
         )  # x, y, velocity, orientation
 
     def action_space(self):
         return spaces.Box(
-            low=np.array([self.constants.min_throttle, self.constants.min_steering_angle], dtype=np.float32),
-            high=np.array([self.constants.max_throttle, self.constants.max_steering_angle], dtype=np.float32),
-            dtype=np.float32
+            low=np.array([self.constants.min_throttle, self.constants.min_steering_angle], dtype=np.float),
+            high=np.array([self.constants.max_throttle, self.constants.max_steering_angle], dtype=np.float),
+            dtype=np.float
         )  # throttle, steering_angle
 
     def reset(self):
@@ -222,7 +222,8 @@ class DynamicBody(Body, Occlusion):
         cos_orientation = math.cos(self.state.orientation)
         sin_orientation = math.sin(self.state.orientation)
 
-        if self.steering_angle == 0:
+        error = 0.00000000001
+        if abs(self.steering_angle) < error:  # steering angles very close to zero cause very large rotation radii, which can cause position jumps due (probably) to floating point error
             self.state = DynamicBodyState(
                 position=Point(
                     x=self.state.position.x + distance_velocity * cos_orientation,
