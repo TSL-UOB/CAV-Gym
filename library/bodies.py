@@ -222,8 +222,8 @@ class DynamicBody(Body, Occlusion):
         cos_orientation = math.cos(self.state.orientation)
         sin_orientation = math.sin(self.state.orientation)
 
-        error = 0.00000000001
-        if abs(self.steering_angle) < error:  # steering angles very close to zero cause very large rotation radii, which can cause position jumps due (probably) to floating point error
+        error = 0.0000000000001
+        if abs(self.steering_angle) < error:  # steering angles very close to zero cause very large rotation radii, which may cause bodies to teleport (probably due to floating point error)
             self.state = DynamicBodyState(
                 position=Point(
                     x=self.state.position.x + distance_velocity * cos_orientation,
@@ -252,13 +252,18 @@ class DynamicBody(Body, Occlusion):
 
             cos_theta = math.cos(theta)
             sin_theta = math.sin(theta)
+
+            successor_position = Point(
+                x=centre_of_rotation.x + diff_x * cos_theta - diff_y * sin_theta,
+                y=centre_of_rotation.y + diff_x * sin_theta + diff_y * cos_theta
+            )
+            distance_travelled = self.state.position.distance(successor_position)
+            assert distance_travelled <= distance_velocity, f"{distance_travelled} <= {distance_velocity} ({math.degrees(self.steering_angle)})"
+
             orientation_theta = self.state.orientation + theta
 
             self.state = DynamicBodyState(
-                position=Point(
-                    x=centre_of_rotation.x + diff_x * cos_theta - diff_y * sin_theta,
-                    y=centre_of_rotation.y + diff_x * sin_theta + diff_y * cos_theta
-                ),
+                position=successor_position,
                 velocity=successor_velocity,
                 orientation=math.atan2(math.sin(orientation_theta), math.cos(orientation_theta))
             )
