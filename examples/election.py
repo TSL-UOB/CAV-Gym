@@ -1,4 +1,4 @@
-from examples.agents import ElectionPedestrianAgent
+from examples.agents.pedestrian import ElectionAgent
 
 
 class Election:
@@ -7,7 +7,7 @@ class Election:
         self.env = env
         self.agents = agents
 
-        self.electorate = [i for i, agent in enumerate(self.agents) if isinstance(agent, ElectionPedestrianAgent)]
+        self.electorate = [i for i, agent in enumerate(self.agents) if isinstance(agent, ElectionAgent)]
         self.active_player = None
 
         self.previous_joint_action = None

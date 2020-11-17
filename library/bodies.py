@@ -16,6 +16,8 @@ from library.assets import Road, Occlusion
 from library.geometry import Point
 
 REACTION_TIME = 0.675
+STEERING_ERROR = 0.0000000000001
+DISTANCE_ERROR = 0.001
 
 
 class Body(ABC):
@@ -209,8 +211,8 @@ class DynamicBody(Body, Occlusion):
 
     def step(self, action, time_resolution):
         self.throttle, self.steering_angle = action
-        error = 0.0000000000001
-        if abs(self.steering_angle) < error:  # steering angles very close to zero cause very large rotation radii, which may cause bodies to teleport (probably due to floating point error)
+
+        if abs(self.steering_angle) < STEERING_ERROR:  # steering angles very close to zero cause very large rotation radii, which may cause bodies to teleport (probably due to floating point error)
             self.steering_angle = 0.0
 
         successor_velocity = max(
@@ -260,7 +262,7 @@ class DynamicBody(Body, Occlusion):
                 y=centre_of_rotation.y + diff_x * sin_theta + diff_y * cos_theta
             )
             distance_travelled = self.state.position.distance(successor_position)
-            assert distance_travelled <= distance_velocity, f"{distance_travelled} <= {distance_velocity} ({math.degrees(self.steering_angle)})"
+            assert distance_travelled <= distance_velocity + DISTANCE_ERROR, f"{distance_travelled} <= {(distance_velocity + DISTANCE_ERROR)} (v={self.state.velocity}, o={math.degrees(self.steering_angle)})"
 
             orientation_theta = self.state.orientation + theta
 
