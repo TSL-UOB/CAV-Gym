@@ -209,6 +209,9 @@ class DynamicBody(Body, Occlusion):
 
     def step(self, action, time_resolution):
         self.throttle, self.steering_angle = action
+        error = 0.0000000000001
+        if abs(self.steering_angle) < error:  # steering angles very close to zero cause very large rotation radii, which may cause bodies to teleport (probably due to floating point error)
+            self.steering_angle = 0.0
 
         successor_velocity = max(
             self.constants.min_velocity,
@@ -222,8 +225,7 @@ class DynamicBody(Body, Occlusion):
         cos_orientation = math.cos(self.state.orientation)
         sin_orientation = math.sin(self.state.orientation)
 
-        error = 0.0000000000001
-        if abs(self.steering_angle) < error:  # steering angles very close to zero cause very large rotation radii, which may cause bodies to teleport (probably due to floating point error)
+        if abs(self.steering_angle) == 0:
             self.state = DynamicBodyState(
                 position=Point(
                     x=self.state.position.x + distance_velocity * cos_orientation,
