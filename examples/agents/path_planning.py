@@ -28,7 +28,7 @@ Ref:
 
 TIMESTEPS = 500
 ANIMATION_AREA = 20.0  # animation area length [m]
-SHOW_ANIMATION = True
+SHOW_ANIMATION = False
 
 
 class Spline:  # Cubic spline class
@@ -50,9 +50,9 @@ class Spline:  # Cubic spline class
         self.c = np.linalg.solve(A, B)
 
         # calc spline coefficient b and d
-        for i in range(self.nx - 1):
-            self.d.append((self.c[i + 1] - self.c[i]) / (3.0 * h[i]))
-            tb = (self.a[i + 1] - self.a[i]) / h[i] - h[i] * (self.c[i + 1] + 2.0 * self.c[i]) / 3.0
+        for ai, ci, hi, aj, cj in zip(self.a, self.c, h, self.a[1:], self.c[1:]):
+            self.d.append((cj - ci) / (3.0 * hi))
+            tb = (aj - ai) / hi - hi * (cj + 2.0 * ci) / 3.0
             self.b.append(tb)
 
     def calc(self, t):  # Calc position (if t is outside of the input x, return None)
@@ -92,13 +92,14 @@ class Spline:  # Cubic spline class
         return bisect(self.x, x) - 1
 
     def __calc_A(self, h):  # calc matrix A for spline coefficient c
-        A = [[0.0 for _ in range(self.nx)] for _ in range(self.nx)]
+        A = [[0.0 for _ in self.x] for _ in self.x]
         A[0][0] = 1.0
-        for i in range(self.nx - 1):
+        for i, hi_hj in enumerate(zip(h, h[1:])):
+            hi, hj = hi_hj
             if i != (self.nx - 2):
-                A[i + 1][i + 1] = 2.0 * (h[i] + h[i + 1])
-            A[i + 1][i] = h[i]
-            A[i][i + 1] = h[i]
+                A[i + 1][i + 1] = 2.0 * (hi + hj)
+            A[i + 1][i] = hi
+            A[i][i + 1] = hi
 
         A[0][1] = 0.0
         A[self.nx - 1][self.nx - 2] = 0.0
@@ -106,9 +107,10 @@ class Spline:  # Cubic spline class
         return A
 
     def __calc_B(self, h):  # calc matrix B for spline coefficient c
-        B = [0.0 for _ in range(self.nx)]
-        for i in range(self.nx - 2):
-            B[i + 1] = 3.0 * (self.a[i + 2] - self.a[i + 1]) / h[i + 1] - 3.0 * (self.a[i + 1] - self.a[i]) / h[i]
+        B = [0.0 for _ in self.x]
+        for i, ai_hi_aj_hj_ak in enumerate(zip(self.a, h, self.a[1:], h[1:], self.a[2:])):
+            ai, hi, aj, hj, ak = ai_hi_aj_hj_ak
+            B[i + 1] = 3.0 * (ak - aj) / hj - 3.0 * (aj - ai) / hi
         return B
 
 
@@ -307,30 +309,29 @@ class FrenetPlanner:
         for fp in fplist:
 
             # calc global positions
-            for i in range(len(fp.s)):
-                ix, iy = csp.calc_position(fp.s[i])
-                if ix is None:
+            for s, d in zip(fp.s, fp.d):
+                x, y = csp.calc_position(s)
+                if x is None:
                     break
-                i_yaw = csp.calc_yaw(fp.s[i])
-                di = fp.d[i]
-                fx = ix + di * math.cos(i_yaw + math.pi / 2.0)
-                fy = iy + di * math.sin(i_yaw + math.pi / 2.0)
+                yaw = csp.calc_yaw(s)
+                fx = x + d * math.cos(yaw + math.pi / 2.0)
+                fy = y + d * math.sin(yaw + math.pi / 2.0)
                 fp.x.append(fx)
                 fp.y.append(fy)
 
             # calc yaw and ds
-            for i in range(len(fp.x) - 1):
-                dx = fp.x[i + 1] - fp.x[i]
-                dy = fp.y[i + 1] - fp.y[i]
+            for xi, yi, xj, yj in zip(fp.x, fp.y, fp.x[1:], fp.y[1:]):
+                dx = xj - xi
+                dy = yj - yi
                 fp.yaw.append(math.atan2(dy, dx))
-                fp.ds.append(math.hypot(dx, dy))
+                fp.ds.append(math.sqrt(dx**2 + dy**2))
 
             fp.yaw.append(fp.yaw[-1])
             fp.ds.append(fp.ds[-1])
 
             # calc curvature
-            for i in range(len(fp.yaw) - 1):
-                fp.c.append((fp.yaw[i + 1] - fp.yaw[i]) / fp.ds[i])
+            for yaw, ds, next_yaw in zip(fp.yaw, fp.ds, fp.yaw[1:]):
+                fp.c.append((next_yaw - yaw) / ds)
 
         return fplist
 
@@ -347,19 +348,19 @@ class FrenetPlanner:
 
     def check_paths(self, fplist, ob):
         ok_ind = []
-        for i, _ in enumerate(fplist):
-            if any([v > self.constants.max_speed for v in fplist[i].s_d]):  # Max speed check
+        for fp in fplist:
+            if any([v > self.constants.max_speed for v in fp.s_d]):  # Max speed check
                 continue
-            elif any([abs(a) > self.constants.max_accel for a in fplist[i].s_dd]):  # Max accel check
+            elif any([abs(a) > self.constants.max_accel for a in fp.s_dd]):  # Max accel check
                 continue
-            elif any([abs(c) > self.constants.max_curvature for c in fplist[i].c]):  # Max curvature check
+            elif any([abs(c) > self.constants.max_curvature for c in fp.c]):  # Max curvature check
                 continue
-            elif not self.check_collision(fplist[i], ob):
+            elif not self.check_collision(fp, ob):
                 continue
 
-            ok_ind.append(i)
+            ok_ind.append(fp)
 
-        return [fplist[i] for i in ok_ind]
+        return ok_ind
 
     def frenet_optimal_planning(self, csp, frenet_state, ob):
         fplist = self.calc_frenet_paths(frenet_state)
