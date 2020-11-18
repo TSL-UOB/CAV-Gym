@@ -8,6 +8,7 @@ import numpy as np
 from matplotlib import pyplot
 
 from examples.agents.template import Agent
+from library.geometry import Point
 
 """
 
@@ -38,7 +39,7 @@ class Spline:  # Cubic spline class
         self.y = y
 
         self.nx = len(x)  # dimension of x
-        h = np.diff(x)
+        h = [xj - xi for xi, xj in zip(x, x[1:])]
 
         # calc coefficient c
         self.a = [iy for iy in y]
@@ -91,21 +92,21 @@ class Spline:  # Cubic spline class
         return bisect(self.x, x) - 1
 
     def __calc_A(self, h):  # calc matrix A for spline coefficient c
-        A = np.zeros((self.nx, self.nx))
-        A[0, 0] = 1.0
+        A = [[0.0 for _ in range(self.nx)] for _ in range(self.nx)]
+        A[0][0] = 1.0
         for i in range(self.nx - 1):
             if i != (self.nx - 2):
-                A[i + 1, i + 1] = 2.0 * (h[i] + h[i + 1])
-            A[i + 1, i] = h[i]
-            A[i, i + 1] = h[i]
+                A[i + 1][i + 1] = 2.0 * (h[i] + h[i + 1])
+            A[i + 1][i] = h[i]
+            A[i][i + 1] = h[i]
 
-        A[0, 1] = 0.0
-        A[self.nx - 1, self.nx - 2] = 0.0
-        A[self.nx - 1, self.nx - 1] = 1.0
+        A[0][1] = 0.0
+        A[self.nx - 1][self.nx - 2] = 0.0
+        A[self.nx - 1][self.nx - 1] = 1.0
         return A
 
     def __calc_B(self, h):  # calc matrix B for spline coefficient c
-        B = np.zeros(self.nx)
+        B = [0.0 for _ in range(self.nx)]
         for i in range(self.nx - 2):
             B[i + 1] = 3.0 * (self.a[i + 2] - self.a[i + 1]) / h[i + 1] - 3.0 * (self.a[i + 1] - self.a[i]) / h[i]
         return B
@@ -118,12 +119,13 @@ class Spline2D:  # 2D cubic spline class
         self.sy = Spline(self.s, y)
 
     def __calc_s(self, x, y):
-        dx = np.diff(x)
-        dy = np.diff(y)
-        self.ds = np.hypot(dx, dy)
-        s = [0]
-        s.extend(np.cumsum(self.ds))
-        return s
+        total = 0
+        cumulative_distances = [total]
+        for xi, yi, xj, yj in zip(x, y, x[1:], y[1:]):
+            distance = math.sqrt((xj - xi)**2 + (yj - yi)**2)
+            total += distance
+            cumulative_distances.append(total)
+        return cumulative_distances
 
     def calc_position(self, s):  # calc position
         x = self.sx.calc(s)
@@ -153,8 +155,8 @@ class QuinticPolynomial:
         self.a1 = vxs
         self.a2 = axs / 2.0
 
-        A = np.array([[time ** 3, time ** 4, time ** 5], [3 * time ** 2, 4 * time ** 3, 5 * time ** 4], [6 * time, 12 * time ** 2, 20 * time ** 3]])
-        b = np.array([xe - self.a0 - self.a1 * time - self.a2 * time ** 2, vxe - self.a1 - 2 * self.a2 * time, axe - 2 * self.a2])
+        A = [[time ** 3, time ** 4, time ** 5], [3 * time ** 2, 4 * time ** 3, 5 * time ** 4], [6 * time, 12 * time ** 2, 20 * time ** 3]]
+        b = [xe - self.a0 - self.a1 * time - self.a2 * time ** 2, vxe - self.a1 - 2 * self.a2 * time, axe - 2 * self.a2]
         x = np.linalg.solve(A, b)
 
         self.a3 = x[0]
@@ -186,8 +188,8 @@ class QuarticPolynomial:
         self.a1 = vxs
         self.a2 = axs / 2.0
 
-        A = np.array([[3 * time ** 2, 4 * time ** 3], [6 * time, 12 * time ** 2]])
-        b = np.array([vxe - self.a1 - 2 * self.a2 * time, axe - 2 * self.a2])
+        A = [[3 * time ** 2, 4 * time ** 3], [6 * time, 12 * time ** 2]]
+        b = [vxe - self.a1 - 2 * self.a2 * time, axe - 2 * self.a2]
         x = np.linalg.solve(A, b)
 
         self.a3 = x[0]
@@ -271,6 +273,7 @@ class FrenetPlanner:
                 lat_qp = QuinticPolynomial(frenet_state.c_d, frenet_state.c_d_d, frenet_state.c_d_dd, di, 0.0, 0.0, Ti)
 
                 fp.t = [t for t in np.arange(0.0, Ti, self.constants.dt)]
+                fp.t = list(np.arange(0.0, Ti, self.constants.dt))
                 fp.d = [lat_qp.calc_point(t) for t in fp.t]
                 fp.d_d = [lat_qp.calc_first_derivative(t) for t in fp.t]
                 fp.d_dd = [lat_qp.calc_second_derivative(t) for t in fp.t]
@@ -286,8 +289,8 @@ class FrenetPlanner:
                     tfp.s_dd = [lon_qp.calc_second_derivative(t) for t in fp.t]
                     tfp.s_ddd = [lon_qp.calc_third_derivative(t) for t in fp.t]
 
-                    Jp = sum(np.power(tfp.d_ddd, 2))  # square of jerk
-                    Js = sum(np.power(tfp.s_ddd, 2))  # square of jerk
+                    Jp = sum([element**2 for element in tfp.d_ddd])  # square of jerk
+                    Js = sum([element**2 for element in tfp.s_ddd])  # square of jerk
 
                     # square of diff from target speed
                     ds = (self.constants.target_speed - tfp.s_d[-1]) ** 2
@@ -332,8 +335,8 @@ class FrenetPlanner:
         return fplist
 
     def check_collision(self, fp, ob):
-        for i in range(len(ob[:, 0])):
-            d = [((ix - ob[i, 0]) ** 2 + (iy - ob[i, 1]) ** 2) for (ix, iy) in zip(fp.x, fp.y)]
+        for x, y in ob:
+            d = [((ix - x) ** 2 + (iy - y) ** 2) for (ix, iy) in zip(fp.x, fp.y)]
 
             collision = any([di <= self.constants.robot_radius ** 2 for di in d])
 
@@ -414,6 +417,22 @@ def read_test_data(path):
     return data
 
 
+@dataclass(frozen=True)
+class FrenetPoint:
+    s: float  # longitudinal position (path position)
+    d: float  # lateral position (left/right path offset)
+
+
+def make_cartesian_point(frenet_point, spline2d):
+    x, y = spline2d.calc_position(frenet_point.s)
+    if x is None:
+        return None
+    yaw = spline2d.calc_yaw(frenet_point.s)
+    fx = x + frenet_point.d * math.cos(yaw + math.pi / 2.0)
+    fy = y + frenet_point.d * math.sin(yaw + math.pi / 2.0)
+    return Point(x=fx, y=fy)
+
+
 def main():
     test_data = read_test_data("frenet.csv")
 
@@ -423,7 +442,7 @@ def main():
     wx = [0.0, 10.0, 20.5, 35.0, 70.5]
     wy = [0.0, -6.0, 5.0, 6.5, 0.0]
     # obstacle lists
-    ob = np.array([[20.0, 10.0], [30.0, 6.0], [30.0, 8.0], [35.0, 8.0], [50.0, 3.0]])
+    ob = [[20.0, 10.0], [30.0, 6.0], [30.0, 8.0], [35.0, 8.0], [50.0, 3.0]]
 
     frenet_planner = FrenetPlanner(
         constants=FrenetPlannerConstants(
@@ -468,11 +487,13 @@ def main():
             c_d_dd=path.d_dd[1],
             c_speed=path.s_d[1]
         )
+        print(make_cartesian_point(FrenetPoint(s=frenet_state.s0, d=frenet_state.c_d), csp))
 
         assert frenet_state == test_data[i], f"{frenet_state} == {test_data[i]}"
 
-        if np.hypot(path.x[1] - tx[-1], path.y[1] - ty[-1]) <= 1.0:
+        if math.sqrt((path.x[1] - tx[-1])**2 + (path.y[1] - ty[-1])**2) <= 1.0:
             print("Goal")
+            assert i == len(test_data) - 1
             break
 
         if SHOW_ANIMATION:  # pragma: no cover
@@ -480,7 +501,7 @@ def main():
             # for stopping simulation with the esc key.
             pyplot.gcf().canvas.mpl_connect("key_release_event", lambda event: [exit(0) if event.key == "escape" else None])
             pyplot.plot(tx, ty)
-            pyplot.plot(ob[:, 0], ob[:, 1], "xk")
+            pyplot.plot([x for x, _ in ob], [y for _, y in ob], "xk")
             pyplot.plot(path.x[1:], path.y[1:], "-or")
             pyplot.plot(path.x[1], path.y[1], "vc")
             pyplot.xlim(path.x[1] - ANIMATION_AREA, path.x[1] + ANIMATION_AREA)
