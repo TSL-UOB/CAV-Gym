@@ -608,7 +608,7 @@ def main():
 
             pyplot.xlim(path.x[1] - ANIMATION_AREA * 0.25, path.x[1] + ANIMATION_AREA * 1.75)
             pyplot.ylim(path.y[1] - ANIMATION_AREA, path.y[1] + ANIMATION_AREA)
-            pyplot.title("v[km/h]:" + str(frenet_state.s_d * 3.6)[0:4])
+            pyplot.title(f"t={i}, v[km/h]={frenet_state.s_d * 3.6}")
             pyplot.legend(loc="lower left")
             pyplot.grid(True)
             pyplot.tight_layout()
