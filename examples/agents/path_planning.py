@@ -28,7 +28,7 @@ Ref:
 
 TIMESTEPS = 500
 ANIMATION_AREA = 20.0  # animation area length [m]
-SHOW_ANIMATION = False
+SHOW_ANIMATION = True
 
 
 class Spline:  # Cubic spline class
@@ -337,9 +337,9 @@ class FrenetPlanner:
 
     def check_collision(self, frenet_path, obstacles):
         for x, y in obstacles:
-            d = [((ix - x) ** 2 + (iy - y) ** 2) for (ix, iy) in zip(frenet_path.x, frenet_path.y)]
+            d = [math.sqrt((ix - x) ** 2 + (iy - y) ** 2) for (ix, iy) in zip(frenet_path.x, frenet_path.y)]
 
-            collision = any([di <= self.constants.robot_radius ** 2 for di in d])
+            collision = any([di <= self.constants.robot_radius for di in d])
 
             if collision:
                 return False
@@ -441,12 +441,82 @@ class Target:
 
 def make_cartesian_point(frenet_point, spline2d):
     x, y = spline2d.calc_position(frenet_point.s)
-    if x is None:
+    if x is None or y is None:
         return None
     yaw = spline2d.calc_yaw(frenet_point.s)
     fx = x + frenet_point.d * math.cos(yaw + math.pi / 2.0)
     fy = y + frenet_point.d * math.sin(yaw + math.pi / 2.0)
     return Point(x=fx, y=fy)
+
+
+def calc_distance(left_point, right_point):
+    return math.sqrt((right_point.x - left_point.x)**2 + (right_point.y - left_point.y)**2)
+
+
+def find_closest_waypoint(point, waypoints):
+    closest_distance = math.inf
+    closest_waypoint_index = None
+    closest_waypoint = None
+
+    for i, waypoint in enumerate(waypoints):
+        distance = calc_distance(point, waypoint)
+        if distance < closest_distance:
+            closest_distance = distance
+            closest_waypoint_index = i
+            closest_waypoint = waypoint
+
+    return closest_waypoint_index, closest_waypoint
+
+
+def find_next_waypoint(point, theta, waypoints):
+    closest_waypoint_index, closest_waypoint = find_closest_waypoint(point, waypoints)
+
+    heading = math.atan2((closest_waypoint.y - point.y), (closest_waypoint.x - point.x))
+
+    angle = abs(theta - heading)
+    angle = min(2 * math.pi - angle, angle)
+
+    if angle > math.pi / 4:
+        closest_waypoint_index += 1
+        if closest_waypoint_index == len(waypoints):
+            closest_waypoint_index = 0
+
+    return closest_waypoint_index, waypoints[closest_waypoint_index]
+
+
+# Transform from Cartesian x,y coordinates to Frenet s,d coordinates
+def frenet_translation(point, theta, waypoints):
+    next_waypoint_index, next_waypoint = find_next_waypoint(point, theta, waypoints)
+
+    previous_waypoint_index = next_waypoint_index - 1
+    if next_waypoint_index == 0:
+        previous_waypoint_index = len(waypoints) - 1
+
+    n = waypoints[next_waypoint_index] - waypoints[previous_waypoint_index]
+    x = point - waypoints[previous_waypoint_index]
+
+    # find the projection of x onto n
+    proj_norm = (x.x * n.x + x.y * n.y) / (n.x * n.x + n.y * n.y)
+    proj = Point(x=proj_norm * n.x, y=proj_norm * n.y)
+
+    frenet_d = calc_distance(x, proj)
+
+    # see if d value is positive or negative by comparing it to a center point
+    center = Point(x=1000, y=2000) - waypoints[previous_waypoint_index]
+    center_to_pos = calc_distance(center, x)
+    center_to_ref = calc_distance(center, proj)
+
+    if center_to_pos > center_to_ref:
+        frenet_d *= -1
+
+    # calculate s value
+    frenet_s = 0
+    for waypoint, next_waypoint in zip(waypoints[:previous_waypoint_index], waypoints[1:previous_waypoint_index+1]):
+        frenet_s += calc_distance(waypoint, next_waypoint)
+
+    frenet_s += calc_distance(Point(x=0, y=0), proj)
+
+    return FrenetPoint(s=frenet_s, d=frenet_d)
 
 
 def main():
@@ -506,7 +576,12 @@ def main():
             d_dd=path.d_dd[1],  # initial lateral acceleration [m/s]
             d_ddd=path.d_ddd[1]
         )
-        print(make_cartesian_point(FrenetPoint(s=frenet_state.s, d=frenet_state.d), spline2d))
+
+        target_points = [target.position for target in targets]
+        path_points = [Point(x=x, y=y) for x, y in zip(path.x, path.y)]
+        translated_path_points = [make_cartesian_point(frenet_translation(point, 0.0, target_points), spline2d) for point in path_points]
+        translated_path_points = [point for point in translated_path_points if point is not None]
+        translated_obstacles = [make_cartesian_point(frenet_translation(obstacle, 0.0, target_points), spline2d) for obstacle in obstacles]
 
         assert frenet_state == test_data[i], f"{frenet_state} == {test_data[i]}"
 
@@ -517,16 +592,26 @@ def main():
 
         if SHOW_ANIMATION:  # pragma: no cover
             pyplot.cla()
+            pyplot.gca().set_aspect("equal", adjustable="box")
             # for stopping simulation with the esc key.
             pyplot.gcf().canvas.mpl_connect("key_release_event", lambda event: [exit(0) if event.key == "escape" else None])
-            pyplot.plot([target.position.x for target in targets], [target.position.y for target in targets])
-            pyplot.plot([obstacle.x for obstacle in obstacles], [obstacle.y for obstacle in obstacles], "xk")
-            pyplot.plot(path.x[1:], path.y[1:], "-or")
-            pyplot.plot(path.x[1], path.y[1], "vc")
-            pyplot.xlim(path.x[1] - ANIMATION_AREA, path.x[1] + ANIMATION_AREA)
+
+            pyplot.plot([target.position.x for target in targets], [target.position.y for target in targets], color="blue", label="target spline")
+            pyplot.plot(path.x[1:], path.y[1:], marker="x", color="green", label="plan")
+            pyplot.plot([point.x for point in translated_path_points[1:]], [point.y for point in translated_path_points[1:]], marker="x", color="orange", label="plan (translated)")
+
+            pyplot.scatter(path.x[1], path.y[1], color="red", label="ego")
+            pyplot.scatter([obstacle.x for obstacle in obstacles], [obstacle.y for obstacle in obstacles], marker="x", color="purple", label="obstacles")
+            pyplot.scatter([obstacle.x for obstacle in translated_obstacles], [obstacle.y for obstacle in translated_obstacles], marker="x", color="orange", label="obstacles (translated)")
+
+            pyplot.gca().add_artist(pyplot.Circle((path.x[1], path.y[1]), radius=frenet_planner.constants.robot_radius, color="red"))
+
+            pyplot.xlim(path.x[1] - ANIMATION_AREA * 0.25, path.x[1] + ANIMATION_AREA * 1.75)
             pyplot.ylim(path.y[1] - ANIMATION_AREA, path.y[1] + ANIMATION_AREA)
             pyplot.title("v[km/h]:" + str(frenet_state.s_d * 3.6)[0:4])
+            pyplot.legend(loc="lower left")
             pyplot.grid(True)
+            pyplot.tight_layout()
             pyplot.pause(0.0001)
 
     print("Finish")
