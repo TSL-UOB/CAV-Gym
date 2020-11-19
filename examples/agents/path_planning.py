@@ -453,7 +453,7 @@ def calc_distance(left_point, right_point):
     return math.sqrt((right_point.x - left_point.x)**2 + (right_point.y - left_point.y)**2)
 
 
-def find_closest_waypoint(point, waypoints):
+def cpp_find_closest_waypoint(point, waypoints):
     closest_distance = math.inf
     closest_waypoint_index = None
     closest_waypoint = None
@@ -468,8 +468,9 @@ def find_closest_waypoint(point, waypoints):
     return closest_waypoint_index, closest_waypoint
 
 
-def find_next_waypoint(point, theta, waypoints):
-    closest_waypoint_index, closest_waypoint = find_closest_waypoint(point, waypoints)
+def cpp_find_next_waypoint(point, waypoints):
+    theta = 0.0
+    closest_waypoint_index, closest_waypoint = cpp_find_closest_waypoint(point, waypoints)
 
     heading = math.atan2((closest_waypoint.y - point.y), (closest_waypoint.x - point.x))
 
@@ -485,36 +486,110 @@ def find_next_waypoint(point, theta, waypoints):
 
 
 # Transform from Cartesian x,y coordinates to Frenet s,d coordinates
-def frenet_translation(point, theta, waypoints):
-    next_waypoint_index, next_waypoint = find_next_waypoint(point, theta, waypoints)
+def cpp_cartesian_to_frenet(point, waypoints):
+    next_waypoint_index, next_waypoint = cpp_find_next_waypoint(point, waypoints)
 
     previous_waypoint_index = next_waypoint_index - 1
     if next_waypoint_index == 0:
         previous_waypoint_index = len(waypoints) - 1
 
-    n = waypoints[next_waypoint_index] - waypoints[previous_waypoint_index]
-    x = point - waypoints[previous_waypoint_index]
+    increment = waypoints[next_waypoint_index] - waypoints[previous_waypoint_index]
+    difference = point - waypoints[previous_waypoint_index]
 
     # find the projection of x onto n
-    proj_norm = (x.x * n.x + x.y * n.y) / (n.x * n.x + n.y * n.y)
-    proj = Point(x=proj_norm * n.x, y=proj_norm * n.y)
+    norm = (difference.x * increment.x + difference.y * increment.y) / (increment.x * increment.x + increment.y * increment.y)
+    projection = Point(x=norm * increment.x, y=norm * increment.y)
 
-    frenet_d = calc_distance(x, proj)
+    frenet_d = calc_distance(difference, projection)
 
     # see if d value is positive or negative by comparing it to a center point
     center = Point(x=1000, y=2000) - waypoints[previous_waypoint_index]
-    center_to_pos = calc_distance(center, x)
-    center_to_ref = calc_distance(center, proj)
+    center_to_pos = calc_distance(center, difference)
+    center_to_ref = calc_distance(center, projection)
 
     if center_to_pos > center_to_ref:
         frenet_d *= -1
 
     # calculate s value
     frenet_s = 0
-    for waypoint, next_waypoint in zip(waypoints[:previous_waypoint_index], waypoints[1:previous_waypoint_index+1]):
+    for waypoint, next_waypoint in zip(waypoints[:previous_waypoint_index], waypoints[1:]):
         frenet_s += calc_distance(waypoint, next_waypoint)
 
-    frenet_s += calc_distance(Point(x=0, y=0), proj)
+    frenet_s += math.sqrt(projection.x ** 2 + projection.y ** 2)
+
+    return FrenetPoint(s=frenet_s, d=frenet_d)
+
+
+def matlab_find_closest_waypoint_index(point, waypoints):
+    closest_distance = math.inf
+    closest_waypoint_index = 1
+
+    for i, reference in enumerate(waypoints):
+        distance = calc_distance(point, reference)
+        if distance < closest_distance:
+            closest_distance = distance
+            closest_waypoint_index = i
+
+    if closest_waypoint_index >= len(waypoints) - 1:
+        closest_2nd_waypoint_index = closest_waypoint_index - 1
+    elif closest_waypoint_index == 0:
+        closest_2nd_waypoint_index = closest_waypoint_index + 1
+    else:
+        reference_p1 = waypoints[closest_waypoint_index+1]
+        distance_p1 = calc_distance(point, reference_p1)
+
+        reference_m1 = waypoints[closest_waypoint_index-1]
+        distance_m1 = calc_distance(point, reference_m1)
+
+        if distance_m1 < distance_p1:
+            closest_2nd_waypoint_index = closest_waypoint_index - 1
+        else:
+            closest_2nd_waypoint_index = closest_waypoint_index + 1
+
+    return closest_waypoint_index, closest_2nd_waypoint_index
+
+
+def matlab_cartesian_to_frenet(point, waypoints):
+    closest_waypoint_index, closest_2nd_waypoint_index = matlab_find_closest_waypoint_index(point, waypoints)
+
+    if closest_waypoint_index > closest_2nd_waypoint_index:
+        next_waypoint_index = closest_waypoint_index
+    else:
+        next_waypoint_index = closest_2nd_waypoint_index
+
+    previous_waypoint_index = next_waypoint_index - 1
+    if next_waypoint_index == 0:
+        previous_waypoint_index = 0
+        next_waypoint_index = 1
+
+    tangent_x = waypoints[next_waypoint_index].x - waypoints[previous_waypoint_index].x
+    tangent_y = waypoints[next_waypoint_index].y - waypoints[previous_waypoint_index].y
+
+    vector_x = point.x - waypoints[previous_waypoint_index].x
+    vector_y = point.y - waypoints[previous_waypoint_index].y
+
+    tangent_length = np.linalg.norm([tangent_x, tangent_y])
+    # print(f"norm({[tangent_x, tangent_y]}) = {tangent_length}")
+    projected_vector_norm = np.dot([vector_x, vector_y], [tangent_x, tangent_y]) / tangent_length
+    # print(f"dot({[vector_x, vector_y]}, {[tangent_x, tangent_y]}) = {np.dot([vector_x, vector_y], [tangent_x, tangent_y])}")
+    projected_vector_x = projected_vector_norm * tangent_x / tangent_length
+    projected_vector_y = projected_vector_norm * tangent_y / tangent_length
+
+    frenet_d = calc_distance(Point(x=vector_x, y=vector_y), Point(x=projected_vector_x, y=projected_vector_y))
+
+    previous_waypoint = waypoints[previous_waypoint_index]
+    next_waypoint = waypoints[next_waypoint_index]
+
+    d = (point.x - previous_waypoint.x) * (next_waypoint.y - previous_waypoint.y) - (point.y - previous_waypoint.y) * (next_waypoint.x - previous_waypoint.x)
+    side = 1 if d > 0 else -1
+    if side > 0:
+        frenet_d = frenet_d * -1
+
+    frenet_s = 0
+    for i in range(previous_waypoint_index):
+        frenet_s = frenet_s + calc_distance(waypoints[i], waypoints[i+1])
+
+    frenet_s = frenet_s + projected_vector_norm
 
     return FrenetPoint(s=frenet_s, d=frenet_d)
 
@@ -579,9 +654,9 @@ def main():
 
         target_points = [target.position for target in targets]
         path_points = [Point(x=x, y=y) for x, y in zip(path.x, path.y)]
-        translated_path_points = [make_cartesian_point(frenet_translation(point, 0.0, target_points), spline2d) for point in path_points]
+        translated_path_points = [make_cartesian_point(matlab_cartesian_to_frenet(point, target_points), spline2d) for point in path_points]
         translated_path_points = [point for point in translated_path_points if point is not None]
-        translated_obstacles = [make_cartesian_point(frenet_translation(obstacle, 0.0, target_points), spline2d) for obstacle in obstacles]
+        translated_obstacles = [make_cartesian_point(matlab_cartesian_to_frenet(obstacle, target_points), spline2d) for obstacle in obstacles]
 
         assert frenet_state == test_data[i], f"{frenet_state} == {test_data[i]}"
 
