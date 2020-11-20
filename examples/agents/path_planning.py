@@ -9,7 +9,6 @@ from matplotlib import pyplot
 
 from examples.agents.template import Agent
 from library.geometry import Point
-from reporting import pretty_float
 
 """
 
@@ -29,7 +28,7 @@ Ref:
 
 TIMESTEPS = 500
 ANIMATION_AREA = 20.0  # animation area length [m]
-SHOW_ANIMATION = False
+SHOW_ANIMATION = True
 
 
 class Spline:  # Cubic spline class
@@ -454,79 +453,7 @@ def calc_distance(left_point, right_point):
     return math.sqrt((right_point.x - left_point.x)**2 + (right_point.y - left_point.y)**2)
 
 
-def find_closest_spline_point_index(point, spline_points):
-    closest_distance = math.inf
-    closest_spline_point_index = 1
-
-    for i, reference in enumerate(spline_points):
-        distance = calc_distance(point, reference)
-        if distance < closest_distance:
-            closest_distance = distance
-            closest_spline_point_index = i
-
-    if closest_spline_point_index >= len(spline_points) - 1:
-        closest_2nd_spline_point_index = closest_spline_point_index - 1
-    elif closest_spline_point_index == 0:
-        closest_2nd_spline_point_index = closest_spline_point_index + 1
-    else:
-        reference_p1 = spline_points[closest_spline_point_index + 1]
-        distance_p1 = calc_distance(point, reference_p1)
-
-        reference_m1 = spline_points[closest_spline_point_index - 1]
-        distance_m1 = calc_distance(point, reference_m1)
-
-        if distance_m1 < distance_p1:
-            closest_2nd_spline_point_index = closest_spline_point_index - 1
-        else:
-            closest_2nd_spline_point_index = closest_spline_point_index + 1
-
-    return closest_spline_point_index, closest_2nd_spline_point_index
-
-
 def make_frenet_point(point, spline_points):
-    closest_spline_point_index, closest_2nd_spline_point_index = find_closest_spline_point_index(point, spline_points)
-
-    if closest_spline_point_index > closest_2nd_spline_point_index:
-        next_spline_point_index = closest_spline_point_index
-    else:
-        next_spline_point_index = closest_2nd_spline_point_index
-
-    previous_spline_point_index = next_spline_point_index - 1
-    if next_spline_point_index == 0:
-        previous_spline_point_index = 0
-        next_spline_point_index = 1
-
-    previous_spline_point = spline_points[previous_spline_point_index]
-    next_spline_point = spline_points[next_spline_point_index]
-
-    tangent_x = next_spline_point.x - previous_spline_point.x
-    tangent_y = next_spline_point.y - previous_spline_point.y
-
-    vector_x = point.x - previous_spline_point.x
-    vector_y = point.y - previous_spline_point.y
-
-    tangent_length = math.sqrt(tangent_x**2 + tangent_y**2)
-    projected_vector_norm = (vector_x * tangent_x + vector_y * tangent_y) / tangent_length
-    projected_vector_x = projected_vector_norm * tangent_x / tangent_length
-    projected_vector_y = projected_vector_norm * tangent_y / tangent_length
-
-    frenet_d = calc_distance(Point(x=vector_x, y=vector_y), Point(x=projected_vector_x, y=projected_vector_y))
-
-    d = (point.x - previous_spline_point.x) * (next_spline_point.y - previous_spline_point.y) - (point.y - previous_spline_point.y) * (next_spline_point.x - previous_spline_point.x)
-    side = 1 if d > 0 else -1
-    if side > 0:
-        frenet_d = frenet_d * -1
-
-    frenet_s = 0
-    for i in range(previous_spline_point_index):
-        frenet_s = frenet_s + calc_distance(spline_points[i], spline_points[i + 1])
-
-    frenet_s = frenet_s + projected_vector_norm
-
-    return FrenetPoint(s=frenet_s, d=frenet_d)
-
-
-def my_make_frenet_point(point, spline_points):
     spline_distances = [calc_distance(point, reference) for reference in spline_points]
 
     closest_mean_distance = math.inf
@@ -540,7 +467,7 @@ def my_make_frenet_point(point, spline_points):
             closest_pair = spline_point_first, spline_point_second
             closest_index = i
 
-    preceding_spline_points = spline_points[:closest_index]  # select spline points up to but excluding closest_pair
+    preceding_spline_points = spline_points[:closest_index]  # select spline points up to but excluding closest_pair (question: should spline_point_first be included?)
     spline_point_first, spline_point_second = closest_pair
 
     tangent_x = spline_point_second.x - spline_point_first.x
@@ -611,22 +538,6 @@ def main():
         d_ddd=0.0
     )
 
-    comparisons = 0
-    draws_s = 0
-    matlab_wins_s = 0
-    my_wins_s = 0
-    draws_d = 0
-    matlab_wins_d = 0
-    my_wins_d = 0
-    draws = 0
-    matlab_wins = 0
-    my_wins = 0
-    matlab_total_error_s = 0
-    matlab_total_error_d = 0
-    matlab_total_error = 0
-    my_total_error_s = 0
-    my_total_error_d = 0
-    my_total_error = 0
     for i in range(TIMESTEPS):
         path = frenet_planner.frenet_optimal_planning(spline2d, frenet_state, obstacles)
 
@@ -643,50 +554,9 @@ def main():
 
         target_points = [target.position for target in targets]
         path_points = [Point(x=x, y=y) for x, y in zip(path.x, path.y)]
-
-        def calc_errors(left_frenet_point, right_frenet_point):
-            distance_s = right_frenet_point.s - left_frenet_point.s
-            distance_d = right_frenet_point.d - left_frenet_point.d
-            distance = math.sqrt(distance_s**2 + distance_d**2)
-            return abs(distance_s), abs(distance_d), abs(distance)
-
-        frenet_path_points = [FrenetPoint(s=s, d=d) for s, d in zip(path.s, path.d)]
-        for frenet_point in frenet_path_points:
-            cartesian_point = make_cartesian_point(frenet_point, spline2d)
-            if cartesian_point is not None:
-                matlab_frenet_point = make_frenet_point(cartesian_point, target_points)
-                my_frenet_point = my_make_frenet_point(cartesian_point, target_points)
-                matlab_error_s, matlab_error_d, matlab_error = calc_errors(frenet_point, matlab_frenet_point)
-                my_error_s, my_error_d, my_error = calc_errors(frenet_point, my_frenet_point)
-                if matlab_error_s < my_error_s:
-                    matlab_wins_s += 1
-                elif matlab_error_s > my_error_s:
-                    my_wins_s += 1
-                else:
-                    draws_s += 1
-                if matlab_error_d < my_error_d:
-                    matlab_wins_d += 1
-                elif matlab_error_d > my_error_d:
-                    my_wins_d += 1
-                else:
-                    draws_d += 1
-                if matlab_error < my_error:
-                    matlab_wins += 1
-                elif matlab_error > my_error:
-                    my_wins += 1
-                else:
-                    draws += 1
-                comparisons += 1
-                matlab_total_error_s += matlab_error_s
-                matlab_total_error_d += matlab_error_d
-                matlab_total_error += matlab_error
-                my_total_error_s += my_error_s
-                my_total_error_d += my_error_d
-                my_total_error += my_error
-
-        translated_path_points = [make_cartesian_point(my_make_frenet_point(point, target_points), spline2d) for point in path_points]
+        translated_path_points = [make_cartesian_point(make_frenet_point(point, target_points), spline2d) for point in path_points]
         translated_path_points = [point for point in translated_path_points if point is not None]
-        translated_obstacles = [make_cartesian_point(my_make_frenet_point(obstacle, target_points), spline2d) for obstacle in obstacles]
+        translated_obstacles = [make_cartesian_point(make_frenet_point(obstacle, target_points), spline2d) for obstacle in obstacles]
         translated_obstacles = [point for point in translated_obstacles if point is not None]
 
         assert frenet_state == test_data[i], f"{frenet_state} == {test_data[i]}"
@@ -725,34 +595,6 @@ def main():
         pyplot.grid(True)
         pyplot.pause(0.0001)
         pyplot.show()
-
-    assert comparisons == draws_s + matlab_wins_s + my_wins_s
-    assert comparisons == draws_d + matlab_wins_d + my_wins_d
-    assert comparisons == draws + matlab_wins + my_wins
-    print(f"{comparisons} error comparisons\n"
-          f"- {draws} draws ({draws / comparisons:.0%})\n"
-          f"- {matlab_wins} matlab wins ({matlab_wins / comparisons:.0%})\n"
-          f"- {my_wins} my wins ({my_wins / comparisons:.0%})\n"
-          f"\n"
-          f"{comparisons} s-error comparisons\n"
-          f"- {draws_s} draws ({draws_s / comparisons:.0%})\n"
-          f"- {matlab_wins_s} matlab wins ({matlab_wins_s / comparisons:.0%})\n"
-          f"- {my_wins_s} my wins ({my_wins_s / comparisons:.0%})\n"
-          f"\n"
-          f"{comparisons} d-error comparisons\n"
-          f"- {draws_d} draws ({draws_d / comparisons:.0%})\n"
-          f"- {matlab_wins_d} matlab wins ({matlab_wins_d / comparisons:.0%})\n"
-          f"- {my_wins_d} my wins ({my_wins_d / comparisons:.0%})\n"
-          f"\n"
-          f"matlab error\n"
-          f"- {pretty_float(matlab_total_error)} total error ({pretty_float(matlab_total_error / comparisons)} average)\n"
-          f"- {pretty_float(matlab_total_error_s)} total s-error ({pretty_float(matlab_total_error_s / comparisons)} average)\n"
-          f"- {pretty_float(matlab_total_error_d)} total d-error ({pretty_float(matlab_total_error_d / comparisons)} average)\n"
-          f"\n"
-          f"my error\n"
-          f"- {pretty_float(my_total_error)} total error ({pretty_float(my_total_error / comparisons)} average)\n"
-          f"- {pretty_float(my_total_error_s)} total s-error ({pretty_float(my_total_error_s / comparisons)} average)\n"
-          f"- {pretty_float(my_total_error_d)} total d-error ({pretty_float(my_total_error_d / comparisons)} average)")
 
 
 if __name__ == "__main__":
