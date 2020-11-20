@@ -453,141 +453,72 @@ def calc_distance(left_point, right_point):
     return math.sqrt((right_point.x - left_point.x)**2 + (right_point.y - left_point.y)**2)
 
 
-def cpp_find_closest_waypoint(point, waypoints):
+def find_closest_spline_point_index(point, spline_points):
     closest_distance = math.inf
-    closest_waypoint_index = None
-    closest_waypoint = None
+    closest_spline_point_index = 1
 
-    for i, waypoint in enumerate(waypoints):
-        distance = calc_distance(point, waypoint)
-        if distance < closest_distance:
-            closest_distance = distance
-            closest_waypoint_index = i
-            closest_waypoint = waypoint
-
-    return closest_waypoint_index, closest_waypoint
-
-
-def cpp_find_next_waypoint(point, waypoints):
-    theta = 0.0
-    closest_waypoint_index, closest_waypoint = cpp_find_closest_waypoint(point, waypoints)
-
-    heading = math.atan2((closest_waypoint.y - point.y), (closest_waypoint.x - point.x))
-
-    angle = abs(theta - heading)
-    angle = min(2 * math.pi - angle, angle)
-
-    if angle > math.pi / 4:
-        closest_waypoint_index += 1
-        if closest_waypoint_index == len(waypoints):
-            closest_waypoint_index = 0
-
-    return closest_waypoint_index, waypoints[closest_waypoint_index]
-
-
-# Transform from Cartesian x,y coordinates to Frenet s,d coordinates
-def cpp_cartesian_to_frenet(point, waypoints):
-    next_waypoint_index, next_waypoint = cpp_find_next_waypoint(point, waypoints)
-
-    previous_waypoint_index = next_waypoint_index - 1
-    if next_waypoint_index == 0:
-        previous_waypoint_index = len(waypoints) - 1
-
-    increment = waypoints[next_waypoint_index] - waypoints[previous_waypoint_index]
-    difference = point - waypoints[previous_waypoint_index]
-
-    # find the projection of x onto n
-    norm = (difference.x * increment.x + difference.y * increment.y) / (increment.x * increment.x + increment.y * increment.y)
-    projection = Point(x=norm * increment.x, y=norm * increment.y)
-
-    frenet_d = calc_distance(difference, projection)
-
-    # see if d value is positive or negative by comparing it to a center point
-    center = Point(x=1000, y=2000) - waypoints[previous_waypoint_index]
-    center_to_pos = calc_distance(center, difference)
-    center_to_ref = calc_distance(center, projection)
-
-    if center_to_pos > center_to_ref:
-        frenet_d *= -1
-
-    # calculate s value
-    frenet_s = 0
-    for waypoint, next_waypoint in zip(waypoints[:previous_waypoint_index], waypoints[1:]):
-        frenet_s += calc_distance(waypoint, next_waypoint)
-
-    frenet_s += math.sqrt(projection.x ** 2 + projection.y ** 2)
-
-    return FrenetPoint(s=frenet_s, d=frenet_d)
-
-
-def matlab_find_closest_waypoint_index(point, waypoints):
-    closest_distance = math.inf
-    closest_waypoint_index = 1
-
-    for i, reference in enumerate(waypoints):
+    for i, reference in enumerate(spline_points):
         distance = calc_distance(point, reference)
         if distance < closest_distance:
             closest_distance = distance
-            closest_waypoint_index = i
+            closest_spline_point_index = i
 
-    if closest_waypoint_index >= len(waypoints) - 1:
-        closest_2nd_waypoint_index = closest_waypoint_index - 1
-    elif closest_waypoint_index == 0:
-        closest_2nd_waypoint_index = closest_waypoint_index + 1
+    if closest_spline_point_index >= len(spline_points) - 1:
+        closest_2nd_spline_point_index = closest_spline_point_index - 1
+    elif closest_spline_point_index == 0:
+        closest_2nd_spline_point_index = closest_spline_point_index + 1
     else:
-        reference_p1 = waypoints[closest_waypoint_index+1]
+        reference_p1 = spline_points[closest_spline_point_index + 1]
         distance_p1 = calc_distance(point, reference_p1)
 
-        reference_m1 = waypoints[closest_waypoint_index-1]
+        reference_m1 = spline_points[closest_spline_point_index - 1]
         distance_m1 = calc_distance(point, reference_m1)
 
         if distance_m1 < distance_p1:
-            closest_2nd_waypoint_index = closest_waypoint_index - 1
+            closest_2nd_spline_point_index = closest_spline_point_index - 1
         else:
-            closest_2nd_waypoint_index = closest_waypoint_index + 1
+            closest_2nd_spline_point_index = closest_spline_point_index + 1
 
-    return closest_waypoint_index, closest_2nd_waypoint_index
+    return closest_spline_point_index, closest_2nd_spline_point_index
 
 
-def matlab_cartesian_to_frenet(point, waypoints):
-    closest_waypoint_index, closest_2nd_waypoint_index = matlab_find_closest_waypoint_index(point, waypoints)
+def make_frenet_point(point, spline_points):
+    closest_spline_point_index, closest_2nd_spline_point_index = find_closest_spline_point_index(point, spline_points)
 
-    if closest_waypoint_index > closest_2nd_waypoint_index:
-        next_waypoint_index = closest_waypoint_index
+    if closest_spline_point_index > closest_2nd_spline_point_index:
+        next_spline_point_index = closest_spline_point_index
     else:
-        next_waypoint_index = closest_2nd_waypoint_index
+        next_spline_point_index = closest_2nd_spline_point_index
 
-    previous_waypoint_index = next_waypoint_index - 1
-    if next_waypoint_index == 0:
-        previous_waypoint_index = 0
-        next_waypoint_index = 1
+    previous_spline_point_index = next_spline_point_index - 1
+    if next_spline_point_index == 0:
+        previous_spline_point_index = 0
+        next_spline_point_index = 1
 
-    tangent_x = waypoints[next_waypoint_index].x - waypoints[previous_waypoint_index].x
-    tangent_y = waypoints[next_waypoint_index].y - waypoints[previous_waypoint_index].y
+    tangent_x = spline_points[next_spline_point_index].x - spline_points[previous_spline_point_index].x
+    tangent_y = spline_points[next_spline_point_index].y - spline_points[previous_spline_point_index].y
 
-    vector_x = point.x - waypoints[previous_waypoint_index].x
-    vector_y = point.y - waypoints[previous_waypoint_index].y
+    vector_x = point.x - spline_points[previous_spline_point_index].x
+    vector_y = point.y - spline_points[previous_spline_point_index].y
 
-    tangent_length = np.linalg.norm([tangent_x, tangent_y])
-    # print(f"norm({[tangent_x, tangent_y]}) = {tangent_length}")
-    projected_vector_norm = np.dot([vector_x, vector_y], [tangent_x, tangent_y]) / tangent_length
-    # print(f"dot({[vector_x, vector_y]}, {[tangent_x, tangent_y]}) = {np.dot([vector_x, vector_y], [tangent_x, tangent_y])}")
+    tangent_length = math.sqrt(tangent_x**2 + tangent_y**2)
+    projected_vector_norm = (vector_x * tangent_x + vector_y * tangent_y) / tangent_length
     projected_vector_x = projected_vector_norm * tangent_x / tangent_length
     projected_vector_y = projected_vector_norm * tangent_y / tangent_length
 
     frenet_d = calc_distance(Point(x=vector_x, y=vector_y), Point(x=projected_vector_x, y=projected_vector_y))
 
-    previous_waypoint = waypoints[previous_waypoint_index]
-    next_waypoint = waypoints[next_waypoint_index]
+    previous_spline_point = spline_points[previous_spline_point_index]
+    next_spline_point = spline_points[next_spline_point_index]
 
-    d = (point.x - previous_waypoint.x) * (next_waypoint.y - previous_waypoint.y) - (point.y - previous_waypoint.y) * (next_waypoint.x - previous_waypoint.x)
+    d = (point.x - previous_spline_point.x) * (next_spline_point.y - previous_spline_point.y) - (point.y - previous_spline_point.y) * (next_spline_point.x - previous_spline_point.x)
     side = 1 if d > 0 else -1
     if side > 0:
         frenet_d = frenet_d * -1
 
     frenet_s = 0
-    for i in range(previous_waypoint_index):
-        frenet_s = frenet_s + calc_distance(waypoints[i], waypoints[i+1])
+    for i in range(previous_spline_point_index):
+        frenet_s = frenet_s + calc_distance(spline_points[i], spline_points[i + 1])
 
     frenet_s = frenet_s + projected_vector_norm
 
@@ -654,9 +585,10 @@ def main():
 
         target_points = [target.position for target in targets]
         path_points = [Point(x=x, y=y) for x, y in zip(path.x, path.y)]
-        translated_path_points = [make_cartesian_point(matlab_cartesian_to_frenet(point, target_points), spline2d) for point in path_points]
+        translated_path_points = [make_cartesian_point(make_frenet_point(point, target_points), spline2d) for point in path_points]
         translated_path_points = [point for point in translated_path_points if point is not None]
-        translated_obstacles = [make_cartesian_point(matlab_cartesian_to_frenet(obstacle, target_points), spline2d) for obstacle in obstacles]
+        translated_obstacles = [make_cartesian_point(make_frenet_point(obstacle, target_points), spline2d) for obstacle in obstacles]
+        translated_obstacles = [point for point in translated_obstacles if point is not None]
 
         assert frenet_state == test_data[i], f"{frenet_state} == {test_data[i]}"
 
