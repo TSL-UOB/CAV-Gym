@@ -37,6 +37,7 @@
         "collisions": { "type": "boolean" },
         "offroad": { "type": "boolean" },
         "zone": { "type": "boolean" },
+        "ego_collisions": { "type": "boolean" },
         "living_cost": { "type": "number" },
         "road_cost": { "type": "number" },
         "win_reward": { "type": "number" },
@@ -64,7 +65,7 @@
             ]
         }
     },
-    "required": [ "verbosity", "episode_log", "run_log", "seed", "episodes", "max_timesteps", "collisions", "offroad", "zone", "living_cost", "road_cost", "win_reward", "scenario_config", "agent_config", "mode_config" ],
+    "required": [ "verbosity", "episode_log", "run_log", "seed", "episodes", "max_timesteps", "collisions", "offroad", "zone", "ego_collisions", "living_cost", "road_cost", "win_reward", "scenario_config", "agent_config", "mode_config" ],
     "additionalProperties": false,
     "definitions": {
         "bus_stop_config": {

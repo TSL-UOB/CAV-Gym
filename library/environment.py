@@ -172,7 +172,7 @@ class CAVEnv(MarkovGameEnv):
                 return True
             return False
 
-        if not terminate:  # terminate early if pedestrian collides with ego or braking zone of ego (uninteresting tests)
+        if not terminate and self.env_config.ego_collisions:  # terminate early if pedestrian collides with ego or braking zone of ego (uninteresting tests)
             ego_collision = any(ego_collision(body_polygons[i]) for i, body in enumerate(self.bodies) if body is not self.ego and isinstance(body, Pedestrian))
             terminate = ego_collision
 

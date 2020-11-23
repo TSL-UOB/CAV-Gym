@@ -212,6 +212,7 @@ class Config:
     collisions: bool
     offroad: bool
     zone: bool
+    ego_collisions: bool
     living_cost: float
     road_cost: float
     win_reward: float
@@ -247,24 +248,24 @@ class Config:
         console.info(f"bodies={pretty_str_list(body.__class__.__name__ for body in env.bodies)}")
 
         keyboard_agent = KeyboardAgent(index=0, noop_action=[0.0, 0.0], body=env.bodies[0], time_resolution=env.time_resolution) if self.mode_config.mode is Mode.RENDER and self.mode_config.keyboard else None
-        # agent = keyboard_agent if keyboard_agent is not None else NoopAgent(index=0, noop_action=[0.0, 0.0])
-        oubound_lane = env.constants.road_map.major_road.outbound.lanes[0].static_bounding_box
-        inbound_lane = env.constants.road_map.major_road.inbound.lanes[0].static_bounding_box
-        inbound_lane_end, inbound_lane_start = inbound_lane.split_longitudinally()
-        agent = keyboard_agent if keyboard_agent is not None else FrenetAgent(
-            index=0,
-            noop_action=[0.0, 0.0],
-            body=env.bodies[0],
-            time_resolution=env.time_resolution,
-            lane_width=env.constants.road_map.major_road.constants.lane_width,
-            waypoints=[
-                oubound_lane.rear_centre(),
-                # inbound_lane_start.centre(),
-                # oubound_lane.centre(),
-                # inbound_lane_end.centre(),
-                oubound_lane.front_centre()
-            ]
-        )
+        agent = keyboard_agent if keyboard_agent is not None else NoopAgent(index=0, noop_action=[0.0, 0.0])
+        # oubound_lane = env.constants.road_map.major_road.outbound.lanes[0].static_bounding_box
+        # inbound_lane = env.constants.road_map.major_road.inbound.lanes[0].static_bounding_box
+        # inbound_lane_end, inbound_lane_start = inbound_lane.split_longitudinally()
+        # agent = keyboard_agent if keyboard_agent is not None else FrenetAgent(
+        #     index=0,
+        #     noop_action=[0.0, 0.0],
+        #     body=env.bodies[0],
+        #     time_resolution=env.time_resolution,
+        #     lane_width=env.constants.road_map.major_road.constants.lane_width,
+        #     waypoints=[
+        #         oubound_lane.rear_centre(),
+        #         # inbound_lane_start.centre(),
+        #         # oubound_lane.centre(),
+        #         # inbound_lane_end.centre(),
+        #         oubound_lane.front_centre()
+        #     ]
+        # )
         agents = [agent]
         for i, body in enumerate(env.bodies[1:], start=1):
             if isinstance(body, DynamicBody):

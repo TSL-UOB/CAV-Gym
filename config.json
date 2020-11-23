@@ -8,6 +8,7 @@
   "collisions": false,
   "offroad": true,
   "zone": true,
+  "ego_collisions": true,
   "living_cost": 1.0,
   "road_cost": 5.0,
   "win_reward": 6000.0,
@@ -18,7 +19,7 @@
     "inbound_pavement": 1.0
   },
   "agent_config": {
-    "option": "random",
+    "option": "random-constrained",
     "epsilon": 0.01
   },
   "mode_config": {
