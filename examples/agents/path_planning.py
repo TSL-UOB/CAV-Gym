@@ -183,6 +183,13 @@ class QuinticPolynomial:
         xt = 6 * self.a3 + 24 * self.a4 * t + 60 * self.a5 * t ** 2
         return xt
 
+    def calc_d_tuple(self, t):
+        d = self.calc_point(t)
+        d_d = self.calc_first_derivative(t)
+        d_dd = self.calc_second_derivative(t)
+        d_ddd = self.calc_third_derivative(t)
+        return d, d_d, d_dd, d_ddd
+
 
 class QuarticPolynomial:
     def __init__(self, xs, vxs, axs, vxe, axe, time):
@@ -214,6 +221,13 @@ class QuarticPolynomial:
     def calc_third_derivative(self, t):
         xt = 6 * self.a3 + 24 * self.a4 * t
         return xt
+
+    def calc_s_tuple(self, t):
+        s = self.calc_point(t)
+        s_d = self.calc_first_derivative(t)
+        s_dd = self.calc_second_derivative(t)
+        s_ddd = self.calc_third_derivative(t)
+        return s, s_d, s_dd, s_ddd
 
 
 class FrenetPath:
@@ -261,9 +275,70 @@ class FrenetPlannerConstants:
     max_curvature: float  # maximum curvature [1/m]
 
 
+@dataclass(frozen=True)
+class FrenetPathCosts:
+    cd: float
+    cv: float
+    cf: float
+
+
+# class FrenetPath:
+#     def __init__(self, frenet_states, costs):
+#         self.frenet_states = frenet_states
+#         self.costs = costs
+#
+#         self.x = []
+#         self.y = []
+#         self.yaw = []
+#         self.ds = []
+#         self.c = []
+
+
 class FrenetPlanner:
     def __init__(self, constants):
         self.constants = constants
+
+    # def calc_frenet_paths(self, frenet_state):
+    #     frenet_paths = []
+    # 
+    #     # generate path to each offset goal
+    #     for di in np.arange(-self.constants.max_road_width, self.constants.max_road_width, self.constants.d_road_w):
+    # 
+    #         # Lateral motion planning
+    #         for Ti in np.arange(self.constants.min_t, self.constants.max_t, self.constants.dt):
+    #             frenet_path = FrenetPath()
+    # 
+    #             lat_qp = QuinticPolynomial(frenet_state.d, frenet_state.d_d, frenet_state.d_dd, di, 0.0, 0.0, Ti)
+    # 
+    #             frenet_path.t = list(np.arange(0.0, Ti, self.constants.dt))
+    #             frenet_path.d = [lat_qp.calc_point(t) for t in frenet_path.t]  # lateral position [m]
+    #             frenet_path.d_d = [lat_qp.calc_first_derivative(t) for t in frenet_path.t]  # lateral speed [m/s]
+    #             frenet_path.d_dd = [lat_qp.calc_second_derivative(t) for t in frenet_path.t]  # lateral acceleration [m/s]
+    #             frenet_path.d_ddd = [lat_qp.calc_third_derivative(t) for t in frenet_path.t]
+    # 
+    #             # Longitudinal motion planning (Velocity keeping)
+    #             for tv in np.arange(self.constants.target_speed - self.constants.d_t_s * self.constants.n_s_sample, self.constants.target_speed + self.constants.d_t_s * self.constants.n_s_sample, self.constants.d_t_s):
+    #                 frenet_path_prime = copy.deepcopy(frenet_path)
+    #                 lon_qp = QuarticPolynomial(frenet_state.s, frenet_state.s_d, 0.0, tv, 0.0, Ti)
+    # 
+    #                 frenet_path_prime.s = [lon_qp.calc_point(t) for t in frenet_path.t]  # longitudinal position
+    #                 frenet_path_prime.s_d = [lon_qp.calc_first_derivative(t) for t in frenet_path.t]  # longitudinal speed
+    #                 frenet_path_prime.s_dd = [lon_qp.calc_second_derivative(t) for t in frenet_path.t]
+    #                 frenet_path_prime.s_ddd = [lon_qp.calc_third_derivative(t) for t in frenet_path.t]
+    # 
+    #                 Jp = sum([element**2 for element in frenet_path_prime.d_ddd])  # square of jerk
+    #                 Js = sum([element**2 for element in frenet_path_prime.s_ddd])  # square of jerk
+    # 
+    #                 # square of diff from target speed
+    #                 ds = (self.constants.target_speed - frenet_path_prime.s_d[-1]) ** 2
+    # 
+    #                 frenet_path_prime.cd = self.constants.k_j * Jp + self.constants.k_t * Ti + self.constants.k_d * frenet_path_prime.d[-1] ** 2
+    #                 frenet_path_prime.cv = self.constants.k_j * Js + self.constants.k_t * Ti + self.constants.k_d * ds
+    #                 frenet_path_prime.cf = self.constants.k_lat * frenet_path_prime.cd + self.constants.k_lon * frenet_path_prime.cv
+    # 
+    #                 frenet_paths.append(frenet_path_prime)
+    # 
+    #     return frenet_paths
 
     def calc_frenet_paths(self, frenet_state):
         frenet_paths = []
@@ -273,37 +348,42 @@ class FrenetPlanner:
 
             # Lateral motion planning
             for Ti in np.arange(self.constants.min_t, self.constants.max_t, self.constants.dt):
-                frenet_path = FrenetPath()
-
                 lat_qp = QuinticPolynomial(frenet_state.d, frenet_state.d_d, frenet_state.d_dd, di, 0.0, 0.0, Ti)
 
-                frenet_path.t = list(np.arange(0.0, Ti, self.constants.dt))
-                frenet_path.d = [lat_qp.calc_point(t) for t in frenet_path.t]  # lateral position [m]
-                frenet_path.d_d = [lat_qp.calc_first_derivative(t) for t in frenet_path.t]  # lateral speed [m/s]
-                frenet_path.d_dd = [lat_qp.calc_second_derivative(t) for t in frenet_path.t]  # lateral acceleration [m/s]
-                frenet_path.d_ddd = [lat_qp.calc_third_derivative(t) for t in frenet_path.t]
+                d_tuples = [lat_qp.calc_d_tuple(t) for t in np.arange(0.0, Ti, self.constants.dt)]
+
+                Jp = sum([d_ddd**2 for d, d_d, d_dd, d_ddd in d_tuples])  # square of jerk
+
+                last_d, _, _, _ = d_tuples[-1]
+                cd = self.constants.k_j * Jp + self.constants.k_t * Ti + self.constants.k_d * last_d ** 2
 
                 # Longitudinal motion planning (Velocity keeping)
                 for tv in np.arange(self.constants.target_speed - self.constants.d_t_s * self.constants.n_s_sample, self.constants.target_speed + self.constants.d_t_s * self.constants.n_s_sample, self.constants.d_t_s):
-                    frenet_path_prime = copy.deepcopy(frenet_path)
                     lon_qp = QuarticPolynomial(frenet_state.s, frenet_state.s_d, 0.0, tv, 0.0, Ti)
 
-                    frenet_path_prime.s = [lon_qp.calc_point(t) for t in frenet_path.t]  # longitudinal position
-                    frenet_path_prime.s_d = [lon_qp.calc_first_derivative(t) for t in frenet_path.t]  # longitudinal speed
-                    frenet_path_prime.s_dd = [lon_qp.calc_second_derivative(t) for t in frenet_path.t]
-                    frenet_path_prime.s_ddd = [lon_qp.calc_third_derivative(t) for t in frenet_path.t]
+                    s_tuples = [lon_qp.calc_s_tuple(t) for t in np.arange(0.0, Ti, self.constants.dt)]
 
-                    Jp = sum([element**2 for element in frenet_path_prime.d_ddd])  # square of jerk
-                    Js = sum([element**2 for element in frenet_path_prime.s_ddd])  # square of jerk
+                    Js = sum([s_ddd**2 for s, s_d, s_dd, s_ddd in s_tuples])  # square of jerk
 
                     # square of diff from target speed
-                    ds = (self.constants.target_speed - frenet_path_prime.s_d[-1]) ** 2
+                    _, last_s_d, _, _ = s_tuples[-1]
+                    ds = (self.constants.target_speed - last_s_d) ** 2
 
-                    frenet_path_prime.cd = self.constants.k_j * Jp + self.constants.k_t * Ti + self.constants.k_d * frenet_path_prime.d[-1] ** 2
-                    frenet_path_prime.cv = self.constants.k_j * Js + self.constants.k_t * Ti + self.constants.k_d * ds
-                    frenet_path_prime.cf = self.constants.k_lat * frenet_path_prime.cd + self.constants.k_lon * frenet_path_prime.cv
+                    frenet_path = FrenetPath()
+                    frenet_path.d = [d_tuple[0] for d_tuple in d_tuples]
+                    frenet_path.d_d = [d_tuple[1] for d_tuple in d_tuples]
+                    frenet_path.d_dd = [d_tuple[2] for d_tuple in d_tuples]
+                    frenet_path.d_ddd = [d_tuple[3] for d_tuple in d_tuples]
+                    frenet_path.s = [s_tuple[0] for s_tuple in s_tuples]
+                    frenet_path.s_d = [s_tuple[1] for s_tuple in s_tuples]
+                    frenet_path.s_dd = [s_tuple[2] for s_tuple in s_tuples]
+                    frenet_path.s_ddd = [s_tuple[3] for s_tuple in s_tuples]
 
-                    frenet_paths.append(frenet_path_prime)
+                    frenet_path.cd = cd
+                    frenet_path.cv = self.constants.k_j * Js + self.constants.k_t * Ti + self.constants.k_d * ds
+                    frenet_path.cf = self.constants.k_lat * frenet_path.cd + self.constants.k_lon * frenet_path.cv
+
+                    frenet_paths.append(frenet_path)
 
         return frenet_paths
 
