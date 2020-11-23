@@ -47,6 +47,10 @@ class BodyView:
         raise NotImplementedError
 
 
+def make_markers(points, radius=3):
+    return rendering.Compound([mods.make_circle(*point, 3) for point in points])
+
+
 class DynamicBodyView(BodyView, OcclusionView):
     def __init__(self, dynamic_body, ego, road):
         super().__init__(occlusion=dynamic_body, ego=ego)
@@ -62,6 +66,21 @@ class DynamicBodyView(BodyView, OcclusionView):
             self.road_angle = rendering.make_polyline(list(dynamic_body.line_anchor(self.focal_road)))
         self.road_angle.set_color(*RGB.MAGENTA.value)
 
+        if dynamic_body.target_spline:
+            self.target_spline = rendering.make_polyline([tuple(point) for point in dynamic_body.target_spline])
+            self.target_spline.set_color(*RGB.RED.value)
+        else:
+            self.target_spline = None
+
+        if dynamic_body.planner_spline:
+            self.planner_spline = rendering.make_polyline([tuple(point) for point in dynamic_body.planner_spline])
+            self.planner_spline_markers = make_markers(dynamic_body.planner_spline)
+        else:
+            self.planner_spline = rendering.make_polyline(list())
+            self.planner_spline_markers = make_markers(list())
+        self.planner_spline.set_color(*RGB.BLUE.value)
+        self.planner_spline_markers.set_color(*RGB.BLUE.value)
+
     def update(self, dynamic_body, ego):
         self.body.v = list(dynamic_body.bounding_box())
 
@@ -72,8 +91,17 @@ class DynamicBodyView(BodyView, OcclusionView):
         else:
             self.road_angle.v = list(dynamic_body.line_anchor(self.focal_road))
 
+        if dynamic_body.planner_spline:
+            self.planner_spline.v = [tuple(point) for point in dynamic_body.planner_spline]
+            self.planner_spline_markers.gs = make_markers(dynamic_body.planner_spline).gs
+        else:
+            self.planner_spline.v = list()
+            self.planner_spline_markers.gs = list()
+
     def geoms(self):
-        yield from [self.body, self.road_angle]
+        if self.target_spline is not None:
+            yield self.target_spline
+        yield from [self.planner_spline, self.planner_spline_markers, self.body, self.road_angle]
         if self.occlusion_zone is not None:
             yield self.occlusion_zone
 
@@ -355,7 +383,7 @@ class RoadMapView:
 
 class RoadEnvViewer(rendering.Viewer):
     def __init__(self, width, height, road_map, bodies, ego):
-        super().__init__(int(width), int(height))  # width and height must be integers
+        super().__init__(width=int(width), height=int(height))  # width and height must be integers
         self.road_map = road_map
 
         self.transform.set_translation(0.0, self.height / 2.0)  # Specify that (0, 0) should be centre-left of viewer (default is bottom-left)

@@ -7,7 +7,9 @@ from dataclasses import dataclass
 import numpy as np
 from matplotlib import pyplot
 
-from examples.agents.template import Agent
+from examples.agents.dynamic_body import make_body_state, make_steering_action
+from examples.agents.template import NoopAgent
+from examples.constants import M2PX
 from library.geometry import Point
 
 """
@@ -326,8 +328,10 @@ class FrenetPlanner:
                 frenet_path.yaw.append(math.atan2(dy, dx))
                 frenet_path.ds.append(math.sqrt(dx**2 + dy**2))
 
-            frenet_path.yaw.append(frenet_path.yaw[-1])
-            frenet_path.ds.append(frenet_path.ds[-1])
+            if frenet_path.yaw:
+                frenet_path.yaw.append(frenet_path.yaw[-1])
+            if frenet_path.ds:
+                frenet_path.ds.append(frenet_path.ds[-1])
 
             # calc curvature
             for yaw, ds, next_yaw in zip(frenet_path.yaw, frenet_path.ds, frenet_path.yaw[1:]):
@@ -485,7 +489,7 @@ def make_frenet_point(point, spline_points):
     frenet_d = calc_distance(Point(x=vector_x, y=vector_y), Point(x=projected_vector_x, y=projected_vector_y))
 
     d = (point.x - spline_point_first.x) * (spline_point_second.y - spline_point_first.y) - (point.y - spline_point_first.y) * (spline_point_second.x - spline_point_first.x)
-    frenet_d = math.copysign(frenet_d, -d)  # sign of frenet_d should be opposite of d
+    frenet_d = math.copysign(frenet_d, -d) if frenet_d != 0.0 else frenet_d  # sign of frenet_d should be opposite of d
 
     frenet_s = projected_vector_norm
     for preceding_spline_point, next_preceding_spline_point in zip(preceding_spline_points, preceding_spline_points[1:]):
@@ -497,7 +501,7 @@ def make_frenet_point(point, spline_points):
 def main():
     test_data = read_test_data("frenet.csv")
 
-    print(__file__ + " start!!")
+    print("Start...")
 
     waypoints = [Point(x=0.0, y=0.0), Point(x=10.0, y=-6.0), Point(x=20.5, y=5.0), Point(x=35.0, y=6.5), Point(x=70.5, y=0.0)]
     obstacles = [Point(x=20.0, y=10.0), Point(x=30.0, y=6.0), Point(x=30.0, y=8.0), Point(x=35.0, y=8.0), Point(x=50.0, y=3.0)]
@@ -562,7 +566,7 @@ def main():
         assert frenet_state == test_data[i], f"{frenet_state} == {test_data[i]}"
 
         if math.sqrt((path.x[1] - targets[-1].position.x)**2 + (path.y[1] - targets[-1].position.y)**2) <= 1.0:  # ig distance from current position to last target position is less than error threshold
-            print("Goal")
+            print("Reached goal")
             assert i == len(test_data) - 1
             break
 
@@ -601,41 +605,84 @@ if __name__ == "__main__":
     main()
 
 
-class FrenetAgent(Agent):
-    def __init__(self, waypoints, **kwargs):
+class FrenetAgent(NoopAgent):
+    def __init__(self, body, time_resolution, lane_width, waypoints, **kwargs):
         super().__init__(**kwargs)
 
+        self.body = body
+        self.time_resolution = time_resolution
         self.waypoints = waypoints
 
         self.frenet_planner = FrenetPlanner(
             constants=FrenetPlannerConstants(
-                max_road_width=7.0,  # maximum road width [m]
-                d_road_w=1.0,  # road width sampling length [m]
-                min_t=4.0,  # min prediction time [m]
-                max_t=5.0,  # max prediction time [m]
-                dt=0.2,  # time tick [s]
-                target_speed=30.0 / 3.6,  # target speed [m/s]
-                d_t_s=5.0 / 3.6,  # target speed sampling length [m/s]
+                max_road_width=lane_width,  # maximum road width [m]
+                d_road_w=lane_width / 4,  # road width sampling length [m]
+                min_t=M2PX * 4.0,  # min prediction time [m]
+                max_t=M2PX * 5.0,  # max prediction time [m]
+                dt=2.5,  # time tick [s]
+                target_speed=M2PX * 4,  # target speed [m/s]
+                d_t_s=M2PX * 5.0 / 3.6,  # target speed sampling length [m/s]
                 n_s_sample=1,  # sampling number of target speed
                 k_j=0.1,  # cost weight
                 k_t=0.1,  # cost weight
                 k_d=1.0,  # cost weight
                 k_lat=1.0,  # cost weight
                 k_lon=1.0,  # cost weight
-                robot_radius=2.0,  # robot radius [m]
-                max_speed=50.0 / 3.6,  # maximum speed [m/s]
-                max_accel=2.0,  # maximum acceleration [m/ss]
-                max_curvature=1.0  # maximum curvature [1/m]
+                robot_radius=math.sqrt(self.body.constants.length**2 + self.body.constants.width**2),  # robot radius [m]
+                max_speed=self.body.constants.max_velocity,  # maximum speed [m/s]
+                max_accel=self.body.constants.max_throttle,  # maximum acceleration [m/ss]
+                max_curvature=M2PX * 1.0  # maximum curvature [1/m]
             )
         )
 
-        self.targets, self.spline2d = self.frenet_planner.generate_target_course([waypoint.x for waypoint in waypoints], [waypoint.y for waypoint in waypoints])
+        targets, self.spline2d = self.frenet_planner.generate_target_course([waypoint.x for waypoint in waypoints], [waypoint.y for waypoint in waypoints])
+        self.body.target_spline = [target.position for target in targets]
+
+        self.waypoint = None
 
     def reset(self):
-        pass
+        self.waypoint = None
 
     def choose_action(self, state, action_space, info=None):
-        pass
+        body_state = make_body_state(state, self.index)
+
+        if self.waypoint is None:
+            frenet_position = make_frenet_point(body_state.position, self.body.target_spline)
+            if frenet_position is None:
+                return self.noop_action
+
+            frenet_state = FrenetState(
+                s=frenet_position.s,  # initial longitudinal position
+                s_d=0.0,  # initial longitudinal speed [m/s]
+                s_dd=0.0,
+                s_ddd=0.0,
+                d=frenet_position.d,  # initial lateral position [m]
+                d_d=0.0,  # initial lateral speed [m/s]
+                d_dd=0.0,  # initial lateral acceleration [m/s]
+                d_ddd=0.0
+            )
+
+            other_body_states = [make_body_state(state, i) for i in range(len(state)) if i != self.index]
+            obstacles = [other_body_state.position for other_body_state in other_body_states]
+
+            path = self.frenet_planner.frenet_optimal_planning(self.spline2d, frenet_state, obstacles)
+            if path is None or len(path.x) <= 1:
+                self.body.planner_spline = None
+                return self.noop_action
+
+            self.body.planner_spline = [Point(x=x, y=y) for x, y in zip(path.x, path.y)]
+
+            self.waypoint = self.body.planner_spline[1]
+
+        target_orientation = math.atan2(self.waypoint.y - body_state.position.y, self.waypoint.x - body_state.position.x)
+        steering_action = make_steering_action(body_state, self.body.constants, self.time_resolution, target_orientation, self.noop_action)
+        self.waypoint = None
+        return [self.noop_action[0], steering_action]
 
     def process_feedback(self, previous_state, action, state, reward):
-        pass
+        body_state = make_body_state(state, self.index)
+
+        if self.waypoint is not None:
+            distance = body_state.position.distance(self.waypoint)
+            if distance < 1:
+                self.waypoint = None

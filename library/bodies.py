@@ -91,6 +91,9 @@ class DynamicBody(Body, Occlusion):
         self.target_velocity = None
         self.target_orientation = None
 
+        self.target_spline = None
+        self.planner_spline = None
+
     def observation_space(self):
         return spaces.Box(
             low=np.array([-math.inf, -math.inf, self.constants.min_velocity, -math.pi], dtype=np.float),
