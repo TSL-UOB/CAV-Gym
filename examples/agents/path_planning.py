@@ -261,19 +261,52 @@ class FrenetPath:
         self.frenet_states = frenet_states
         self.cost = cost
 
-        self.x = []
-        self.y = []
-        self.yaw = []
-        self.ds = []
-        self.c = []
+        self.max_speed = max([frenet_state.s_d for frenet_state in self.frenet_states])
+        self.max_accel = max([abs(frenet_state.s_dd) for frenet_state in self.frenet_states])
+
+        self.cartesian_path = None
+
+    def max_speed(self):
+        return max([frenet_state.s_d for frenet_state in self.frenet_states])
+
+    def max_accel(self):
+        return max([abs(frenet_state.s_dd) for frenet_state in self.frenet_states])
+
+
+class CartesianPath:
+    def __init__(self, spline2d, frenet_states):
+        self.points = []
+        for frenet_state in frenet_states:
+            x, y = spline2d.calc_position(frenet_state.s)
+            if x is None:
+                break
+            yaw = spline2d.calc_yaw(frenet_state.s)
+            fx = x + frenet_state.d * math.cos(yaw + math.pi / 2.0)
+            fy = y + frenet_state.d * math.sin(yaw + math.pi / 2.0)
+            self.points.append(Point(x=fx, y=fy))
+
+        distances_xy = [(next_point.x - point.x, next_point.y - point.y) for point, next_point in zip(self.points, self.points[1:])]
+        yaws = [math.atan2(dy, dx) for dx, dy in distances_xy]
+        distances = [math.sqrt(dx**2 + dy**2) for dx, dy in distances_xy]
+        curvatures = [(next_yaw - yaw) / ds for yaw, ds, next_yaw in zip(yaws, distances, yaws[1:])]
+        self.max_curvature = max([abs(curvature) for curvature in curvatures]) if curvatures else 0.0
+
+    def collision_detected(self, obstacles, robot_radius):
+        for obstacle in obstacles:
+            d = [math.sqrt((point.x - obstacle.x) ** 2 + (point.y - obstacle.y) ** 2) for point in self.points]
+            collision = any([di <= robot_radius for di in d])
+            if collision:
+                return True
+        return False
 
 
 class FrenetPlanner:
     def __init__(self, constants):
         self.constants = constants
 
-    def calc_frenet_paths(self, frenet_state):
-        frenet_paths = []
+    def frenet_optimal_planning(self, spline2d, frenet_state, obstacles):
+        min_cost = math.inf
+        best_path = None
 
         # generate path to each offset goal
         for di in np.arange(-self.constants.max_road_width, self.constants.max_road_width, self.constants.d_road_w):
@@ -288,6 +321,10 @@ class FrenetPlanner:
 
                 last_d, _, _, _ = d_tuples[-1]
                 cd = self.constants.k_j * Jp + self.constants.k_t * Ti + self.constants.k_d * last_d ** 2
+                cf_d = self.constants.k_lat * cd
+
+                if cf_d >= min_cost:  # can skip longitudinal planning if this is true (assuming costs are non-negative)
+                    continue
 
                 # Longitudinal motion planning (Velocity keeping)
                 for tv in np.arange(self.constants.target_speed - self.constants.d_t_s * self.constants.n_s_sample, self.constants.target_speed + self.constants.d_t_s * self.constants.n_s_sample, self.constants.d_t_s):
@@ -302,85 +339,30 @@ class FrenetPlanner:
                     ds = (self.constants.target_speed - last_s_d) ** 2
 
                     cv = self.constants.k_j * Js + self.constants.k_t * Ti + self.constants.k_d * ds
-                    cf = self.constants.k_lat * cd + self.constants.k_lon * cv
+                    cf = cf_d + self.constants.k_lon * cv
+
+                    if cf >= min_cost:
+                        continue
 
                     frenet_path_states = [FrenetState(*s_tuple, *d_tuple) for s_tuple, d_tuple in zip(s_tuples, d_tuples)]
+                    frenet_path = FrenetPath(frenet_path_states, cf)
 
-                    frenet_paths.append(FrenetPath(frenet_path_states, cf))
+                    if frenet_path.max_speed > self.constants.max_speed:
+                        continue
+                    if frenet_path.max_accel > self.constants.max_accel:
+                        continue
 
-        return frenet_paths
+                    cartesian_path = CartesianPath(spline2d, frenet_path_states)
 
-    def calc_global_paths(self, frenet_paths, spline2d):
-        for frenet_path in frenet_paths:
+                    if cartesian_path.max_curvature > self.constants.max_curvature:
+                        continue
+                    if cartesian_path.collision_detected(obstacles, self.constants.robot_radius):
+                        continue
 
-            # calc global positions
-            for frenet_state in frenet_path.frenet_states:
-                x, y = spline2d.calc_position(frenet_state.s)
-                if x is None:
-                    break
-                yaw = spline2d.calc_yaw(frenet_state.s)
-                fx = x + frenet_state.d * math.cos(yaw + math.pi / 2.0)
-                fy = y + frenet_state.d * math.sin(yaw + math.pi / 2.0)
-                frenet_path.x.append(fx)
-                frenet_path.y.append(fy)
+                    frenet_path.cartesian_path = cartesian_path
 
-            # calc yaw and ds
-            for xi, yi, xj, yj in zip(frenet_path.x, frenet_path.y, frenet_path.x[1:], frenet_path.y[1:]):
-                dx = xj - xi
-                dy = yj - yi
-                frenet_path.yaw.append(math.atan2(dy, dx))
-                frenet_path.ds.append(math.sqrt(dx**2 + dy**2))
-
-            if frenet_path.yaw:
-                frenet_path.yaw.append(frenet_path.yaw[-1])
-            if frenet_path.ds:
-                frenet_path.ds.append(frenet_path.ds[-1])
-
-            # calc curvature
-            for yaw, ds, next_yaw in zip(frenet_path.yaw, frenet_path.ds, frenet_path.yaw[1:]):
-                frenet_path.c.append((next_yaw - yaw) / ds)
-
-        return frenet_paths
-
-    def check_collision(self, frenet_path, obstacles):
-        for x, y in obstacles:
-            d = [math.sqrt((ix - x) ** 2 + (iy - y) ** 2) for (ix, iy) in zip(frenet_path.x, frenet_path.y)]
-
-            collision = any([di <= self.constants.robot_radius for di in d])
-
-            if collision:
-                return False
-
-        return True
-
-    def check_paths(self, frenet_paths, obstacles):
-        ok_ind = []
-        for frenet_path in frenet_paths:
-            if any([frenet_state.s_d > self.constants.max_speed for frenet_state in frenet_path.frenet_states]):  # Max speed check
-                continue
-            elif any([abs(frenet_state.s_dd) > self.constants.max_accel for frenet_state in frenet_path.frenet_states]):  # Max accel check
-                continue
-            elif any([abs(c) > self.constants.max_curvature for c in frenet_path.c]):  # Max curvature check
-                continue
-            elif not self.check_collision(frenet_path, obstacles):
-                continue
-
-            ok_ind.append(frenet_path)
-
-        return ok_ind
-
-    def frenet_optimal_planning(self, spline2d, frenet_state, obstacles):
-        frenet_paths = self.calc_frenet_paths(frenet_state)
-        frenet_paths = self.calc_global_paths(frenet_paths, spline2d)
-        frenet_paths = self.check_paths(frenet_paths, obstacles)
-
-        # find minimum cost path
-        min_cost = float("inf")
-        best_path = None
-        for frenet_path in frenet_paths:
-            if min_cost >= frenet_path.cost:
-                min_cost = frenet_path.cost
-                best_path = frenet_path
+                    min_cost = frenet_path.cost
+                    best_path = frenet_path
 
         return best_path
 
@@ -551,15 +533,14 @@ def main():
         frenet_state = path.frenet_states[1]
 
         target_points = [target.position for target in targets]
-        path_points = [Point(x=x, y=y) for x, y in zip(path.x, path.y)]
-        translated_path_points = [make_cartesian_point(make_frenet_point(point, target_points), spline2d) for point in path_points]
+        translated_path_points = [make_cartesian_point(make_frenet_point(point, target_points), spline2d) for point in path.cartesian_path.points]
         translated_path_points = [point for point in translated_path_points if point is not None]
         translated_obstacles = [make_cartesian_point(make_frenet_point(obstacle, target_points), spline2d) for obstacle in obstacles]
         translated_obstacles = [point for point in translated_obstacles if point is not None]
 
         assert frenet_state == test_data[i], f"{frenet_state} == {test_data[i]}"
 
-        if math.sqrt((path.x[1] - targets[-1].position.x)**2 + (path.y[1] - targets[-1].position.y)**2) <= 1.0:  # ig distance from current position to last target position is less than error threshold
+        if math.sqrt((path.cartesian_path.points[1].x - targets[-1].position.x)**2 + (path.cartesian_path.points[1].y - targets[-1].position.y)**2) <= 1.0:  # if distance from current position to last target position is less than error threshold
             print("Reached goal")
             assert i == len(test_data) - 1
             break
@@ -571,17 +552,17 @@ def main():
             pyplot.gcf().canvas.mpl_connect("key_release_event", lambda event: [exit(0) if event.key == "escape" else None])
 
             pyplot.plot([target.position.x for target in targets], [target.position.y for target in targets], color="blue", label="target spline")
-            pyplot.plot(path.x[1:], path.y[1:], marker="x", color="green", label="plan")
+            pyplot.plot([point.x for point in path.cartesian_path.points[1:]], [point.y for point in path.cartesian_path.points[1:]], marker="x", color="green", label="plan")
             pyplot.plot([point.x for point in translated_path_points[1:]], [point.y for point in translated_path_points[1:]], marker="x", color="orange", label="plan (translated)")
 
-            pyplot.scatter(path.x[1], path.y[1], color="red", label="ego")
+            pyplot.scatter(path.cartesian_path.points[1].x, path.cartesian_path.points[1].y, color="red", label="ego")
             pyplot.scatter([obstacle.x for obstacle in obstacles], [obstacle.y for obstacle in obstacles], marker="x", color="purple", label="obstacles")
             pyplot.scatter([obstacle.x for obstacle in translated_obstacles], [obstacle.y for obstacle in translated_obstacles], marker="x", color="orange", label="obstacles (translated)")
 
-            pyplot.gca().add_artist(pyplot.Circle((path.x[1], path.y[1]), radius=frenet_planner.constants.robot_radius, color="red"))
+            pyplot.gca().add_artist(pyplot.Circle(tuple(path.cartesian_path.points[1]), radius=frenet_planner.constants.robot_radius, color="red"))
 
-            pyplot.xlim(path.x[1] - ANIMATION_AREA * 0.25, path.x[1] + ANIMATION_AREA * 1.75)
-            pyplot.ylim(path.y[1] - ANIMATION_AREA, path.y[1] + ANIMATION_AREA)
+            pyplot.xlim(path.cartesian_path.points[1].x - ANIMATION_AREA * 0.25, path.cartesian_path.points[1].x + ANIMATION_AREA * 1.75)
+            pyplot.ylim(path.cartesian_path.points[1].y - ANIMATION_AREA, path.cartesian_path.points[1].y + ANIMATION_AREA)
             pyplot.title(f"t={i}, v[km/h]={frenet_state.s_d * 3.6}")
             pyplot.legend(loc="lower left")
             pyplot.grid(True)
@@ -660,11 +641,11 @@ class FrenetAgent(NoopAgent):
             obstacles = [other_body_state.position for other_body_state in other_body_states]
 
             path = self.frenet_planner.frenet_optimal_planning(self.spline2d, frenet_state, obstacles)
-            if path is None or len(path.x) <= 1:
+            if path is None or len(path.cartesian_path.points) <= 1:
                 self.body.planner_spline = None
                 return self.noop_action
 
-            self.body.planner_spline = [Point(x=x, y=y) for x, y in zip(path.x, path.y)]
+            self.body.planner_spline = path.cartesian_path.points
 
             self.waypoint = self.body.planner_spline[1]
 
