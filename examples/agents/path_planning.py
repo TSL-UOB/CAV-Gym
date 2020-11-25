@@ -204,36 +204,36 @@ class QuarticPolynomial:
 
 @dataclass(frozen=True)
 class FrenetPlannerConstants:
-    d_offset_left: float
-    d_offset_right: float
-    d_samples: int
-    min_t: int  # min prediction ticks
-    max_t: int  # max prediction ticks
+    lateral_range_left: float
+    lateral_range_right: float
+    lateral_range_samples: int
+    timesteps_min: int  # min prediction ticks
+    timesteps_max: int  # max prediction ticks
     dt: float  # time tick [s]
-    target_speed: float  # target speed [m/s]
-    speed_offset: float  # target_speed +- speed_offset
-    speed_samples: int  # samples between target_speed-speed_offset and target_speed+speed_offset
-    k_j: float  # cost weight
-    k_t: float  # cost weight
-    k_d: float  # cost weight
-    k_lat: float  # cost weight
-    k_lon: float  # cost weight
+    velocity_target: float  # target velocity [m/s]
+    velocity_target_offset: float  # velocity_target +- velocity_target_offset [m/s]
+    velocity_range_samples: int  # |{velocity_target-velocity_target_offset, ..., velocity_target+velocity_target_offset}|
+    weight_jerk: float  # jerk cost weight
+    weight_time: float  # time cost weight
+    weight_velocity: float  # velocity cost weight
+    weight_lateral: float  # lateral cost weight
+    weight_longitudinal: float  # longitudinal cost weight
     robot_radius: float  # robot radius [m]
-    max_speed: float  # maximum speed [m/s]
-    max_accel: float  # maximum acceleration [m/ss]
+    max_velocity: float  # maximum speed [m/s]
+    max_thottle: float  # maximum acceleration [m/ss]
     max_curvature: float  # maximum curvature [1/m]
 
     def __post_init__(self):
-        assert self.d_samples % 2 != 0
-        assert self.speed_samples % 2 != 0
+        assert self.lateral_range_samples % 2 != 0
+        assert self.velocity_range_samples % 2 != 0
 
 
 class FrenetPath:
     def __init__(self, frenet_states):
         self.frenet_states = frenet_states
 
-        self.max_speed = max([frenet_state.s_d for frenet_state in self.frenet_states])
-        self.max_accel = max([abs(frenet_state.s_dd) for frenet_state in self.frenet_states])
+        self.max_velocity = max([frenet_state.s_d for frenet_state in self.frenet_states])
+        self.max_thottle = max([abs(frenet_state.s_dd) for frenet_state in self.frenet_states])
 
         self.cartesian_path = None
 
@@ -279,10 +279,17 @@ class FrenetPlanner:
         best_path = None
 
         # generate path to each offset goal
-        for di in np.linspace(start=-self.constants.d_offset_right, stop=self.constants.d_offset_left, num=self.constants.d_samples, endpoint=True):
+        for di in np.linspace(
+                start=-self.constants.lateral_range_right,
+                stop=self.constants.lateral_range_left,
+                num=self.constants.lateral_range_samples,
+                endpoint=True
+        ):
 
             # Lateral motion planning
-            for Ti in np.arange(self.constants.min_t * self.constants.dt, self.constants.max_t * self.constants.dt, self.constants.dt):
+            # for Ti in np.arange(self.constants.timesteps_min * self.constants.dt, self.constants.timesteps_max * self.constants.dt, self.constants.dt):
+            for i in range(self.constants.timesteps_min, self.constants.timesteps_max):
+                Ti = i * self.constants.dt
                 lat_qp = QuinticPolynomial(frenet_state.d, frenet_state.d_d, frenet_state.d_dd, di, 0.0, 0.0, Ti)
 
                 d_tuples = [lat_qp.solve(t) for t in np.arange(0.0, Ti, self.constants.dt)]
@@ -290,17 +297,17 @@ class FrenetPlanner:
                 Jp = sum([d_ddd**2 for d, d_d, d_dd, d_ddd in d_tuples])  # square of jerk
 
                 last_d, _, _, _ = d_tuples[-1]
-                cd = self.constants.k_j * Jp + self.constants.k_t * Ti + self.constants.k_d * last_d ** 2
-                cf_d = self.constants.k_lat * cd
+                cd = self.constants.weight_jerk * Jp + self.constants.weight_time * Ti + self.constants.weight_velocity * last_d ** 2
+                cf_d = self.constants.weight_lateral * cd
 
                 if cf_d >= min_cost:  # can skip longitudinal planning if this is true (assuming costs are non-negative)
                     continue
 
                 # Longitudinal motion planning (Velocity keeping)
                 for tv in np.linspace(
-                        start=self.constants.target_speed - self.constants.speed_offset,
-                        stop=self.constants.target_speed + self.constants.speed_offset,
-                        num=self.constants.speed_samples,
+                        start=self.constants.velocity_target - self.constants.velocity_target_offset,
+                        stop=self.constants.velocity_target + self.constants.velocity_target_offset,
+                        num=self.constants.velocity_range_samples,
                         endpoint=True
                 ):
                     lon_qp = QuarticPolynomial(frenet_state.s, frenet_state.s_d, 0.0, tv, 0.0, Ti)
@@ -311,19 +318,19 @@ class FrenetPlanner:
 
                     # square of diff from target speed
                     _, last_s_d, _, _ = s_tuples[-1]
-                    ds = (self.constants.target_speed - last_s_d) ** 2
+                    ds = (self.constants.velocity_target - last_s_d) ** 2
 
-                    cv = self.constants.k_j * Js + self.constants.k_t * Ti + self.constants.k_d * ds
-                    cf = cf_d + self.constants.k_lon * cv
+                    cv = self.constants.weight_jerk * Js + self.constants.weight_time * Ti + self.constants.weight_velocity * ds
+                    cf = cf_d + self.constants.weight_longitudinal * cv
 
                     if cf >= min_cost:
                         continue
 
                     frenet_path = FrenetPath([FrenetState(*s_tuple, *d_tuple) for s_tuple, d_tuple in zip(s_tuples, d_tuples)])
 
-                    if frenet_path.max_speed > self.constants.max_speed:
+                    if frenet_path.max_velocity > self.constants.max_velocity:
                         continue
-                    if frenet_path.max_accel > self.constants.max_accel:
+                    if frenet_path.max_thottle > self.constants.max_thottle:
                         continue
 
                     frenet_path.cartesian_path = make_cartesian_path(spline2d, frenet_path.frenet_states)
@@ -453,23 +460,23 @@ def main():
 
     frenet_planner = FrenetPlanner(
         constants=FrenetPlannerConstants(
-            d_offset_left=7.0,
-            d_offset_right=7.0,
-            d_samples=15,
-            min_t=20,  # min prediction ticks
-            max_t=25,  # max prediction ticks
+            lateral_range_left=7.0,
+            lateral_range_right=7.0,
+            lateral_range_samples=15,
+            timesteps_min=20,  # min prediction ticks
+            timesteps_max=25,  # max prediction ticks
             dt=0.2,  # time tick [s]
-            target_speed=30.0 / 3.6,  # target speed [m/s]
-            speed_offset=5.0 / 3.6,
-            speed_samples=3,
-            k_j=0.1,  # cost weight
-            k_t=0.1,  # cost weight
-            k_d=1.0,  # cost weight
-            k_lat=1.0,  # cost weight
-            k_lon=1.0,  # cost weight
+            velocity_target=30.0 / 3.6,  # target speed [m/s]
+            velocity_target_offset=5.0 / 3.6,
+            velocity_range_samples=3,
+            weight_jerk=0.1,  # cost weight
+            weight_time=0.1,  # cost weight
+            weight_velocity=1.0,  # cost weight
+            weight_lateral=1.0,  # cost weight
+            weight_longitudinal=1.0,  # cost weight
             robot_radius=2.0,  # robot radius [m]
-            max_speed=50.0 / 3.6,  # maximum speed [m/s]
-            max_accel=2.0,  # maximum acceleration [m/ss]
+            max_velocity=50.0 / 3.6,  # maximum speed [m/s]
+            max_thottle=2.0,  # maximum acceleration [m/ss]
             max_curvature=1.0  # maximum curvature [1/m]
         )
     )
@@ -550,23 +557,23 @@ class FrenetAgent(NoopAgent):
 
         self.frenet_planner = FrenetPlanner(
             constants=FrenetPlannerConstants(
-                d_offset_left=lane_width,
-                d_offset_right=lane_width,
-                d_samples=5,
-                min_t=16,  # min prediction ticks
-                max_t=32,  # max prediction ticks
+                lateral_range_left=lane_width,
+                lateral_range_right=lane_width,
+                lateral_range_samples=5,
+                timesteps_min=16,  # min prediction ticks
+                timesteps_max=32,  # max prediction ticks
                 dt=1.0,  # time tick [s]
-                target_speed=M2PX * 3.0,  # target speed [m/s]
-                speed_offset=M2PX * 1.0,
-                speed_samples=3,
-                k_j=0.1,  # cost weight
-                k_t=0.1,  # cost weight
-                k_d=1.0,  # cost weight
-                k_lat=1.0,  # cost weight
-                k_lon=1.0,  # cost weight
+                velocity_target=M2PX * 3.0,  # target speed [m/s]
+                velocity_target_offset=M2PX * 1.0,
+                velocity_range_samples=3,
+                weight_jerk=0.1,  # cost weight
+                weight_time=0.1,  # cost weight
+                weight_velocity=1.0,  # cost weight
+                weight_lateral=1.0,  # cost weight
+                weight_longitudinal=1.0,  # cost weight
                 robot_radius=math.sqrt(self.body.constants.length**2 + self.body.constants.width**2) / 2.0,  # robot radius [m]
-                max_speed=self.body.constants.max_velocity,  # maximum speed [m/s]
-                max_accel=self.body.constants.max_throttle,  # maximum acceleration [m/ss]
+                max_velocity=self.body.constants.max_velocity,  # maximum speed [m/s]
+                max_thottle=self.body.constants.max_throttle,  # maximum acceleration [m/ss]
                 max_curvature=M2PX * 1.0  # maximum curvature [1/m]
             )
         )
