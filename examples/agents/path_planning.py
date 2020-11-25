@@ -211,8 +211,8 @@ class FrenetPlannerConstants:
     max_t: int  # max prediction ticks
     dt: float  # time tick [s]
     target_speed: float  # target speed [m/s]
-    d_t_s: float  # target speed sampling length [m/s]
-    n_s_sample: float  # sampling number of target speed
+    speed_offset: float  # target_speed +- speed_offset
+    speed_samples: int  # samples between target_speed-speed_offset and target_speed+speed_offset
     k_j: float  # cost weight
     k_t: float  # cost weight
     k_d: float  # cost weight
@@ -222,6 +222,10 @@ class FrenetPlannerConstants:
     max_speed: float  # maximum speed [m/s]
     max_accel: float  # maximum acceleration [m/ss]
     max_curvature: float  # maximum curvature [1/m]
+
+    def __post_init__(self):
+        assert self.d_samples % 2 != 0
+        assert self.speed_samples % 2 != 0
 
 
 class FrenetPath:
@@ -275,7 +279,7 @@ class FrenetPlanner:
         best_path = None
 
         # generate path to each offset goal
-        for di in np.linspace(start=-self.constants.d_offset_right, stop=self.constants.d_offset_left, num=self.constants.d_samples + 1 if self.constants.d_samples % 2 == 0 else self.constants.d_samples, endpoint=True):
+        for di in np.linspace(start=-self.constants.d_offset_right, stop=self.constants.d_offset_left, num=self.constants.d_samples, endpoint=True):
 
             # Lateral motion planning
             for Ti in np.arange(self.constants.min_t * self.constants.dt, self.constants.max_t * self.constants.dt, self.constants.dt):
@@ -293,7 +297,12 @@ class FrenetPlanner:
                     continue
 
                 # Longitudinal motion planning (Velocity keeping)
-                for tv in np.arange(self.constants.target_speed - self.constants.d_t_s * self.constants.n_s_sample, self.constants.target_speed + self.constants.d_t_s * self.constants.n_s_sample, self.constants.d_t_s):
+                for tv in np.linspace(
+                        start=self.constants.target_speed - self.constants.speed_offset,
+                        stop=self.constants.target_speed + self.constants.speed_offset,
+                        num=self.constants.speed_samples,
+                        endpoint=True
+                ):
                     lon_qp = QuarticPolynomial(frenet_state.s, frenet_state.s_d, 0.0, tv, 0.0, Ti)
 
                     s_tuples = [lon_qp.solve(t) for t in np.arange(0.0, Ti, self.constants.dt)]
@@ -446,13 +455,13 @@ def main():
         constants=FrenetPlannerConstants(
             d_offset_left=7.0,
             d_offset_right=7.0,
-            d_samples=14,
+            d_samples=15,
             min_t=20,  # min prediction ticks
             max_t=25,  # max prediction ticks
             dt=0.2,  # time tick [s]
             target_speed=30.0 / 3.6,  # target speed [m/s]
-            d_t_s=5.0 / 3.6,  # target speed sampling length [m/s]
-            n_s_sample=1,  # sampling number of target speed
+            speed_offset=5.0 / 3.6,
+            speed_samples=3,
             k_j=0.1,  # cost weight
             k_t=0.1,  # cost weight
             k_d=1.0,  # cost weight
@@ -543,13 +552,13 @@ class FrenetAgent(NoopAgent):
             constants=FrenetPlannerConstants(
                 d_offset_left=lane_width,
                 d_offset_right=lane_width,
-                d_samples=4,
+                d_samples=5,
                 min_t=16,  # min prediction ticks
                 max_t=32,  # max prediction ticks
                 dt=1.0,  # time tick [s]
                 target_speed=M2PX * 3.0,  # target speed [m/s]
-                d_t_s=M2PX * 1.0,  # target speed sampling length [m/s]
-                n_s_sample=1,  # sampling number of target speed
+                speed_offset=M2PX * 1.0,
+                speed_samples=3,
                 k_j=0.1,  # cost weight
                 k_t=0.1,  # cost weight
                 k_d=1.0,  # cost weight
