@@ -207,8 +207,8 @@ class FrenetPlannerConstants:
     d_offset_left: float
     d_offset_right: float
     d_samples: int
-    min_t: float  # min prediction time [m]
-    max_t: float  # max prediction time [m]
+    min_t: int  # min prediction ticks
+    max_t: int  # max prediction ticks
     dt: float  # time tick [s]
     target_speed: float  # target speed [m/s]
     d_t_s: float  # target speed sampling length [m/s]
@@ -278,7 +278,7 @@ class FrenetPlanner:
         for di in np.linspace(start=-self.constants.d_offset_right, stop=self.constants.d_offset_left, num=self.constants.d_samples + 1 if self.constants.d_samples % 2 == 0 else self.constants.d_samples, endpoint=True):
 
             # Lateral motion planning
-            for Ti in np.arange(self.constants.min_t, self.constants.max_t, self.constants.dt):
+            for Ti in np.arange(self.constants.min_t * self.constants.dt, self.constants.max_t * self.constants.dt, self.constants.dt):
                 lat_qp = QuinticPolynomial(frenet_state.d, frenet_state.d_d, frenet_state.d_dd, di, 0.0, 0.0, Ti)
 
                 d_tuples = [lat_qp.solve(t) for t in np.arange(0.0, Ti, self.constants.dt)]
@@ -447,8 +447,8 @@ def main():
             d_offset_left=7.0,
             d_offset_right=7.0,
             d_samples=14,
-            min_t=4.0,  # min prediction time [m]
-            max_t=5.0,  # max prediction time [m]
+            min_t=20,  # min prediction ticks
+            max_t=25,  # max prediction ticks
             dt=0.2,  # time tick [s]
             target_speed=30.0 / 3.6,  # target speed [m/s]
             d_t_s=5.0 / 3.6,  # target speed sampling length [m/s]
@@ -544,8 +544,8 @@ class FrenetAgent(NoopAgent):
                 d_offset_left=lane_width,
                 d_offset_right=lane_width,
                 d_samples=4,
-                min_t=M2PX * 1.0,  # min prediction time [m]
-                max_t=M2PX * 2.0,  # max prediction time [m]
+                min_t=16,  # min prediction ticks
+                max_t=32,  # max prediction ticks
                 dt=1.0,  # time tick [s]
                 target_speed=M2PX * 3.0,  # target speed [m/s]
                 d_t_s=M2PX * 1.0,  # target speed sampling length [m/s]
