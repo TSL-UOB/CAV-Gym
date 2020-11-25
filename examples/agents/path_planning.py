@@ -204,8 +204,9 @@ class QuarticPolynomial:
 
 @dataclass(frozen=True)
 class FrenetPlannerConstants:
-    max_road_width: float  # maximum road width [m]
-    d_road_w: float  # road width sampling length [m]
+    d_offset_left: float
+    d_offset_right: float
+    d_samples: int
     min_t: float  # min prediction time [m]
     max_t: float  # max prediction time [m]
     dt: float  # time tick [s]
@@ -274,7 +275,7 @@ class FrenetPlanner:
         best_path = None
 
         # generate path to each offset goal
-        for di in np.arange(-self.constants.max_road_width, self.constants.max_road_width, self.constants.d_road_w):
+        for di in np.linspace(start=-self.constants.d_offset_right, stop=self.constants.d_offset_left, num=self.constants.d_samples + 1 if self.constants.d_samples % 2 == 0 else self.constants.d_samples, endpoint=True):
 
             # Lateral motion planning
             for Ti in np.arange(self.constants.min_t, self.constants.max_t, self.constants.dt):
@@ -443,8 +444,9 @@ def main():
 
     frenet_planner = FrenetPlanner(
         constants=FrenetPlannerConstants(
-            max_road_width=7.0,  # maximum road width [m]
-            d_road_w=1.0,  # road width sampling length [m]
+            d_offset_left=7.0,
+            d_offset_right=7.0,
+            d_samples=14,
             min_t=4.0,  # min prediction time [m]
             max_t=5.0,  # max prediction time [m]
             dt=0.2,  # time tick [s]
@@ -539,20 +541,21 @@ class FrenetAgent(NoopAgent):
 
         self.frenet_planner = FrenetPlanner(
             constants=FrenetPlannerConstants(
-                max_road_width=lane_width,  # maximum road width [m]
-                d_road_w=lane_width / 4,  # road width sampling length [m]
-                min_t=M2PX * 4.0,  # min prediction time [m]
-                max_t=M2PX * 5.0,  # max prediction time [m]
-                dt=2.5,  # time tick [s]
-                target_speed=M2PX * 4,  # target speed [m/s]
-                d_t_s=M2PX * 5.0 / 3.6,  # target speed sampling length [m/s]
+                d_offset_left=lane_width,
+                d_offset_right=lane_width,
+                d_samples=4,
+                min_t=M2PX * 1.0,  # min prediction time [m]
+                max_t=M2PX * 2.0,  # max prediction time [m]
+                dt=1.0,  # time tick [s]
+                target_speed=M2PX * 3.0,  # target speed [m/s]
+                d_t_s=M2PX * 1.0,  # target speed sampling length [m/s]
                 n_s_sample=1,  # sampling number of target speed
                 k_j=0.1,  # cost weight
                 k_t=0.1,  # cost weight
                 k_d=1.0,  # cost weight
                 k_lat=1.0,  # cost weight
                 k_lon=1.0,  # cost weight
-                robot_radius=math.sqrt(self.body.constants.length**2 + self.body.constants.width**2),  # robot radius [m]
+                robot_radius=math.sqrt(self.body.constants.length**2 + self.body.constants.width**2) / 2.0,  # robot radius [m]
                 max_speed=self.body.constants.max_velocity,  # maximum speed [m/s]
                 max_accel=self.body.constants.max_throttle,  # maximum acceleration [m/ss]
                 max_curvature=M2PX * 1.0  # maximum curvature [1/m]
@@ -593,13 +596,19 @@ class FrenetAgent(NoopAgent):
                 self.body.planner_spline = None
                 return self.noop_action
 
-            self.body.planner_spline = path.cartesian_path.points
+            for i, pair in enumerate(zip(path.frenet_states[1:], path.cartesian_path.points[1:])):
+                frenet_path_state, cartesian_point = pair
+                if frenet_path_state.s > frenet_state.s + self.body.constants.length:  # find first waypoint that is greater than one car length in front
+                    self.waypoint = cartesian_point
+                    self.body.planner_spline = path.cartesian_path.points[i:]
+                    break
 
-            self.waypoint = self.body.planner_spline[1]
+        if self.waypoint is None:
+            return self.noop_action
 
         target_orientation = math.atan2(self.waypoint.y - body_state.position.y, self.waypoint.x - body_state.position.x)
         steering_action = make_steering_action(body_state, self.body.constants, self.time_resolution, target_orientation, self.noop_action)
-        self.waypoint = None
+        # self.waypoint = None
         return [self.noop_action[0], steering_action]
 
     def process_feedback(self, previous_state, action, state, reward):
@@ -607,5 +616,5 @@ class FrenetAgent(NoopAgent):
 
         if self.waypoint is not None:
             distance = body_state.position.distance(self.waypoint)
-            if distance < 1:
+            if distance < M2PX:
                 self.waypoint = None

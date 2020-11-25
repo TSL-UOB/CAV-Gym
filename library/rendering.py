@@ -68,7 +68,7 @@ class DynamicBodyView(BodyView, OcclusionView):
 
         if dynamic_body.target_spline:
             self.target_spline = rendering.make_polyline([tuple(point) for point in dynamic_body.target_spline])
-            self.target_spline.set_color(*RGB.RED.value)
+            self.target_spline.set_color(*RGB.GREEN.value)
         else:
             self.target_spline = None
 
