@@ -287,12 +287,13 @@ class FrenetPlanner:
         ):
 
             # Lateral motion planning
-            # for Ti in np.arange(self.constants.timesteps_min * self.constants.dt, self.constants.timesteps_max * self.constants.dt, self.constants.dt):
-            for i in range(self.constants.timesteps_min, self.constants.timesteps_max):
+            for i in range(self.constants.timesteps_min, self.constants.timesteps_max+1):  # include range end point (timesteps_max)
                 Ti = i * self.constants.dt
                 lat_qp = QuinticPolynomial(frenet_state.d, frenet_state.d_d, frenet_state.d_dd, di, 0.0, 0.0, Ti)
 
-                d_tuples = [lat_qp.solve(t) for t in np.arange(0.0, Ti, self.constants.dt)]
+                preceding_times = [j * self.constants.dt for j in range(i+1)]  # include range end point (Ti)
+
+                d_tuples = [lat_qp.solve(t) for t in preceding_times]
 
                 Jp = sum([d_ddd**2 for d, d_d, d_dd, d_ddd in d_tuples])  # square of jerk
 
@@ -312,7 +313,7 @@ class FrenetPlanner:
                 ):
                     lon_qp = QuarticPolynomial(frenet_state.s, frenet_state.s_d, 0.0, tv, 0.0, Ti)
 
-                    s_tuples = [lon_qp.solve(t) for t in np.arange(0.0, Ti, self.constants.dt)]
+                    s_tuples = [lon_qp.solve(t) for t in preceding_times]
 
                     Js = sum([s_ddd**2 for s, s_d, s_dd, s_ddd in s_tuples])  # square of jerk
 
@@ -346,11 +347,11 @@ class FrenetPlanner:
         return best_path
 
 
-def make_target_spline(waypoints, increment=0.1):
+def make_target_spline(waypoints, samples=775):
     spline2d = Spline2D([waypoint.x for waypoint in waypoints], [waypoint.y for waypoint in waypoints])
 
     spline_points = []
-    for s in np.arange(0, spline2d.s[-1], increment):
+    for s in np.linspace(start=0, stop=spline2d.s[-1], num=samples, endpoint=False):  # exclude end point (spline2d.s[-1])
         x, y = spline2d.calc_position(s)
         spline_points.append(Point(x=x, y=y))
 
