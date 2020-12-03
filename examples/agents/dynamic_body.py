@@ -26,9 +26,8 @@ def make_throttle_action(body_state, body_constants, time_resolution, target_vel
     if target_velocity is None:
         throttle_action = noop_action[0]
     else:
-        diff = (target_velocity - body_state.velocity) / time_resolution
-        throttle_action = min(body_constants.max_throttle, max(body_constants.min_throttle, diff))
-    return throttle_action
+        throttle_action = (target_velocity - body_state.velocity) / time_resolution
+    return min(body_constants.max_throttle, max(body_constants.min_throttle, throttle_action))
 
 
 def make_steering_action(body_state, body_constants, time_resolution, target_orientation, noop_action):
@@ -47,7 +46,7 @@ def make_steering_action(body_state, body_constants, time_resolution, target_ori
             steering_action = calc_steering_angle(max_turn_angle)
         else:
             steering_action = calc_steering_angle(target_turn_angle)
-    return steering_action
+    return min(body_constants.max_steering_angle, max(body_constants.min_steering_angle, steering_action))
 
 
 class TargetAgent(NoopAgent):

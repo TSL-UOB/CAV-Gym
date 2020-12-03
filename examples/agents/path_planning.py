@@ -6,9 +6,9 @@ from dataclasses import dataclass
 import numpy as np
 from matplotlib import pyplot
 
-from examples.agents.dynamic_body import make_body_state, make_steering_action
+from examples.agents.dynamic_body import make_body_state, make_steering_action, make_throttle_action
 from examples.agents.template import NoopAgent
-from examples.constants import M2PX
+from library.bodies import DynamicBodyState
 from library.geometry import Point
 
 """
@@ -291,7 +291,7 @@ class FrenetPlanner:
                 Ti = i * self.constants.dt
                 lat_qp = QuinticPolynomial(frenet_state.d, frenet_state.d_d, frenet_state.d_dd, di, 0.0, 0.0, Ti)
 
-                preceding_times = [j * self.constants.dt for j in range(i+1)]  # include range end point (Ti)
+                preceding_times = [j * self.constants.dt for j in range(i)]  # exclude range end point (Ti)
 
                 d_tuples = [lat_qp.solve(t) for t in preceding_times]
 
@@ -556,16 +556,31 @@ class FrenetAgent(NoopAgent):
         self.time_resolution = time_resolution
         self.waypoints = waypoints
 
+        self.replanning_frequency = 12
+        dt = self.time_resolution * self.replanning_frequency
+        max_curvature = abs(
+                math.atan2(
+                    self.body.constants.wheelbase * math.sin(
+                        2 * dt * self.body.constants.max_velocity / math.sqrt(self.body.constants.wheelbase**2 * (1 + 4 / math.tan(self.body.constants.max_steering_angle)**2))
+                    ),
+                    self.body.constants.wheelbase * math.cos(
+                        2 * dt * self.body.constants.max_velocity / math.sqrt(self.body.constants.wheelbase**2 * (1 + 4 / math.tan(self.body.constants.max_steering_angle)**2))
+                    )
+                ) / (
+                    dt * self.body.constants.max_velocity
+                )
+            )
+
         self.frenet_planner = FrenetPlanner(
             constants=FrenetPlannerConstants(
                 lateral_range_left=lane_width,
                 lateral_range_right=lane_width,
                 lateral_range_samples=5,
-                timesteps_min=16,  # min prediction ticks
-                timesteps_max=32,  # max prediction ticks
-                dt=1.0,  # time tick [s]
-                velocity_target=M2PX * 3.0,  # target speed [m/s]
-                velocity_target_offset=M2PX * 1.0,
+                timesteps_min=49,  # min prediction ticks
+                timesteps_max=51,  # max prediction ticks
+                dt=dt,  # time tick [s]
+                velocity_target=self.body.constants.max_velocity * 0.5,  # target speed [m/s]
+                velocity_target_offset=self.body.constants.max_velocity * 0.4,
                 velocity_range_samples=3,
                 weight_jerk=0.1,  # cost weight
                 weight_time=0.1,  # cost weight
@@ -575,28 +590,46 @@ class FrenetAgent(NoopAgent):
                 robot_radius=math.sqrt(self.body.constants.length**2 + self.body.constants.width**2) / 2.0,  # robot radius [m]
                 max_velocity=self.body.constants.max_velocity,  # maximum speed [m/s]
                 max_thottle=self.body.constants.max_throttle,  # maximum acceleration [m/ss]
-                max_curvature=M2PX * 1.0  # maximum curvature [1/m]
+                max_curvature=max_curvature
             )
         )
 
         self.body.target_spline, self.spline2d = make_target_spline(waypoints)
 
-        self.waypoint = None
+        self.body.planner_spline = None
+        self.target_velocities = None
+        self.replanning_counter = 0
 
     def reset(self):
-        self.waypoint = None
+        self.body.planner_spline = None
+        self.target_velocities = None
+        self.replanning_counter = 0
 
-    def choose_action(self, state, action_space, info=None):
-        body_state = make_body_state(state, self.index)
+    def predict_obstacles(self, state):
+        other_body_states = [make_body_state(state, i) for i in range(len(state)) if i != self.index]
+        yield [other_body_state.position for other_body_state in other_body_states]
 
-        if self.waypoint is None:
-            frenet_position = make_frenet_point(body_state.position, self.body.target_spline)
-            if frenet_position is None:
-                return self.noop_action
+        def predict_step(body_state):  # assume noop action
+            distance_velocity = body_state.velocity * self.frenet_planner.constants.dt
+            return DynamicBodyState(
+                position=Point(
+                    x=body_state.position.x + distance_velocity * math.cos(body_state.orientation),
+                    y=body_state.position.y + distance_velocity * math.sin(body_state.orientation)
+                ),
+                velocity=body_state.velocity,
+                orientation=body_state.orientation
+            )
 
+        for _ in range(self.frenet_planner.constants.timesteps_max):
+            other_body_states = [predict_step(other_body_state) for other_body_state in other_body_states]
+            yield [other_body_state.position for other_body_state in other_body_states]
+
+    def path_plan(self, body_state, obstacles):
+        frenet_position = make_frenet_point(body_state.position, self.body.target_spline)
+        if frenet_position is not None:
             frenet_state = FrenetState(
                 s=frenet_position.s,  # initial longitudinal position
-                s_d=0.0,  # initial longitudinal speed [m/s]
+                s_d=body_state.velocity,  # initial longitudinal speed [m/s]
                 s_dd=0.0,
                 s_ddd=0.0,
                 d=frenet_position.d,  # initial lateral position [m]
@@ -605,33 +638,40 @@ class FrenetAgent(NoopAgent):
                 d_ddd=0.0
             )
 
-            other_body_states = [make_body_state(state, i) for i in range(len(state)) if i != self.index]
-            obstacles = [other_body_state.position for other_body_state in other_body_states]
-
             path = self.frenet_planner.frenet_optimal_planning(self.spline2d, frenet_state, obstacles)
-            if path is None or len(path.cartesian_path.points) <= 1:
-                self.body.planner_spline = None
-                return self.noop_action
+            if path is not None and len(path.cartesian_path.points) > 1:
+                for i, pair in enumerate(zip(path.frenet_states[1:], path.cartesian_path.points[1:])):
+                    frenet_path_state, cartesian_point = pair
+                    if frenet_path_state.s > frenet_state.s + self.body.constants.length / 2:  # find first waypoint that is greater than one car length in front
+                        return path.cartesian_path.points[i:], [other_frenet_path_state.s_d for other_frenet_path_state in path.frenet_states[i:]]
 
-            for i, pair in enumerate(zip(path.frenet_states[1:], path.cartesian_path.points[1:])):
-                frenet_path_state, cartesian_point = pair
-                if frenet_path_state.s > frenet_state.s + self.body.constants.length:  # find first waypoint that is greater than one car length in front
-                    self.waypoint = cartesian_point
-                    self.body.planner_spline = path.cartesian_path.points[i:]
-                    break
+        return None, None
 
-        if self.waypoint is None:
-            return self.noop_action
-
-        target_orientation = math.atan2(self.waypoint.y - body_state.position.y, self.waypoint.x - body_state.position.x)
-        steering_action = make_steering_action(body_state, self.body.constants, self.time_resolution, target_orientation, self.noop_action)
-        # self.waypoint = None
-        return [self.noop_action[0], steering_action]
-
-    def process_feedback(self, previous_state, action, state, reward):
+    def choose_action(self, state, action_space, info=None):
         body_state = make_body_state(state, self.index)
 
-        if self.waypoint is not None:
-            distance = body_state.position.distance(self.waypoint)
-            if distance < M2PX:
-                self.waypoint = None
+        if self.replanning_counter >= self.replanning_frequency:
+            self.replanning_counter = 0
+            obstacles = [make_body_state(state, i).position for i in range(len(state)) if i != self.index]
+            self.body.planner_spline, self.target_velocities = self.path_plan(body_state, obstacles)
+
+        if not self.body.planner_spline:
+            return self.noop_action
+
+        waypoint = self.body.planner_spline[0]
+        target_velocity = self.target_velocities[0]
+
+        throttle_action = make_throttle_action(body_state, self.body.constants, self.time_resolution, target_velocity, self.noop_action)
+        target_orientation = math.atan2(waypoint.y - body_state.position.y, waypoint.x - body_state.position.x)
+        steering_action = make_steering_action(body_state, self.body.constants, self.time_resolution, target_orientation, self.noop_action)
+        return [throttle_action, steering_action]
+
+    def process_feedback(self, previous_state, action, state, reward):
+        if self.body.planner_spline:
+            body_state = make_body_state(state, self.index)
+            waypoint = self.body.planner_spline[0]
+            if body_state.position.distance(waypoint) < 1:
+                self.body.planner_spline.pop(0)
+                self.target_velocities.pop(0)
+
+        self.replanning_counter += 1
