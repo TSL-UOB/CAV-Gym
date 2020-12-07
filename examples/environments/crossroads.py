@@ -53,7 +53,7 @@ bodies = [
     Car(
         init_state=DynamicBodyState(
             position=road_map.major_road.outbound.lanes[0].spawn,
-            velocity=car_constants.target_fast_velocity,
+            velocity=car_constants.max_velocity / 2.0,
             orientation=road_map.major_road.outbound.orientation
         ),
         constants=car_constants
@@ -61,7 +61,7 @@ bodies = [
     Car(
         init_state=DynamicBodyState(
             position=road_map.major_road.inbound.lanes[0].spawn,
-            velocity=car_constants.target_fast_velocity,
+            velocity=car_constants.max_velocity / 2.0,
             orientation=road_map.major_road.inbound.orientation
         ),
         constants=car_constants

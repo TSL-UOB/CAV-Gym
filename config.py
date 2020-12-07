@@ -300,66 +300,70 @@ class Config:
         agents = [agent]
         for i, body in enumerate(env.bodies[1:], start=1):
             if isinstance(body, DynamicBody):
-                if isinstance(body, Pedestrian):
-                    if self.agent_config.agent is AgentType.RANDOM:
-                        agent = RandomAgent(
-                            index=i,
-                            noop_action=[0.0, 0.0],
-                            epsilon=self.agent_config.epsilon,
-                            np_random=np_random
-                        )
-                    elif self.agent_config.agent is AgentType.RANDOM_CONSTRAINED:
-                        agent = RandomConstrainedAgent(
-                            index=i,
-                            noop_action=[0.0, 0.0],
-                            body=body,
-                            time_resolution=env.time_resolution,
-                            road_centre=env.constants.road_map.major_road.bounding_box().longitudinal_line(),
-                            epsilon=self.agent_config.epsilon,
-                            np_random=np_random
-                        )
-                    elif self.agent_config.agent is AgentType.PROXIMITY:
-                        agent = ProximityAgent(
-                            index=i,
-                            noop_action=[0.0, 0.0],
-                            body=body,
-                            time_resolution=env.time_resolution,
-                            road_centre=env.constants.road_map.major_road.bounding_box().longitudinal_line(),
-                            distance_threshold=self.agent_config.threshold
-                        )
-                    elif self.agent_config.agent is AgentType.ELECTION:
-                        agent = ElectionAgent(
-                            index=i,
-                            noop_action=[0.0, 0.0],
-                            body=body,
-                            time_resolution=env.time_resolution,
-                            road_centre=env.constants.road_map.major_road.bounding_box().longitudinal_line(),
-                            distance_threshold=self.agent_config.threshold
-                        )
-                    elif self.agent_config.agent is AgentType.Q_LEARNING:
-                        agent = QLearningAgent(
-                            index=i,
-                            noop_action=[0.0, 0.0],
-                            body=body,
-                            ego_constants=env.bodies[0].constants,
-                            road_polgon=env.constants.road_map.major_road.static_bounding_box,
-                            time_resolution=env.time_resolution,
-                            width=env.constants.viewer_width,
-                            height=env.constants.viewer_height,
-                            np_random=np_random,
-                            q_learning_config=self.agent_config
-                        )
-                    else:
-                        raise NotImplementedError
+                # if self.agent_config.agent is AgentType.RANDOM:
+                #     agent = NoopAgent(
+                #         index=i,
+                #         noop_action=[0.0, 0.0]
+                #     )
+                # el
+                if self.agent_config.agent is AgentType.RANDOM:
+                    agent = RandomAgent(
+                        index=i,
+                        noop_action=[0.0, 0.0],
+                        epsilon=self.agent_config.epsilon,
+                        np_random=np_random
+                    )
+                elif self.agent_config.agent is AgentType.RANDOM_CONSTRAINED and isinstance(body, Pedestrian):
+                    agent = RandomConstrainedAgent(
+                        index=i,
+                        noop_action=[0.0, 0.0],
+                        body=body,
+                        time_resolution=env.time_resolution,
+                        road_centre=env.constants.road_map.major_road.bounding_box().longitudinal_line(),
+                        epsilon=self.agent_config.epsilon,
+                        np_random=np_random
+                    )
+                elif self.agent_config.agent is AgentType.PROXIMITY and isinstance(body, Pedestrian):
+                    agent = ProximityAgent(
+                        index=i,
+                        noop_action=[0.0, 0.0],
+                        body=body,
+                        time_resolution=env.time_resolution,
+                        road_centre=env.constants.road_map.major_road.bounding_box().longitudinal_line(),
+                        distance_threshold=self.agent_config.threshold
+                    )
+                elif self.agent_config.agent is AgentType.ELECTION and isinstance(body, Pedestrian):
+                    agent = ElectionAgent(
+                        index=i,
+                        noop_action=[0.0, 0.0],
+                        body=body,
+                        time_resolution=env.time_resolution,
+                        road_centre=env.constants.road_map.major_road.bounding_box().longitudinal_line(),
+                        distance_threshold=self.agent_config.threshold
+                    )
+                elif self.agent_config.agent is AgentType.Q_LEARNING and isinstance(body, Pedestrian):
+                    agent = QLearningAgent(
+                        index=i,
+                        noop_action=[0.0, 0.0],
+                        body=body,
+                        ego_constants=env.bodies[0].constants,
+                        road_polgon=env.constants.road_map.major_road.static_bounding_box,
+                        time_resolution=env.time_resolution,
+                        width=env.constants.viewer_width,
+                        height=env.constants.viewer_height,
+                        np_random=np_random,
+                        q_learning_config=self.agent_config
+                    )
                 else:
                     raise NotImplementedError
             elif isinstance(body, TrafficLight) or isinstance(body, PelicanCrossing):
-                agent = RandomAgent(
-                    index=i,
-                    noop_action=TrafficLightAction.NOOP,
-                    epsilon=self.agent_config.epsilon,
-                    np_random=np_random
-                )
+                # agent = RandomAgent(
+                #     index=i,
+                #     noop_action=TrafficLightAction.NOOP,
+                #     epsilon=self.agent_config.epsilon,
+                #     np_random=np_random
+                # )
+                agent = NoopAgent(index=i, noop_action=0)
             agents.append(agent)
 
         console.info(f"agents={pretty_str_list(agent.__class__.__name__ for agent in agents)}")

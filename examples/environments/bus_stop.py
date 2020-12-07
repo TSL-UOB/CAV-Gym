@@ -37,7 +37,7 @@ bodies = [
     Car(
         init_state=DynamicBodyState(
             position=geometry.Point(200, 0).rotate(road_map.major_road.outbound.orientation).translate(road_map.major_road.outbound.lanes[0].spawn),
-            velocity=car_constants.target_fast_velocity,
+            velocity=car_constants.max_velocity / 2.0,
             orientation=road_map.major_road.outbound.orientation
         ),
         constants=car_constants
@@ -45,7 +45,7 @@ bodies = [
     Bus(
         init_state=DynamicBodyState(
             position=geometry.Point(400, 0).rotate(road_map.major_road.outbound.orientation).translate(road_map.major_road.outbound.lanes[0].spawn),
-            velocity=bus_constants.target_fast_velocity,
+            velocity=car_constants.max_velocity / 2.0,
             orientation=road_map.major_road.outbound.orientation
         ),
         constants=bus_constants
@@ -53,7 +53,7 @@ bodies = [
     Car(
         init_state=DynamicBodyState(
             position=road_map.major_road.outbound.lanes[0].spawn,
-            velocity=car_constants.target_fast_velocity,
+            velocity=car_constants.max_velocity / 2.0,
             orientation=road_map.major_road.outbound.orientation
         ),
         constants=car_constants
@@ -61,7 +61,7 @@ bodies = [
     Car(
         init_state=DynamicBodyState(
             position=road_map.major_road.outbound.lanes[1].spawn,
-            velocity=car_constants.target_fast_velocity,
+            velocity=car_constants.max_velocity / 2.0,
             orientation=road_map.major_road.outbound.orientation
         ),
         constants=car_constants
@@ -69,7 +69,7 @@ bodies = [
     Bicycle(
         init_state=DynamicBodyState(
             position=road_map.major_road.outbound.lanes[2].spawn,
-            velocity=bicycle_constants.target_fast_velocity,
+            velocity=bicycle_constants.max_velocity / 2.0,
             orientation=road_map.major_road.outbound.orientation
         ),
         constants=bicycle_constants
