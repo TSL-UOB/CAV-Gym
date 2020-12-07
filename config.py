@@ -249,31 +249,37 @@ class Config:
         console.info(f"bodies={pretty_str_list(body.__class__.__name__ for body in env.bodies)}")
 
         keyboard_agent = KeyboardAgent(index=0, noop_action=[0.0, 0.0], body=env.bodies[0], time_resolution=env.time_resolution) if self.mode_config.mode is Mode.RENDER and self.mode_config.keyboard else None
-        # agent = keyboard_agent if keyboard_agent is not None else NoopAgent(index=0, noop_action=[0.0, 0.0])
-        agent = keyboard_agent if keyboard_agent is not None else QLearningEgoAgent(
-            index=0,
-            noop_action=[0.0, 0.0],
-            np_random=np_random,
-            q_learning_config=QLearningConfig(
-                alpha=0.18,
-                gamma=0.87,
-                epsilon=0.01,
-                features=FeatureConfig(
-                    distance_x=True,
-                    distance_y=True,
-                    distance=True,
-                    on_road=False,
-                    facing=True,
-                    inverse_distance=False
-                ),
-                log=None
-            ),
-            body=env.bodies[0],
-            time_resolution=env.time_resolution,
-            width=env.constants.viewer_width,
-            height=env.constants.viewer_height,
-            num_velocity_targets=11
-        )
+        agent = keyboard_agent if keyboard_agent is not None else NoopAgent(index=0, noop_action=[0.0, 0.0])
+        #
+        # Approximate Q-learning agent
+        #
+        # agent = keyboard_agent if keyboard_agent is not None else QLearningEgoAgent(
+        #     index=0,
+        #     noop_action=[0.0, 0.0],
+        #     np_random=np_random,
+        #     q_learning_config=QLearningConfig(
+        #         alpha=0.18,
+        #         gamma=0.87,
+        #         epsilon=0.01,
+        #         features=FeatureConfig(
+        #             distance_x=True,
+        #             distance_y=True,
+        #             distance=True,
+        #             on_road=False,
+        #             facing=True,
+        #             inverse_distance=False
+        #         ),
+        #         log=None
+        #     ),
+        #     body=env.bodies[0],
+        #     time_resolution=env.time_resolution,
+        #     width=env.constants.viewer_width,
+        #     height=env.constants.viewer_height,
+        #     num_velocity_targets=11
+        # )
+        #
+        # Frenet agent
+        #
         # oubound_lane = env.constants.road_map.major_road.outbound.lanes[0].static_bounding_box
         # inbound_lane = env.constants.road_map.major_road.inbound.lanes[0].static_bounding_box
         # inbound_lane_end, inbound_lane_start = inbound_lane.split_longitudinally()
@@ -444,7 +450,7 @@ class ConfigParser(ArgumentParser):
     def __init__(self):
         super().__init__()
 
-        self.add_argument("input", metavar="INPUT", nargs="?", type=FileType("r"), default="-", help="read config from %(metavar)s file, or standard input if no %(metavar)s")
+        self.add_argument("input", metavar="INPUT", nargs="?", type=FileType("r"), default="-", help="read config from %(metavar)s file, or from stdin if no file is provided")
 
     def parse_config(self):
         args = self.parse_args()
