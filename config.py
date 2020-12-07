@@ -12,11 +12,8 @@ from enforce_typing import enforce_types
 from gym.utils import seeding
 
 from examples.agents.dynamic_body import KeyboardAgent
-from examples.agents.ego import QLearningEgoAgent
-from examples.agents.path_planning import FrenetAgent
 from examples.agents.pedestrian import RandomConstrainedAgent, ProximityAgent, ElectionAgent, QLearningAgent
 from examples.agents.template import RandomAgent, NoopAgent
-from library.actions import TrafficLightAction
 from library.bodies import DynamicBody, Pedestrian, TrafficLight, PelicanCrossing
 from reporting import Verbosity, get_console, pretty_str_list
 
@@ -32,6 +29,7 @@ class Scenario(Enum):
 
 
 class AgentType(Enum):
+    NOOP = "noop"
     RANDOM = "random"
     RANDOM_CONSTRAINED = "random-constrained"
     PROXIMITY = "proximity"
@@ -105,6 +103,12 @@ class PedestriansConfig(ScenarioConfig):
 @dataclass(frozen=True)
 class PelicanCrossingConfig(ScenarioConfig):
     scenario = Scenario.PELICAN_CROSSING
+
+
+@enforce_types
+@dataclass(frozen=True)
+class NoopConfig(AgentConfig):
+    agent = AgentType.NOOP
 
 
 @enforce_types
@@ -218,7 +222,7 @@ class Config:
     road_cost: float
     win_reward: float
     scenario_config: Union[BusStopConfig, CrossroadsConfig, PedestriansConfig, PelicanCrossingConfig]
-    agent_config: Union[RandomConfig, RandomConstrainedConfig, ProximityConfig, ElectionConfig, QLearningConfig]
+    agent_config: Union[NoopConfig, RandomConfig, RandomConstrainedConfig, ProximityConfig, ElectionConfig, QLearningConfig]
     mode_config: Union[HeadlessConfig, RenderConfig]
 
     def __post_init__(self):
@@ -300,13 +304,12 @@ class Config:
         agents = [agent]
         for i, body in enumerate(env.bodies[1:], start=1):
             if isinstance(body, DynamicBody):
-                # if self.agent_config.agent is AgentType.RANDOM:
-                #     agent = NoopAgent(
-                #         index=i,
-                #         noop_action=[0.0, 0.0]
-                #     )
-                # el
-                if self.agent_config.agent is AgentType.RANDOM:
+                if self.agent_config.agent is AgentType.NOOP:
+                    agent = NoopAgent(
+                        index=i,
+                        noop_action=[0.0, 0.0]
+                    )
+                elif self.agent_config.agent is AgentType.RANDOM:
                     agent = RandomAgent(
                         index=i,
                         noop_action=[0.0, 0.0],
@@ -414,7 +417,9 @@ def make_scenario_config(data):  # deserialise data to ScenarioConfig
 
 def make_agent_config(data):  # deserialise data to AgentConfig
     option = data.pop("option")
-    if option == AgentType.RANDOM.value:
+    if option == AgentType.NOOP.value:
+        return NoopConfig(**data)
+    elif option == AgentType.RANDOM.value:
         return RandomConfig(**data)
     elif option == AgentType.RANDOM_CONSTRAINED.value:
         return RandomConstrainedConfig(**data)

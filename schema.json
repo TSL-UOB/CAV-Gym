@@ -51,6 +51,7 @@
         },
         "agent_config": {
             "oneOf": [
+                { "$ref": "#/definitions/noop_config" },
                 { "$ref": "#/definitions/random_config" },
                 { "$ref": "#/definitions/random_constrained_config" },
                 { "$ref": "#/definitions/proximity_config" },
@@ -110,6 +111,14 @@
             "type": "object",
             "properties": {
                 "option": { "const": "pelican-crossing" }
+            },
+            "required": [ "option" ],
+            "additionalProperties": false
+        },
+        "noop_config": {
+            "type": "object",
+            "properties": {
+                "option": { "const": "noop" }
             },
             "required": [ "option" ],
             "additionalProperties": false
