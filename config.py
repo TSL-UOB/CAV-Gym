@@ -14,6 +14,7 @@ from gym.utils import seeding
 from examples.agents.dynamic_body import KeyboardAgent
 from examples.agents.pedestrian import RandomConstrainedAgent, ProximityAgent, ElectionAgent, QLearningAgent
 from examples.agents.template import RandomAgent, NoopAgent
+from library.actions import TrafficLightAction
 from library.bodies import DynamicBody, Pedestrian, TrafficLight, PelicanCrossing
 from reporting import Verbosity, get_console, pretty_str_list
 
@@ -360,13 +361,18 @@ class Config:
                 else:
                     raise NotImplementedError
             elif isinstance(body, TrafficLight) or isinstance(body, PelicanCrossing):
-                # agent = RandomAgent(
-                #     index=i,
-                #     noop_action=TrafficLightAction.NOOP,
-                #     epsilon=self.agent_config.epsilon,
-                #     np_random=np_random
-                # )
-                agent = NoopAgent(index=i, noop_action=0)
+                if self.agent_config.agent is AgentType.NOOP:
+                    agent = NoopAgent(
+                        index=i,
+                        noop_action=TrafficLightAction.NOOP.value
+                    )
+                elif self.agent_config.agent is AgentType.RANDOM:
+                    agent = RandomAgent(
+                        index=i,
+                        noop_action=TrafficLightAction.NOOP.value,
+                        epsilon=self.agent_config.epsilon,
+                        np_random=np_random
+                    )
             agents.append(agent)
 
         console.info(f"agents={pretty_str_list(agent.__class__.__name__ for agent in agents)}")
@@ -418,7 +424,7 @@ def make_scenario_config(data):  # deserialise data to ScenarioConfig
 def make_agent_config(data):  # deserialise data to AgentConfig
     option = data.pop("option")
     if option == AgentType.NOOP.value:
-        return NoopConfig(**data)
+        return NoopConfig()
     elif option == AgentType.RANDOM.value:
         return RandomConfig(**data)
     elif option == AgentType.RANDOM_CONSTRAINED.value:

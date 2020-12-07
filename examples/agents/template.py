@@ -1,5 +1,7 @@
 from abc import ABC
 
+import numpy as np
+from gym.spaces import Discrete, Box
 from gym.utils import seeding
 
 
@@ -49,7 +51,8 @@ class RandomAgent(NoopAgent):
 
     def choose_action(self, state, action_space, info=None):
         if self.epsilon_valid():
-            self.action = list(action_space.sample())  # update and store action (so that it can be repeated)
+            action_space_sample = action_space.sample()
+            self.action = list(action_space_sample) if isinstance(action_space_sample, np.ndarray) else action_space_sample  # update and store action (so that it can be repeated)
         return self.action
 
     def process_feedback(self, previous_state, action, state, reward):
