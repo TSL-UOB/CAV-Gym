@@ -8,6 +8,7 @@ from gym.utils import seeding
 from config import Mode
 from library.bodies import PelicanCrossing, Pedestrian
 from library.assets import RoadMap, Occlusion
+from reporting import pretty_float
 
 console_logger = logging.getLogger("library.console.environment")
 
@@ -126,18 +127,21 @@ class CAVEnv(MarkovGameEnv):
         joint_reward = [-self.env_config.living_cost for _ in self.bodies]
 
         for i, polygon in enumerate(body_polygons):
-            if any(polygon.mostly_intersects(road.bounding_box()) for road in self.constants.road_map.roads):  # on road
+            if i > 0 and any(polygon.mostly_intersects(road.bounding_box()) for road in self.constants.road_map.roads):  # pedestrian on road
                 self.episode_liveness[i] += 1
                 self.run_liveness[i] += 1
-                if i > 0:  # not ego
-                    joint_reward[i] -= self.env_config.road_cost
-            else:  # off road
-                if i == 0:  # ego
-                    joint_reward[i] -= self.env_config.road_cost
+                joint_reward[i] -= self.env_config.road_cost
+
+        joint_reward[0] -= 1 - ((self.ego.state.velocity - self.ego.constants.min_velocity) / (self.ego.constants.max_velocity - self.ego.constants.min_velocity))
+        joint_reward[0] -= abs(joint_action[0][0]) / self.ego.constants.max_throttle
 
         terminate = False
 
-        if self.env_config.collisions:
+        if not terminate and all(x > self.ego.state.position.x for x, y in self.ego.bounding_box()):
+            print("ego reached goal")
+            terminate = True
+
+        if not terminate and self.env_config.collisions:
             collidable_entities = self.collidable_entities()
             collidable_bounding_boxes = [entity.bounding_box() for entity in collidable_entities]  # no need to recompute bounding boxes
             collided_entities = list()  # record collided entities so that they can be skipped in subsequent iterations

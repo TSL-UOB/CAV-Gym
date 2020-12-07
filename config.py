@@ -12,6 +12,7 @@ from enforce_typing import enforce_types
 from gym.utils import seeding
 
 from examples.agents.dynamic_body import KeyboardAgent
+from examples.agents.ego import QLearningEgoAgent
 from examples.agents.path_planning import FrenetAgent
 from examples.agents.pedestrian import RandomConstrainedAgent, ProximityAgent, ElectionAgent, QLearningAgent
 from examples.agents.template import RandomAgent, NoopAgent
@@ -248,7 +249,31 @@ class Config:
         console.info(f"bodies={pretty_str_list(body.__class__.__name__ for body in env.bodies)}")
 
         keyboard_agent = KeyboardAgent(index=0, noop_action=[0.0, 0.0], body=env.bodies[0], time_resolution=env.time_resolution) if self.mode_config.mode is Mode.RENDER and self.mode_config.keyboard else None
-        agent = keyboard_agent if keyboard_agent is not None else NoopAgent(index=0, noop_action=[0.0, 0.0])
+        # agent = keyboard_agent if keyboard_agent is not None else NoopAgent(index=0, noop_action=[0.0, 0.0])
+        agent = keyboard_agent if keyboard_agent is not None else QLearningEgoAgent(
+            index=0,
+            noop_action=[0.0, 0.0],
+            np_random=np_random,
+            q_learning_config=QLearningConfig(
+                alpha=0.18,
+                gamma=0.87,
+                epsilon=0.01,
+                features=FeatureConfig(
+                    distance_x=True,
+                    distance_y=True,
+                    distance=True,
+                    on_road=False,
+                    facing=True,
+                    inverse_distance=False
+                ),
+                log=None
+            ),
+            body=env.bodies[0],
+            time_resolution=env.time_resolution,
+            width=env.constants.viewer_width,
+            height=env.constants.viewer_height,
+            num_velocity_targets=11
+        )
         # oubound_lane = env.constants.road_map.major_road.outbound.lanes[0].static_bounding_box
         # inbound_lane = env.constants.road_map.major_road.inbound.lanes[0].static_bounding_box
         # inbound_lane_end, inbound_lane_start = inbound_lane.split_longitudinally()
