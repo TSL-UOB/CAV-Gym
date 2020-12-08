@@ -12,6 +12,7 @@ from enforce_typing import enforce_types
 from gym.utils import seeding
 
 from examples.agents.dynamic_body import KeyboardAgent
+from examples.agents.ego import QLearningEgoAgent
 from examples.agents.pedestrian import RandomConstrainedAgent, ProximityAgent, ElectionAgent, QLearningAgent
 from examples.agents.template import RandomAgent, NoopAgent
 from library.actions import TrafficLightAction
@@ -229,7 +230,7 @@ class Config:
     road_cost: float
     win_reward: float
     scenario_config: Union[BusStopConfig, CrossroadsConfig, PedestriansConfig, PelicanCrossingConfig]
-    ego_config: Union[NoopConfig, KeyboardConfig, RandomConfig]
+    ego_config: Union[NoopConfig, KeyboardConfig, RandomConfig, QLearningConfig]
     tester_config: Union[NoopConfig, RandomConfig, RandomConstrainedConfig, ProximityConfig, ElectionConfig, QLearningConfig]
     mode_config: Union[HeadlessConfig, RenderConfig]
 
@@ -280,30 +281,17 @@ class Config:
                 noop_action=env.bodies[0].noop_action,
                 epsilon=self.ego_config.epsilon
             )
-        # elif self.ego_config.agent is AgentType.Q_LEARNING:
-        #     agent = keyboard_agent if keyboard_agent is not None else QLearningEgoAgent(
-        #         index=0,
-        #         np_random=np_random,
-        #         q_learning_config=QLearningConfig(
-        #             alpha=0.18,
-        #             gamma=0.87,
-        #             epsilon=0.01,
-        #             features=FeatureConfig(
-        #                 distance_x=True,
-        #                 distance_y=True,
-        #                 distance=True,
-        #                 on_road=False,
-        #                 facing=True,
-        #                 inverse_distance=False
-        #             ),
-        #             log=None
-        #         ),
-        #         body=env.bodies[0],
-        #         time_resolution=env.time_resolution,
-        #         width=env.constants.viewer_width,
-        #         height=env.constants.viewer_height,
-        #         num_velocity_targets=11
-        #     )
+        elif self.ego_config.agent is AgentType.Q_LEARNING:
+            agent = keyboard_agent if keyboard_agent is not None else QLearningEgoAgent(
+                index=0,
+                np_random=np_random,
+                q_learning_config=self.ego_config,
+                body=env.bodies[0],
+                time_resolution=env.time_resolution,
+                width=env.constants.viewer_width,
+                height=env.constants.viewer_height,
+                num_velocity_targets=5
+            )
         # elif self.ego_config.agent is AgentType.FRENET:
         #     oubound_lane = env.constants.road_map.major_road.outbound.lanes[0].static_bounding_box
         #     # inbound_lane = env.constants.road_map.major_road.inbound.lanes[0].static_bounding_box
@@ -440,6 +428,12 @@ def make_scenario_config(data):  # deserialise data to ScenarioConfig
         raise NotImplementedError
 
 
+def make_q_learning_config(data):
+    feature_config_data = data.pop("feature_config")
+    feature_config = FeatureConfig(**feature_config_data)
+    return QLearningConfig(**data, features=feature_config)
+
+
 def make_ego_config(data):  # deserialise data to AgentConfig
     option = data.pop("option")
     if option == AgentType.NOOP.value:
@@ -448,6 +442,8 @@ def make_ego_config(data):  # deserialise data to AgentConfig
         return KeyboardConfig()
     elif option == AgentType.RANDOM.value:
         return RandomConfig(**data)
+    elif option == AgentType.Q_LEARNING.value:
+        return make_q_learning_config(data)
     else:
         raise NotImplementedError
 
@@ -465,9 +461,7 @@ def make_tester_config(data):  # deserialise data to AgentConfig
     elif option == AgentType.ELECTION.value:
         return ElectionConfig(**data)
     elif option == AgentType.Q_LEARNING.value:
-        feature_config_data = data.pop("feature_config")
-        feature_config = FeatureConfig(**feature_config_data)
-        return QLearningConfig(**data, features=feature_config)
+        return make_q_learning_config(data)
     else:
         raise NotImplementedError
 

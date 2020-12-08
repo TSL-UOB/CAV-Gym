@@ -19,7 +19,19 @@
     "inbound_pavement": 1.0
   },
   "ego_config": {
-    "option": "noop"
+    "option": "q-learning",
+    "alpha": 0.18,
+    "gamma": 0.87,
+    "epsilon": 0.0005,
+    "feature_config": {
+      "distance_x": true,
+      "distance_y": true,
+      "distance": true,
+      "on_road": false,
+      "facing": false,
+      "inverse_distance": false
+    },
+    "log": null
   },
   "tester_config": {
     "option": "random-constrained",

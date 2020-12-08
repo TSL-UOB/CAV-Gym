@@ -14,7 +14,7 @@ ACTION_ERROR = 0.000000000000001
 
 class QLearningEgoAgent(RandomAgent):
     def __init__(self, q_learning_config, body, time_resolution, num_velocity_targets, width, height, **kwargs):
-        super().__init__(epsilon=q_learning_config.epsilon, **kwargs)
+        super().__init__(noop_action=body.noop_action, epsilon=q_learning_config.epsilon, **kwargs)
 
         self.alpha = q_learning_config.alpha  # learning rate (should decrease over time)
         self.gamma = q_learning_config.gamma  # discount fbody (should be fixed over time?)
@@ -41,6 +41,8 @@ class QLearningEgoAgent(RandomAgent):
         self.body.target_velocity = None
 
     def choose_action(self, state, action_space, info=None):
+        body_state = make_body_state(state, self.index)
+
         if self.body.target_velocity is None:
             if self.epsilon_valid():
                 self.body.target_velocity = self.np_random.choice(self.target_velocities)
@@ -57,7 +59,10 @@ class QLearningEgoAgent(RandomAgent):
                 assert best_targets, "no best target(s) found"
                 self.body.target_velocity = best_targets[0] if len(best_targets) == 1 else self.np_random.choice(best_targets)
 
-        body_state = make_body_state(state, self.index)
+            if abs(self.body.target_velocity - body_state.velocity) < TARGET_ERROR:
+                self.body.target_velocity = None
+                return self.noop_action
+
         throttle_action = make_throttle_action(body_state, self.body.constants, self.time_resolution, self.body.target_velocity, self.noop_action)
 
         # account for minor (precision) error only: large error indicates issue with logic
@@ -71,8 +76,6 @@ class QLearningEgoAgent(RandomAgent):
         difference = (reward + self.gamma * max(self.q_value(state, target_velocity) for target_velocity in self.target_velocities)) - self.q_value(previous_state, self.body.target_velocity)
         for feature, feature_value in self.features(previous_state, self.body.target_velocity).items():
             self.feature_weights[feature] = self.feature_weights[feature] + self.alpha * difference * feature_value
-
-        # print(self.feature_weights)
 
         body_state = make_body_state(state, self.index)
 

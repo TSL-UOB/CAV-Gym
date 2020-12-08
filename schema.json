@@ -54,7 +54,8 @@
             "oneOf": [
                 { "$ref": "#/definitions/noop_config" },
                 { "$ref": "#/definitions/keyboard_config" },
-                { "$ref": "#/definitions/random_config" }
+                { "$ref": "#/definitions/random_config" },
+                { "$ref": "#/definitions/q_learning_config" }
             ]
         },
         "tester_config": {
