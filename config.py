@@ -264,13 +264,12 @@ class Config:
         if self.ego_config.agent is AgentType.NOOP:
             agent = NoopAgent(
                 index=0,
-                noop_action=[0.0, 0.0]
+                noop_action=env.bodies[0].noop_action
             )
         elif self.ego_config.agent is AgentType.KEYBOARD:
             assert self.mode_config.mode is Mode.RENDER, "keyboard agents only work in render mode"
             keyboard_agent = KeyboardAgent(
                 index=0,
-                noop_action=[0.0, 0.0],
                 body=env.bodies[0],
                 time_resolution=env.time_resolution
             )
@@ -278,13 +277,12 @@ class Config:
         elif self.ego_config.agent is AgentType.RANDOM:
             agent = RandomAgent(
                 index=0,
-                noop_action=[0.0, 0.0],
+                noop_action=env.bodies[0].noop_action,
                 epsilon=self.ego_config.epsilon
             )
         # elif self.ego_config.agent is AgentType.Q_LEARNING:
         #     agent = keyboard_agent if keyboard_agent is not None else QLearningEgoAgent(
         #         index=0,
-        #         noop_action=[0.0, 0.0],
         #         np_random=np_random,
         #         q_learning_config=QLearningConfig(
         #             alpha=0.18,
@@ -312,7 +310,6 @@ class Config:
         #     # inbound_lane_end, inbound_lane_start = inbound_lane.split_longitudinally()
         #     agent = FrenetAgent(
         #         index=0,
-        #         noop_action=[0.0, 0.0],
         #         body=env.bodies[0],
         #         time_resolution=env.time_resolution,
         #         lane_width=env.constants.road_map.major_road.constants.lane_width,
@@ -333,19 +330,18 @@ class Config:
                 if self.tester_config.agent is AgentType.NOOP:
                     agent = NoopAgent(
                         index=i,
-                        noop_action=[0.0, 0.0]
+                        noop_action=body.noop_action
                     )
                 elif self.tester_config.agent is AgentType.RANDOM:
                     agent = RandomAgent(
                         index=i,
-                        noop_action=[0.0, 0.0],
+                        noop_action=body.noop_action,
                         epsilon=self.tester_config.epsilon,
                         np_random=np_random
                     )
                 elif self.tester_config.agent is AgentType.RANDOM_CONSTRAINED and isinstance(body, Pedestrian):
                     agent = RandomConstrainedAgent(
                         index=i,
-                        noop_action=[0.0, 0.0],
                         body=body,
                         time_resolution=env.time_resolution,
                         road_centre=env.constants.road_map.major_road.bounding_box().longitudinal_line(),
@@ -355,7 +351,6 @@ class Config:
                 elif self.tester_config.agent is AgentType.PROXIMITY and isinstance(body, Pedestrian):
                     agent = ProximityAgent(
                         index=i,
-                        noop_action=[0.0, 0.0],
                         body=body,
                         time_resolution=env.time_resolution,
                         road_centre=env.constants.road_map.major_road.bounding_box().longitudinal_line(),
@@ -364,7 +359,6 @@ class Config:
                 elif self.tester_config.agent is AgentType.ELECTION and isinstance(body, Pedestrian):
                     agent = ElectionAgent(
                         index=i,
-                        noop_action=[0.0, 0.0],
                         body=body,
                         time_resolution=env.time_resolution,
                         road_centre=env.constants.road_map.major_road.bounding_box().longitudinal_line(),
@@ -373,7 +367,6 @@ class Config:
                 elif self.tester_config.agent is AgentType.Q_LEARNING and isinstance(body, Pedestrian):
                     agent = QLearningAgent(
                         index=i,
-                        noop_action=[0.0, 0.0],
                         body=body,
                         ego_constants=env.bodies[0].constants,
                         road_polgon=env.constants.road_map.major_road.static_bounding_box,

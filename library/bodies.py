@@ -85,8 +85,8 @@ class DynamicBody(Body, Occlusion):
 
         self.wheels = geometry.make_rectangle(self.constants.wheelbase, self.constants.track)
 
-        self.throttle = 0.0
-        self.steering_angle = 0.0
+        self.noop_action = [0.0, 0.0]
+        self.throttle, self.steering_angle = self.noop_action
 
         self.target_velocity = None
         self.target_orientation = None
@@ -111,8 +111,7 @@ class DynamicBody(Body, Occlusion):
     def reset(self):
         super().reset()
 
-        self.throttle = 0.0
-        self.steering_angle = 0.0
+        self.throttle, self.steering_angle = self.noop_action
 
     def bounding_box(self):
         return self.shape.transform(self.state.orientation, self.state.position)

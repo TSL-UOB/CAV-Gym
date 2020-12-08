@@ -2,7 +2,7 @@ import math
 
 import reporting
 from examples.agents.dynamic_body import make_body_state, make_steering_action, TARGET_ERROR, make_throttle_action, \
-    ACTION_ERROR, TargetAgent
+    TargetAgent
 from examples.agents.template import RandomAgent, NoopAgent
 from examples.constants import M2PX
 from examples.targets import TargetOrientation, TargetVelocity
@@ -13,7 +13,7 @@ from library.geometry import Point
 
 class CrossingAgent(NoopAgent):
     def __init__(self, body, time_resolution, road_centre, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__(noop_action=body.noop_action, **kwargs)
 
         self.body = body
         self.time_resolution = time_resolution
@@ -177,7 +177,7 @@ class QLearningAgent(TargetAgent, RandomAgent):
         steering_action = make_steering_action(self_state, self.body.constants, self.time_resolution, target_orientation, self.noop_action)
 
         action = [throttle_action, steering_action]
-        joint_action = [[0.0, 0.0], action]
+        joint_action = [ego_body.noop_action, action]
 
         spawn_bodies = [ego_body, self_body]
         for i, spawn_body in enumerate(spawn_bodies):
@@ -248,30 +248,3 @@ class QLearningAgent(TargetAgent, RandomAgent):
         # print(reporting.pretty_float_list(list(self.feature_weights.values())))
 
         super().process_feedback(previous_state, action, state, reward)
-
-
-class DecayedQLearningAgent(QLearningAgent):
-    def __init__(self, decay_length=1000, alpha_start=1, alpha_end=0.01, epsilon_start=0.2, epsilon_end=0, **kwargs):
-        assert decay_length > 0
-
-        super().__init__(alpha=alpha_start, epsilon=epsilon_start, **kwargs)
-
-        self.decay_length = decay_length
-        self.alpha_start = alpha_start
-        self.alpha_end = alpha_end
-        self.epsilon_start = epsilon_start
-        self.epsilon_end = epsilon_end
-
-        self.decay_updates = 0
-
-    def reset(self):
-        decay = max((self.decay_length - self.decay_updates) / self.decay_length, 0)
-
-        def decayed_value(start, end):
-            return ((start - end) * decay) + end
-
-        self.alpha = decayed_value(self.alpha_start, self.alpha_end)
-        self.epsilon = decayed_value(self.epsilon_start, self.epsilon_end)
-        self.decay_updates += 1
-
-        # print(f"alpha={self.alpha}, epsilon={self.epsilon}, gamma={self.gamma}")

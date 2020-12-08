@@ -51,7 +51,7 @@ def make_steering_action(body_state, body_constants, time_resolution, target_ori
 
 class TargetAgent(NoopAgent):
     def __init__(self, body, time_resolution, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__(noop_action=body.noop_action, **kwargs)
 
         self.body = body
         self.time_resolution = time_resolution
