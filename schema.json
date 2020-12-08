@@ -245,14 +245,14 @@
             "type": "object",
             "properties": {
                 "option": { "const": "render" },
-                "record": {
+                "video_dir": {
                     "oneOf": [
                         { "type": "string" },
                         { "type": "null" }
                     ]
                 }
             },
-            "required": [ "option", "record" ],
+            "required": [ "option", "video_dir" ],
             "additionalProperties": false
         }
     }

@@ -207,7 +207,7 @@ class HeadlessConfig(ModeConfig):
 @enforce_types
 @dataclass(frozen=True)
 class RenderConfig(ModeConfig):
-    record: Optional[str]
+    video_dir: Optional[str]
 
     mode = Mode.RENDER
 
