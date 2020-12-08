@@ -16,14 +16,14 @@ class Simulation:
         self.keyboard_agent = keyboard_agent
 
         if self.keyboard_agent is not None:
-            assert self.config.mode_config.mode is Mode.RENDER and self.config.mode_config.keyboard, "keyboard agents and recordings do not work in headless mode"
+            assert self.config.mode_config.mode is Mode.RENDER, "keyboard agents only work in render mode"
 
         if self.config.mode_config.mode is Mode.RENDER and self.config.mode_config.record is not None:
             from library import mods  # lazy import of pyglet to allow headless mode on headless machines
             self.env = wrappers.Monitor(self.env, self.config.mode_config.record, video_callable=lambda episode_id: True, force=True)  # save all episodes instead of default behaviour (episodes 1, 8, 27, 64, ...)
             self.env.stats_recorder = mods.make_joint_stats_recorder(self.env, len(agents))  # workaround to avoid bugs due to existence of joint rewards
 
-        if self.config.agent_config.agent is AgentType.ELECTION:
+        if self.config.tester_config.agent is AgentType.ELECTION:
             self.election = Election(env, agents)
         else:
             self.election = None

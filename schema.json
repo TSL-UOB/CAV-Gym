@@ -49,7 +49,14 @@
                 { "$ref": "#/definitions/pelican_crossing_config" }
             ]
         },
-        "agent_config": {
+        "ego_config": {
+            "oneOf": [
+                { "$ref": "#/definitions/noop_config" },
+                { "$ref": "#/definitions/keyboard_config" },
+                { "$ref": "#/definitions/random_config" }
+            ]
+        },
+        "tester_config": {
             "oneOf": [
                 { "$ref": "#/definitions/noop_config" },
                 { "$ref": "#/definitions/random_config" },
@@ -66,7 +73,7 @@
             ]
         }
     },
-    "required": [ "verbosity", "episode_log", "run_log", "seed", "episodes", "max_timesteps", "collisions", "offroad", "zone", "ego_collisions", "living_cost", "road_cost", "win_reward", "scenario_config", "agent_config", "mode_config" ],
+    "required": [ "verbosity", "episode_log", "run_log", "seed", "episodes", "max_timesteps", "collisions", "offroad", "zone", "ego_collisions", "living_cost", "road_cost", "win_reward", "scenario_config", "ego_config", "tester_config", "mode_config" ],
     "additionalProperties": false,
     "definitions": {
         "bus_stop_config": {
@@ -89,7 +96,7 @@
             "type": "object",
             "properties": {
                 "option": { "const": "pedestrians" },
-                "bodies": {
+                "num_pedestrians": {
                     "type": "integer",
                     "minimum": 1
                 },
@@ -104,7 +111,7 @@
                     "maximum": 1
                 }
             },
-            "required": [ "option", "bodies" ],
+            "required": [ "option", "num_pedestrians", "outbound_pavement", "inbound_pavement" ],
             "additionalProperties": false
         },
         "pelican_crossing_config": {
@@ -119,6 +126,14 @@
             "type": "object",
             "properties": {
                 "option": { "const": "noop" }
+            },
+            "required": [ "option" ],
+            "additionalProperties": false
+        },
+        "keyboard_config": {
+            "type": "object",
+            "properties": {
+                "option": { "const": "keyboard" }
             },
             "required": [ "option" ],
             "additionalProperties": false
@@ -230,7 +245,6 @@
             "type": "object",
             "properties": {
                 "option": { "const": "render" },
-                "keyboard": { "type": "boolean" },
                 "record": {
                     "oneOf": [
                         { "type": "string" },
@@ -238,7 +252,7 @@
                     ]
                 }
             },
-            "required": [ "option", "keyboard", "record" ],
+            "required": [ "option", "record" ],
             "additionalProperties": false
         }
     }

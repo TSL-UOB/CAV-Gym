@@ -31,6 +31,7 @@ class Scenario(Enum):
 
 class AgentType(Enum):
     NOOP = "noop"
+    KEYBOARD = "keyboard"
     RANDOM = "random"
     RANDOM_CONSTRAINED = "random-constrained"
     PROXIMITY = "proximity"
@@ -85,15 +86,15 @@ class CrossroadsConfig(ScenarioConfig):
 @enforce_types
 @dataclass(frozen=True)
 class PedestriansConfig(ScenarioConfig):
-    bodies: int
+    num_pedestrians: int
     outbound_pavement: float
     inbound_pavement: float
 
     scenario = Scenario.PEDESTRIANS
 
     def __post_init__(self):
-        if self.bodies < 0:
-            raise ValueError("bodies must be >= 0")
+        if self.num_pedestrians < 0:
+            raise ValueError("num_pedestrians must be >= 0")
         if self.outbound_pavement < 0 or self.outbound_pavement > 1:
             raise ValueError("outbound_pavement must be in [0,1]")
         if self.inbound_pavement < 0 or self.inbound_pavement > 1:
@@ -110,6 +111,12 @@ class PelicanCrossingConfig(ScenarioConfig):
 @dataclass(frozen=True)
 class NoopConfig(AgentConfig):
     agent = AgentType.NOOP
+
+
+@enforce_types
+@dataclass(frozen=True)
+class KeyboardConfig(AgentConfig):
+    agent = AgentType.KEYBOARD
 
 
 @enforce_types
@@ -200,7 +207,6 @@ class HeadlessConfig(ModeConfig):
 @enforce_types
 @dataclass(frozen=True)
 class RenderConfig(ModeConfig):
-    keyboard: bool
     record: Optional[str]
 
     mode = Mode.RENDER
@@ -223,7 +229,8 @@ class Config:
     road_cost: float
     win_reward: float
     scenario_config: Union[BusStopConfig, CrossroadsConfig, PedestriansConfig, PelicanCrossingConfig]
-    agent_config: Union[NoopConfig, RandomConfig, RandomConstrainedConfig, ProximityConfig, ElectionConfig, QLearningConfig]
+    ego_config: Union[NoopConfig, KeyboardConfig, RandomConfig]
+    tester_config: Union[NoopConfig, RandomConfig, RandomConstrainedConfig, ProximityConfig, ElectionConfig, QLearningConfig]
     mode_config: Union[HeadlessConfig, RenderConfig]
 
     def __post_init__(self):
@@ -247,105 +254,123 @@ class Config:
         elif self.scenario_config.scenario is Scenario.CROSSROADS:
             env = gym.make('Crossroads-v0', env_config=self, np_random=np_random)
         elif self.scenario_config.scenario is Scenario.PEDESTRIANS:
-            env = gym.make('Pedestrians-v0', env_config=self, num_pedestrians=self.scenario_config.bodies, outbound_percentage=self.scenario_config.outbound_pavement, inbound_percentage=self.scenario_config.inbound_pavement, np_random=np_random)
+            env = gym.make('Pedestrians-v0', env_config=self, num_pedestrians=self.scenario_config.num_pedestrians, outbound_percentage=self.scenario_config.outbound_pavement, inbound_percentage=self.scenario_config.inbound_pavement, np_random=np_random)
         else:
             raise NotImplementedError
 
         console.info(f"bodies={pretty_str_list(body.__class__.__name__ for body in env.bodies)}")
 
-        keyboard_agent = KeyboardAgent(index=0, noop_action=[0.0, 0.0], body=env.bodies[0], time_resolution=env.time_resolution) if self.mode_config.mode is Mode.RENDER and self.mode_config.keyboard else None
-        agent = keyboard_agent if keyboard_agent is not None else NoopAgent(index=0, noop_action=[0.0, 0.0])
-        #
-        # Approximate Q-learning agent
-        #
-        # agent = keyboard_agent if keyboard_agent is not None else QLearningEgoAgent(
-        #     index=0,
-        #     noop_action=[0.0, 0.0],
-        #     np_random=np_random,
-        #     q_learning_config=QLearningConfig(
-        #         alpha=0.18,
-        #         gamma=0.87,
-        #         epsilon=0.01,
-        #         features=FeatureConfig(
-        #             distance_x=True,
-        #             distance_y=True,
-        #             distance=True,
-        #             on_road=False,
-        #             facing=True,
-        #             inverse_distance=False
+        keyboard_agent = None
+        if self.ego_config.agent is AgentType.NOOP:
+            agent = NoopAgent(
+                index=0,
+                noop_action=[0.0, 0.0]
+            )
+        elif self.ego_config.agent is AgentType.KEYBOARD:
+            assert self.mode_config.mode is Mode.RENDER, "keyboard agents only work in render mode"
+            keyboard_agent = KeyboardAgent(
+                index=0,
+                noop_action=[0.0, 0.0],
+                body=env.bodies[0],
+                time_resolution=env.time_resolution
+            )
+            agent = keyboard_agent
+        elif self.ego_config.agent is AgentType.RANDOM:
+            agent = RandomAgent(
+                index=0,
+                noop_action=[0.0, 0.0],
+                epsilon=self.ego_config.epsilon
+            )
+        # elif self.ego_config.agent is AgentType.Q_LEARNING:
+        #     agent = keyboard_agent if keyboard_agent is not None else QLearningEgoAgent(
+        #         index=0,
+        #         noop_action=[0.0, 0.0],
+        #         np_random=np_random,
+        #         q_learning_config=QLearningConfig(
+        #             alpha=0.18,
+        #             gamma=0.87,
+        #             epsilon=0.01,
+        #             features=FeatureConfig(
+        #                 distance_x=True,
+        #                 distance_y=True,
+        #                 distance=True,
+        #                 on_road=False,
+        #                 facing=True,
+        #                 inverse_distance=False
+        #             ),
+        #             log=None
         #         ),
-        #         log=None
-        #     ),
-        #     body=env.bodies[0],
-        #     time_resolution=env.time_resolution,
-        #     width=env.constants.viewer_width,
-        #     height=env.constants.viewer_height,
-        #     num_velocity_targets=11
-        # )
-        #
-        # Frenet agent
-        #
-        # oubound_lane = env.constants.road_map.major_road.outbound.lanes[0].static_bounding_box
-        # inbound_lane = env.constants.road_map.major_road.inbound.lanes[0].static_bounding_box
-        # inbound_lane_end, inbound_lane_start = inbound_lane.split_longitudinally()
-        # agent = keyboard_agent if keyboard_agent is not None else FrenetAgent(
-        #     index=0,
-        #     noop_action=[0.0, 0.0],
-        #     body=env.bodies[0],
-        #     time_resolution=env.time_resolution,
-        #     lane_width=env.constants.road_map.major_road.constants.lane_width,
-        #     waypoints=[
-        #         oubound_lane.rear_centre(),
-        #         # inbound_lane_start.centre(),
-        #         # oubound_lane.centre(),
-        #         # inbound_lane_end.centre(),
-        #         oubound_lane.front_centre()
-        #     ]
-        # )
+        #         body=env.bodies[0],
+        #         time_resolution=env.time_resolution,
+        #         width=env.constants.viewer_width,
+        #         height=env.constants.viewer_height,
+        #         num_velocity_targets=11
+        #     )
+        # elif self.ego_config.agent is AgentType.FRENET:
+        #     oubound_lane = env.constants.road_map.major_road.outbound.lanes[0].static_bounding_box
+        #     # inbound_lane = env.constants.road_map.major_road.inbound.lanes[0].static_bounding_box
+        #     # inbound_lane_end, inbound_lane_start = inbound_lane.split_longitudinally()
+        #     agent = FrenetAgent(
+        #         index=0,
+        #         noop_action=[0.0, 0.0],
+        #         body=env.bodies[0],
+        #         time_resolution=env.time_resolution,
+        #         lane_width=env.constants.road_map.major_road.constants.lane_width,
+        #         waypoints=[
+        #             oubound_lane.rear_centre(),
+        #             # inbound_lane_start.centre(),
+        #             # oubound_lane.centre(),
+        #             # inbound_lane_end.centre(),
+        #             oubound_lane.front_centre()
+        #         ]
+        #     )
+        else:
+            raise NotImplementedError
+
         agents = [agent]
         for i, body in enumerate(env.bodies[1:], start=1):
             if isinstance(body, DynamicBody):
-                if self.agent_config.agent is AgentType.NOOP:
+                if self.tester_config.agent is AgentType.NOOP:
                     agent = NoopAgent(
                         index=i,
                         noop_action=[0.0, 0.0]
                     )
-                elif self.agent_config.agent is AgentType.RANDOM:
+                elif self.tester_config.agent is AgentType.RANDOM:
                     agent = RandomAgent(
                         index=i,
                         noop_action=[0.0, 0.0],
-                        epsilon=self.agent_config.epsilon,
+                        epsilon=self.tester_config.epsilon,
                         np_random=np_random
                     )
-                elif self.agent_config.agent is AgentType.RANDOM_CONSTRAINED and isinstance(body, Pedestrian):
+                elif self.tester_config.agent is AgentType.RANDOM_CONSTRAINED and isinstance(body, Pedestrian):
                     agent = RandomConstrainedAgent(
                         index=i,
                         noop_action=[0.0, 0.0],
                         body=body,
                         time_resolution=env.time_resolution,
                         road_centre=env.constants.road_map.major_road.bounding_box().longitudinal_line(),
-                        epsilon=self.agent_config.epsilon,
+                        epsilon=self.tester_config.epsilon,
                         np_random=np_random
                     )
-                elif self.agent_config.agent is AgentType.PROXIMITY and isinstance(body, Pedestrian):
+                elif self.tester_config.agent is AgentType.PROXIMITY and isinstance(body, Pedestrian):
                     agent = ProximityAgent(
                         index=i,
                         noop_action=[0.0, 0.0],
                         body=body,
                         time_resolution=env.time_resolution,
                         road_centre=env.constants.road_map.major_road.bounding_box().longitudinal_line(),
-                        distance_threshold=self.agent_config.threshold
+                        distance_threshold=self.tester_config.threshold
                     )
-                elif self.agent_config.agent is AgentType.ELECTION and isinstance(body, Pedestrian):
+                elif self.tester_config.agent is AgentType.ELECTION and isinstance(body, Pedestrian):
                     agent = ElectionAgent(
                         index=i,
                         noop_action=[0.0, 0.0],
                         body=body,
                         time_resolution=env.time_resolution,
                         road_centre=env.constants.road_map.major_road.bounding_box().longitudinal_line(),
-                        distance_threshold=self.agent_config.threshold
+                        distance_threshold=self.tester_config.threshold
                     )
-                elif self.agent_config.agent is AgentType.Q_LEARNING and isinstance(body, Pedestrian):
+                elif self.tester_config.agent is AgentType.Q_LEARNING and isinstance(body, Pedestrian):
                     agent = QLearningAgent(
                         index=i,
                         noop_action=[0.0, 0.0],
@@ -356,21 +381,21 @@ class Config:
                         width=env.constants.viewer_width,
                         height=env.constants.viewer_height,
                         np_random=np_random,
-                        q_learning_config=self.agent_config
+                        q_learning_config=self.tester_config
                     )
                 else:
                     raise NotImplementedError
             elif isinstance(body, TrafficLight) or isinstance(body, PelicanCrossing):
-                if self.agent_config.agent is AgentType.NOOP:
+                if self.tester_config.agent is AgentType.NOOP:
                     agent = NoopAgent(
                         index=i,
                         noop_action=TrafficLightAction.NOOP.value
                     )
-                elif self.agent_config.agent is AgentType.RANDOM:
+                elif self.tester_config.agent is AgentType.RANDOM:
                     agent = RandomAgent(
                         index=i,
                         noop_action=TrafficLightAction.NOOP.value,
-                        epsilon=self.agent_config.epsilon,
+                        epsilon=self.tester_config.epsilon,
                         np_random=np_random
                     )
             agents.append(agent)
@@ -394,7 +419,8 @@ class ConfigJSONEncoder(JSONEncoder):  # serialise Config to data
             obj_dict = asdict(obj)
             obj_dict["verbosity"] = obj.verbosity.value
             obj_dict["scenario_config"] = {"option": str(obj.scenario_config.scenario), **asdict(obj.scenario_config)}
-            obj_dict["agent_config"] = {"option": str(obj.agent_config.agent), **asdict(obj.agent_config)}
+            obj_dict["ego_config"] = {"option": str(obj.ego_config.agent), **asdict(obj.ego_config)}
+            obj_dict["tester_config"] = {"option": str(obj.tester_config.agent), **asdict(obj.tester_config)}
             obj_dict["mode_config"] = {"option": str(obj.mode_config.mode), **asdict(obj.mode_config)}
             return obj_dict
         else:
@@ -421,7 +447,19 @@ def make_scenario_config(data):  # deserialise data to ScenarioConfig
         raise NotImplementedError
 
 
-def make_agent_config(data):  # deserialise data to AgentConfig
+def make_ego_config(data):  # deserialise data to AgentConfig
+    option = data.pop("option")
+    if option == AgentType.NOOP.value:
+        return NoopConfig()
+    elif option == AgentType.KEYBOARD.value:
+        return KeyboardConfig()
+    elif option == AgentType.RANDOM.value:
+        return RandomConfig(**data)
+    else:
+        raise NotImplementedError
+
+
+def make_tester_config(data):  # deserialise data to AgentConfig
     option = data.pop("option")
     if option == AgentType.NOOP.value:
         return NoopConfig()
@@ -456,7 +494,8 @@ def make_mode_config(data):  # deserialise data to ModeConfig
 def make_config(data):
     data["verbosity"] = Verbosity(str(data["verbosity"]))
     data["scenario_config"] = make_scenario_config(data["scenario_config"])
-    data["agent_config"] = make_agent_config(data["agent_config"])
+    data["ego_config"] = make_ego_config(data["ego_config"])
+    data["tester_config"] = make_tester_config(data["tester_config"])
     data["mode_config"] = make_mode_config(data["mode_config"])
     return Config(**data)
 

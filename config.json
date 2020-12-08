@@ -14,11 +14,14 @@
   "win_reward": 6000.0,
   "scenario_config": {
     "option": "pedestrians",
-    "bodies": 1,
+    "num_pedestrians": 1,
     "outbound_pavement": 1.0,
     "inbound_pavement": 1.0
   },
-  "agent_config": {
+  "ego_config": {
+    "option": "noop"
+  },
+  "tester_config": {
     "option": "random-constrained",
     "epsilon": 0.01
   },
