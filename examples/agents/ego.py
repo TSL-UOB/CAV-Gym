@@ -2,6 +2,7 @@ import math
 
 import numpy as np
 
+import reporting
 from examples.agents.dynamic_body import make_body_state, make_throttle_action
 from examples.agents.template import RandomAgent
 from library import geometry
@@ -25,6 +26,10 @@ class QLearningEgoAgent(RandomAgent):
 
         self.target_velocities = list(np.linspace(start=self.body.constants.min_velocity, stop=self.body.constants.max_velocity, num=num_velocity_targets, endpoint=True))
 
+        self.log_file = None
+        if q_learning_config.log is not None:
+            self.log_file = reporting.get_agent_file_logger(q_learning_config.log)
+
         self.feature_bounds = dict()
         if self.feature_config.distance_x:
             self.feature_bounds["distance_x"] = (0, width)
@@ -37,8 +42,14 @@ class QLearningEgoAgent(RandomAgent):
 
         self.feature_weights = {feature: 0.0 for feature in self.feature_bounds.keys()}
 
+        if self.log_file:
+            self.enabled_features = sorted(self.feature_bounds.keys())
+            self.log_file.info(f"{','.join(map(str, self.enabled_features))}")
+
     def reset(self):
         self.body.target_velocity = None
+        if self.log_file:
+            self.log_file.info(f"{','.join(map(str, [self.feature_weights[feature] for feature in self.enabled_features]))}")
 
     def choose_action(self, state, action_space, info=None):
         body_state = make_body_state(state, self.index)

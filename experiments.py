@@ -8,7 +8,7 @@ from config import Config, PedestriansConfig, HeadlessConfig, QLearningConfig, F
 from simulation import Simulation
 
 
-def make_agent_config(agent_type, log_dir):
+def make_tester_config(agent_type):
     if agent_type is AgentType.RANDOM:
         return RandomConfig(epsilon=0.01)
     elif agent_type is AgentType.RANDOM_CONSTRAINED:
@@ -30,41 +30,58 @@ def make_agent_config(agent_type, log_dir):
                 facing=False,
                 inverse_distance=True
             ),
-            log=f"{log_dir}/qlearning.log"
+            log=None
         )
     else:
         raise NotImplementedError
 
 
-def make_config(agent_type, outbound_pavement, inbound_pavement):
-    log_dir = f"logs/agent_type={agent_type}/outbound_pavement={outbound_pavement}/inbound_pavement={inbound_pavement}"
+def make_config(tester_type, alpha, gamma, epsilon):
+    log_dir = f"logs/tester={tester_type}/alpha={alpha}/gamma={gamma}/epsilon={epsilon}"
     return log_dir, Config(
         verbosity=Verbosity.SILENT,
         episode_log=f"{log_dir}/episode.log",
         run_log=f"{log_dir}/run.log",
         seed=0,
-        episodes=1000,
+        episodes=10,
         max_timesteps=1000,
         collisions=False,
         offroad=True,
         zone=True,
+        ego_collisions=True,
         living_cost=1.0,
         road_cost=5.0,
         win_reward=6000.0,
         scenario_config=PedestriansConfig(
-            bodies=1,
-            outbound_pavement=outbound_pavement,
-            inbound_pavement=inbound_pavement
+            num_pedestrians=1,
+            outbound_pavement=1.0,
+            inbound_pavement=1.0
         ),
-        agent_config=make_agent_config(agent_type, log_dir),
+        ego_config=QLearningConfig(
+            alpha=0.18,
+            gamma=0.87,
+            epsilon=0.0005,
+            features=FeatureConfig(
+                distance_x=True,
+                distance_y=True,
+                distance=True,
+                on_road=False,
+                facing=False,
+                inverse_distance=True
+            ),
+            log=f"{log_dir}/ego-qlearning.log"
+        ),
+        tester_config=make_tester_config(tester_type),
         mode_config=HeadlessConfig()
     )
 
 
-def run(agent_type, outbound_pavement, inbound_pavement):
-    # print(f"starting: agent_type={agent_type}, outbound_pavement={outbound_pavement}, inbound_pavement={inbound_pavement}")
+def run(tester_type, alpha, gamma, epsilon):
+    label = f"tester={tester_type}, alpha={alpha}, gamma={gamma}, epsilon={epsilon}"
 
-    log_dir, config = make_config(agent_type, outbound_pavement, inbound_pavement)
+    print(f"starting: {label}")
+
+    log_dir, config = make_config(tester_type, alpha, gamma, epsilon)
     config.write_json(f"{log_dir}/config.json")
 
     np_seed, env, agents, keyboard_agent = config.setup()
@@ -72,7 +89,7 @@ def run(agent_type, outbound_pavement, inbound_pavement):
     simulation = Simulation(env, agents, config=config, keyboard_agent=keyboard_agent)
     simulation.run()
 
-    # print(f"finished: agent_type={agent_type}, outbound_pavement={outbound_pavement}, inbound_pavement={inbound_pavement}")
+    print(f"finished: {label}")
 
 
 class PoolParser(ArgumentParser):
@@ -93,11 +110,12 @@ class PoolParser(ArgumentParser):
 
 
 if __name__ == '__main__':
-    agent_types = [AgentType.RANDOM, AgentType.RANDOM_CONSTRAINED, AgentType.PROXIMITY, AgentType.Q_LEARNING]
-    outbound_pavements = [1.0, 0.75, 0.5, 0.25, 0.0]
-    inbound_pavements = [1.0, 0.75, 0.5, 0.25, 0.0]
+    tester_types = [AgentType.RANDOM_CONSTRAINED]
+    alphas = [0.1, 0.5, 0.9]
+    gammas = [0.1, 0.5, 0.9]
+    epsilons = [0.1, 0.5, 0.9]
 
-    parameters = [(agent_type, outbound_pavement, inbound_pavement) for agent_type in agent_types for outbound_pavement in outbound_pavements for inbound_pavement in inbound_pavements if outbound_pavement > 0 or inbound_pavement > 0]
+    parameters = [(tester_type, alpha, gamma, epsilon) for tester_type in tester_types for alpha in alphas for gamma in gammas for epsilon in epsilons]
 
     parser = PoolParser()
     pool = parser.parse_pool()
