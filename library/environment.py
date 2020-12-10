@@ -86,7 +86,6 @@ class CAVEnv(MarkovGameEnv):
 
         self.ego_maintenance_velocity = self.ego.init_state.velocity
         self.ego_max_velocity_offset = max(abs(self.ego.constants.max_velocity - self.ego_maintenance_velocity), abs(self.ego.constants.min_velocity - self.ego_maintenance_velocity))
-        self.run_rewards = [0.0 for _ in self.bodies]
 
         self.current_timestep = 0
 
@@ -215,13 +214,6 @@ class CAVEnv(MarkovGameEnv):
                 info['winner'] = win_tester
         else:
             assert not win_ego and win_tester is None
-
-        print(self.current_timestep, joint_reward)
-
-        for i, _ in enumerate(self.run_rewards):
-            self.run_rewards[i] += joint_reward[i]
-        if terminate or self.current_timestep == self.env_config.max_timesteps - 1:
-            print(self.run_rewards)
 
         self.current_timestep += 1
         return state, joint_reward, terminate, info
