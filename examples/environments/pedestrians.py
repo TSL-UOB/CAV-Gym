@@ -85,7 +85,7 @@ class PedestriansEnv(CAVEnv):
             Car(
                 init_state=DynamicBodyState(
                     position=road_map.major_road.outbound.lanes[0].spawn,
-                    velocity=car_constants.max_velocity,
+                    velocity=car_constants.min_velocity + (car_constants.max_velocity - car_constants.min_velocity) * 0.75,
                     orientation=road_map.major_road.outbound.orientation
                 ),
                 constants=car_constants

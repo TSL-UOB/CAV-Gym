@@ -120,19 +120,19 @@ class DynamicBody(Body, Occlusion):
         return self.wheels.transform(self.state.orientation, self.state.position)
 
     def stopping_zones(self):
+        braking_distance = (self.state.velocity ** 2) / (2 * -self.constants.min_throttle)
+        reaction_distance = self.state.velocity * REACTION_TIME
+        total_distance = braking_distance + reaction_distance
+
+        if total_distance == 0:
+            return None, None
+
+        if self.steering_angle == 0:
+            zone = geometry.make_rectangle(total_distance, self.constants.width, rear_offset=0).transform(self.state.orientation, Point(self.constants.length * 0.5, 0).transform(self.state.orientation, self.state.position))
+            braking_zone, reaction_zone = zone.split_longitudinally(braking_distance / total_distance)
+            return braking_zone, reaction_zone
+
         return None, None
-        #
-        # braking_distance = (self.state.velocity ** 2) / (2 * -self.constants.min_throttle)
-        # reaction_distance = self.state.velocity * REACTION_TIME
-        # total_distance = braking_distance + reaction_distance
-        #
-        # if total_distance == 0:
-        #     return None, None
-        #
-        # if self.steering_angle == 0:
-        #     zone = geometry.make_rectangle(total_distance, self.constants.width, rear_offset=0).transform(self.state.orientation, Point(self.constants.length * 0.5, 0).transform(self.state.orientation, self.state.position))
-        #     braking_zone, reaction_zone = zone.split_longitudinally(braking_distance / total_distance)
-        #     return braking_zone, reaction_zone
         #
         # front_remaining_length = (self.constants.length - self.constants.wheelbase) / 2.0
         #

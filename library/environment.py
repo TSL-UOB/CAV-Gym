@@ -5,10 +5,9 @@ import gym
 from gym import spaces
 from gym.utils import seeding
 
-from config import Mode
+from config import Mode, CollisionType
 from library.bodies import PelicanCrossing, Pedestrian
 from library.assets import RoadMap, Occlusion
-from reporting import pretty_float
 
 console_logger = logging.getLogger("library.console.environment")
 
@@ -85,6 +84,12 @@ class CAVEnv(MarkovGameEnv):
 
         self.ego = self.bodies[0]
 
+        self.ego_maintenance_velocity = self.ego.init_state.velocity
+        self.ego_max_velocity_offset = max(abs(self.ego.constants.max_velocity - self.ego_maintenance_velocity), abs(self.ego.constants.min_velocity - self.ego_maintenance_velocity))
+        self.run_rewards = [0.0 for _ in self.bodies]
+
+        self.current_timestep = 0
+
         self.viewer = None
 
     def collidable_entities(self):
@@ -124,24 +129,28 @@ class CAVEnv(MarkovGameEnv):
 
         state = self.state()
 
-        joint_reward = [-self.env_config.living_cost for _ in self.bodies]
+        joint_reward = [0.0 for _ in self.bodies]
+
+        ego_velocity_relative_offset = abs(self.ego.state.velocity - self.ego_maintenance_velocity) / self.ego_max_velocity_offset
+        joint_reward[0] -= ego_velocity_relative_offset * self.env_config.cost_step
 
         for i, polygon in enumerate(body_polygons):
-            if i > 0 and any(polygon.mostly_intersects(road.bounding_box()) for road in self.constants.road_map.roads):  # pedestrian on road
-                self.episode_liveness[i] += 1
-                self.run_liveness[i] += 1
-                joint_reward[i] -= self.env_config.road_cost
-
-        joint_reward[0] -= 1 - ((self.ego.state.velocity - self.ego.constants.min_velocity) / (self.ego.constants.max_velocity - self.ego.constants.min_velocity))
-        joint_reward[0] -= abs(joint_action[0][0]) / self.ego.constants.max_throttle
+            if i > 0:
+                percentage_intersects = max(polygon.percentage_intersects(road.bounding_box()) for road in self.constants.road_map.roads)
+                joint_reward[i] -= percentage_intersects * self.env_config.cost_step
+                if percentage_intersects > 0.5:  # pedestrian mostly on road
+                    self.episode_liveness[i] += 1
+                    self.run_liveness[i] += 1
 
         terminate = False
+        win_ego = False
+        win_tester = None
 
-        if not terminate and all(x > self.ego.state.position.x for x, y in self.ego.bounding_box()):
-            print("ego reached goal")
+        if not terminate and all(x > self.constants.viewer_width for x, y in self.ego.bounding_box()):
             terminate = True
+            win_ego = True
 
-        if not terminate and self.env_config.collisions:
+        if not terminate and self.env_config.terminate_collisions is CollisionType.ALL:
             collidable_entities = self.collidable_entities()
             collidable_bounding_boxes = [entity.bounding_box() for entity in collidable_entities]  # no need to recompute bounding boxes
             collided_entities = list()  # record collided entities so that they can be skipped in subsequent iterations
@@ -164,7 +173,7 @@ class CAVEnv(MarkovGameEnv):
             collision_occurred = any(collision_detections)
             terminate = collision_occurred
 
-        if not terminate and self.env_config.offroad:
+        if not terminate and self.env_config.terminate_ego_offroad:
             ego_on_road = any(body_polygons[0].intersects(road.bounding_box()) for road in self.constants.road_map.roads)
             terminate = not ego_on_road
 
@@ -176,29 +185,45 @@ class CAVEnv(MarkovGameEnv):
                 return True
             return False
 
-        if not terminate and self.env_config.ego_collisions:  # terminate early if pedestrian collides with ego or braking zone of ego (uninteresting tests)
+        if not terminate and self.env_config.terminate_collisions is CollisionType.EGO:  # terminate early if pedestrian collides with ego or braking zone of ego (uninteresting tests)
             ego_collision = any(ego_collision(body_polygons[i]) for i, body in enumerate(self.bodies) if body is not self.ego and isinstance(body, Pedestrian))
             terminate = ego_collision
 
         def check_pedestrian_in_reaction_zone():
-            braking_zone = self.ego.stopping_zones()[1]
-            if braking_zone is not None:
+            reaction_zone = self.ego.stopping_zones()[1]
+            if reaction_zone is not None:
                 for other_body_index, other_body in enumerate(self.bodies):
-                    if other_body is not self.ego and isinstance(other_body, Pedestrian) and body_polygons[other_body_index].intersects(braking_zone):
+                    if other_body is not self.ego and isinstance(other_body, Pedestrian) and body_polygons[other_body_index].intersects(reaction_zone):
                         return other_body_index
             return None
 
-        pedestrian_in_reaction_zone = None
-        if not terminate and self.env_config.zone:
+        if not terminate and self.env_config.terminate_ego_zones:
             pedestrian_in_reaction_zone = check_pedestrian_in_reaction_zone()
             terminate = pedestrian_in_reaction_zone is not None
+            win_tester = pedestrian_in_reaction_zone
 
-        if terminate:
-            winner = pedestrian_in_reaction_zone if pedestrian_in_reaction_zone else 0  # index of winner
-            joint_reward[winner] += self.env_config.win_reward
+        if terminate or self.current_timestep == self.env_config.max_timesteps - 1:
+            assert not win_ego or win_tester is None
+            joint_reward[0] += self.env_config.reward_win if win_ego else -self.env_config.reward_win if win_tester is not None else self.env_config.reward_draw
+            for i, _ in enumerate(joint_reward):
+                if i > 0:
+                    joint_reward[i] += -self.env_config.reward_win if win_ego else self.env_config.reward_draw if win_tester is None else self.env_config.reward_win if win_tester == i else self.env_config.reward_draw
             # noinspection PyTypeChecker
-            info['winner'] = winner
+            if win_ego:
+                info['winner'] = 0
+            elif win_tester is not None:
+                info['winner'] = win_tester
+        else:
+            assert not win_ego and win_tester is None
 
+        print(self.current_timestep, joint_reward)
+
+        for i, _ in enumerate(self.run_rewards):
+            self.run_rewards[i] += joint_reward[i]
+        if terminate or self.current_timestep == self.env_config.max_timesteps - 1:
+            print(self.run_rewards)
+
+        self.current_timestep += 1
         return state, joint_reward, terminate, info
 
     def reset(self):

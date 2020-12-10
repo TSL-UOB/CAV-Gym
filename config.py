@@ -213,6 +213,12 @@ class RenderConfig(ModeConfig):
     mode = Mode.RENDER
 
 
+class CollisionType(Enum):
+    NONE = "none"
+    EGO = "ego"
+    ALL = "all"
+
+
 @enforce_types
 @dataclass(frozen=True)
 class Config:
@@ -222,13 +228,12 @@ class Config:
     seed: Optional[int]
     episodes: int
     max_timesteps: int
-    collisions: bool
-    offroad: bool
-    zone: bool
-    ego_collisions: bool
-    living_cost: float
-    road_cost: float
-    win_reward: float
+    terminate_collisions: CollisionType
+    terminate_ego_zones: bool
+    terminate_ego_offroad: bool
+    reward_win: float
+    reward_draw: float
+    cost_step: float
     scenario_config: Union[BusStopConfig, CrossroadsConfig, PedestriansConfig, PelicanCrossingConfig]
     ego_config: Union[NoopConfig, KeyboardConfig, RandomConfig, QLearningConfig]
     tester_config: Union[NoopConfig, RandomConfig, RandomConstrainedConfig, ProximityConfig, ElectionConfig, QLearningConfig]
@@ -480,6 +485,7 @@ def make_mode_config(data):  # deserialise data to ModeConfig
 
 def make_config(data):
     data["verbosity"] = Verbosity(str(data["verbosity"]))
+    data["terminate_collisions"] = CollisionType(str(data["terminate_collisions"])) if data["terminate_collisions"] else CollisionType.NONE
     data["scenario_config"] = make_scenario_config(data["scenario_config"])
     data["ego_config"] = make_ego_config(data["ego_config"])
     data["tester_config"] = make_tester_config(data["tester_config"])

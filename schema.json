@@ -35,13 +35,18 @@
             "type": "integer",
             "minimum": 1
         },
-        "collisions": { "type": "boolean" },
-        "offroad": { "type": "boolean" },
-        "zone": { "type": "boolean" },
-        "ego_collisions": { "type": "boolean" },
-        "living_cost": { "type": "number" },
-        "road_cost": { "type": "number" },
-        "win_reward": { "type": "number" },
+        "terminate_collisions": {
+            "oneOf": [
+                { "type": "null" },
+                { "const": "ego" },
+                { "const": "all" }
+            ]
+        },
+        "terminate_ego_zones": { "type": "boolean" },
+        "terminate_ego_offroad": { "type": "boolean" },
+        "reward_win": { "type": "number" },
+        "reward_draw": { "type": "number" },
+        "cost_step": { "type": "number" },
         "scenario_config": {
             "oneOf": [
                 { "$ref": "#/definitions/bus_stop_config" },
@@ -75,7 +80,7 @@
             ]
         }
     },
-    "required": [ "verbosity", "episode_log", "run_log", "seed", "episodes", "max_timesteps", "collisions", "offroad", "zone", "ego_collisions", "living_cost", "road_cost", "win_reward", "scenario_config", "ego_config", "tester_config", "mode_config" ],
+    "required": [ "verbosity", "episode_log", "run_log", "seed", "episodes", "max_timesteps", "terminate_collisions", "terminate_ego_zones", "terminate_ego_offroad", "reward_win", "reward_draw", "cost_step", "scenario_config", "ego_config", "tester_config", "mode_config" ],
     "additionalProperties": false,
     "definitions": {
         "bus_stop_config": {

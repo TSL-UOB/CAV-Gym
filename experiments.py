@@ -110,7 +110,7 @@ class PoolParser(ArgumentParser):
 
 
 if __name__ == '__main__':
-    tester_types = [AgentType.RANDOM_CONSTRAINED]
+    tester_types = [AgentType.RANDOM, AgentType.RANDOM_CONSTRAINED, AgentType.PROXIMITY]
     alphas = [0.1, 0.5, 0.9]
     gammas = [0.1, 0.5, 0.9]
     epsilons = [0.1, 0.5, 0.9]
