@@ -4,7 +4,7 @@ from multiprocessing import Pool
 from examples.constants import M2PX
 from reporting import Verbosity
 from config import Config, PedestriansConfig, HeadlessConfig, QLearningConfig, FeatureConfig, AgentType, RandomConfig, \
-    RandomConstrainedConfig, ProximityConfig, ElectionConfig
+    RandomConstrainedConfig, ProximityConfig, ElectionConfig, CollisionType
 from simulation import Simulation
 
 
@@ -45,22 +45,21 @@ def make_config(tester_type, alpha, gamma, epsilon):
         seed=0,
         episodes=10,
         max_timesteps=1000,
-        collisions=False,
-        offroad=True,
-        zone=True,
-        ego_collisions=True,
-        living_cost=1.0,
-        road_cost=5.0,
-        win_reward=6000.0,
+        terminate_collisions=CollisionType.EGO,
+        terminate_ego_zones=True,
+        terminate_ego_offroad=False,
+        reward_win=6000.0,
+        reward_draw=2000.0,
+        cost_step=4.0,
         scenario_config=PedestriansConfig(
             num_pedestrians=1,
             outbound_pavement=1.0,
             inbound_pavement=1.0
         ),
         ego_config=QLearningConfig(
-            alpha=0.18,
-            gamma=0.87,
-            epsilon=0.0005,
+            alpha=alpha,
+            gamma=gamma,
+            epsilon=epsilon,
             features=FeatureConfig(
                 distance_x=True,
                 distance_y=True,

@@ -404,6 +404,7 @@ class ConfigJSONEncoder(JSONEncoder):  # serialise Config to data
         if isinstance(obj, Config):
             obj_dict = asdict(obj)
             obj_dict["verbosity"] = obj.verbosity.value
+            obj_dict["terminate_collisions"] = obj.terminate_collisions.value
             obj_dict["scenario_config"] = {"option": str(obj.scenario_config.scenario), **asdict(obj.scenario_config)}
             obj_dict["ego_config"] = {"option": str(obj.ego_config.agent), **asdict(obj.ego_config)}
             obj_dict["tester_config"] = {"option": str(obj.tester_config.agent), **asdict(obj.tester_config)}
@@ -485,7 +486,7 @@ def make_mode_config(data):  # deserialise data to ModeConfig
 
 def make_config(data):
     data["verbosity"] = Verbosity(str(data["verbosity"]))
-    data["terminate_collisions"] = CollisionType(str(data["terminate_collisions"])) if data["terminate_collisions"] else CollisionType.NONE
+    data["terminate_collisions"] = CollisionType(str(data["terminate_collisions"]))
     data["scenario_config"] = make_scenario_config(data["scenario_config"])
     data["ego_config"] = make_ego_config(data["ego_config"])
     data["tester_config"] = make_tester_config(data["tester_config"])
