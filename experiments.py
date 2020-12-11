@@ -61,12 +61,13 @@ def make_config(tester_type, alpha, gamma, epsilon):
             gamma=gamma,
             epsilon=epsilon,
             features=FeatureConfig(
-                distance_x=True,
-                distance_y=True,
+                distance_x=False,
+                distance_y=False,
                 distance=True,
+                relative_angle=True,
+                heading=True,
                 on_road=False,
-                facing=False,
-                inverse_distance=True
+                inverse_distance=False
             ),
             log=f"{log_dir}/ego-qlearning.log"
         ),
