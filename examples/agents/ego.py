@@ -14,7 +14,7 @@ ACTION_ERROR = 0.000000000000001
 
 
 class QLearningEgoAgent(RandomAgent):
-    def __init__(self, q_learning_config, body, time_resolution, num_velocity_targets, width, height, **kwargs):
+    def __init__(self, q_learning_config, body, time_resolution, num_opponents, num_velocity_targets, width, height, **kwargs):
         super().__init__(noop_action=body.noop_action, epsilon=q_learning_config.epsilon, **kwargs)
 
         self.alpha = q_learning_config.alpha  # learning rate (should decrease over time)
@@ -24,6 +24,8 @@ class QLearningEgoAgent(RandomAgent):
         self.body = body
         self.time_resolution = time_resolution
 
+        self.opponent_indexes = list(range(1, num_opponents + 1))
+
         self.target_velocities = list(np.linspace(start=self.body.constants.min_velocity, stop=self.body.constants.max_velocity, num=num_velocity_targets, endpoint=True))
 
         self.log_file = None
@@ -32,24 +34,23 @@ class QLearningEgoAgent(RandomAgent):
 
         self.feature_bounds = dict()
         if self.feature_config.distance_x:
-            self.feature_bounds["distance_x"] = (0, width)
+            self.feature_bounds["distance_x"] = (0.0, float(width))
         if self.feature_config.distance_y:
-            self.feature_bounds["distance_y"] = (0, height)
+            self.feature_bounds["distance_y"] = (0.0, float(height))
         if self.feature_config.distance:
-            self.feature_bounds["distance"] = (0, math.sqrt((width ** 2) + (height ** 2)))
+            self.feature_bounds["distance"] = (0.0, math.sqrt((width ** 2) + (height ** 2)))
         if self.feature_config.facing:
-            self.feature_bounds["facing"] = (0, math.pi)
+            self.feature_bounds["facing"] = (0.0, math.pi)
 
-        self.feature_weights = {feature: 0.0 for feature in self.feature_bounds.keys()}
+        self.feature_weights = {index: {feature: 0.0 for feature in self.feature_bounds.keys()} for index in self.opponent_indexes}
 
         if self.log_file:
-            self.enabled_features = sorted(self.feature_bounds.keys())
-            self.log_file.info(f"{','.join(map(str, self.enabled_features))}")
+            self.enabled_features = {index: sorted(self.feature_bounds.keys()) for index in self.opponent_indexes}
+            labels = [f"{feature}{index}" for index, features in self.enabled_features.items() for feature in features]
+            self.log_file.info(f"{','.join(map(str, labels))}")
 
     def reset(self):
         self.body.target_velocity = None
-        if self.log_file:
-            self.log_file.info(f"{','.join(map(str, [self.feature_weights[feature] for feature in self.enabled_features]))}")
 
     def choose_action(self, state, action_space, info=None):
         body_state = make_body_state(state, self.index)
@@ -85,8 +86,14 @@ class QLearningEgoAgent(RandomAgent):
 
     def process_feedback(self, previous_state, action, state, reward):
         difference = (reward + self.gamma * max(self.q_value(state, target_velocity) for target_velocity in self.target_velocities)) - self.q_value(previous_state, self.body.target_velocity)
-        for feature, feature_value in self.features(previous_state, self.body.target_velocity).items():
-            self.feature_weights[feature] = self.feature_weights[feature] + self.alpha * difference * feature_value
+        for index, opponent_features in self.features(previous_state, self.body.target_velocity).items():
+            for feature, feature_value in opponent_features.items():
+                self.feature_weights[index][feature] = self.feature_weights[index][feature] + self.alpha * difference * feature_value
+
+        if self.log_file:
+            weights = [self.feature_weights[index][feature] for index, features in self.enabled_features.items() for feature in features]
+            print(weights)
+            self.log_file.info(f"{','.join(map(str, weights))}")
 
         body_state = make_body_state(state, self.index)
 
@@ -96,12 +103,15 @@ class QLearningEgoAgent(RandomAgent):
 
     def q_value(self, state, target_velocity):
         feature_values = self.features(state, target_velocity)
-        q_value = sum(feature_value * self.feature_weights[feature] for feature, feature_value in feature_values.items())
+        q_value = sum(feature_value * self.feature_weights[index][feature] for index, opponent_feature_values in feature_values.items() for feature, feature_value in opponent_feature_values.items())
         return q_value
 
     def features(self, state, target_velocity):
+        return {index: self.features_opponent(state, target_velocity, index) for index in self.opponent_indexes}
+
+    def features_opponent(self, state, target_velocity, opponent_index):
         self_state = make_body_state(state, self.index)
-        opponent_state = make_body_state(state, self.index + 1)
+        opponent_state = make_body_state(state, opponent_index)
 
         def one_step_lookahead(body_state, throttle):  # one-step lookahead with no steering
             distance_velocity = body_state.velocity * self.time_resolution

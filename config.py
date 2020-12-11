@@ -295,7 +295,8 @@ class Config:
                 time_resolution=env.time_resolution,
                 width=env.constants.viewer_width,
                 height=env.constants.viewer_height,
-                num_velocity_targets=5
+                num_velocity_targets=5,
+                num_opponents=len(env.bodies)-1
             )
         # elif self.ego_config.agent is AgentType.FRENET:
         #     oubound_lane = env.constants.road_map.major_road.outbound.lanes[0].static_bounding_box
