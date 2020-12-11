@@ -202,10 +202,10 @@
                 "distance_y": { "type": "boolean" },
                 "distance": { "type": "boolean" },
                 "on_road": { "type": "boolean" },
-                "facing": { "type": "boolean" },
+                "relative_angle": { "type": "boolean" },
                 "inverse_distance": { "type": "boolean" }
             },
-            "required": [ "distance_x", "distance_y", "distance", "on_road", "facing", "inverse_distance" ],
+            "required": [ "distance_x", "distance_y", "distance", "on_road", "relative_angle", "inverse_distance" ],
             "additionalProperties": false
         },
         "q_learning_config": {

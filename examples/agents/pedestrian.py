@@ -135,17 +135,17 @@ class QLearningAgent(TargetAgent, RandomAgent):
 
         self.feature_bounds = dict()
         if self.feature_config.distance_x:
-            self.feature_bounds["distance_x"] = (0, width)
+            self.feature_bounds["distance_x"] = (0.0, width)
         if self.feature_config.distance_y:
-            self.feature_bounds["distance_y"] = (0, height)
+            self.feature_bounds["distance_y"] = (0.0, height)
         if self.feature_config.distance:
-            self.feature_bounds["distance"] = (1, math.sqrt((width ** 2) + (height ** 2)))
+            self.feature_bounds["distance"] = (0.0, math.sqrt((width ** 2) + (height ** 2)))
         if self.feature_config.on_road:
-            self.feature_bounds["on_road"] = (0, 1)
-        if self.feature_config.facing:
-            self.feature_bounds["facing"] = (0, math.pi)
+            self.feature_bounds["on_road"] = (0.0, 1.0)
+        if self.feature_config.relative_angle:
+            self.feature_bounds["relative_angle"] = (0.0, math.pi)
         if self.feature_config.inverse_distance:
-            self.feature_bounds["inverse_distance"] = (0, 1)
+            self.feature_bounds["inverse_distance"] = (0.0, 1.0)
             x_mid = M2PX * 16  # 0 < x_mid < self.x_max
             y_mid = 0.5  # 0 < y_mid < 1
             self.x_max = self.feature_bounds["distance"][1] if "distance" in self.feature_bounds else math.sqrt((width ** 2) + (height ** 2))
@@ -203,8 +203,8 @@ class QLearningAgent(TargetAgent, RandomAgent):
             unnormalised_values["distance"] = self_position.distance(ego_position)
         if self.feature_config.on_road:
             unnormalised_values["on_road"] = 1 if self_body.bounding_box().intersects(self.road_polgon) else 0
-        if self.feature_config.facing:
-            unnormalised_values["facing"] = abs(geometry.Line(start=ego_position, end=self_position).orientation() - ego_body.state.orientation)
+        if self.feature_config.relative_angle:
+            unnormalised_values["relative_angle"] = abs(geometry.normalise_angle(geometry.Line(start=self_state.position, end=ego_position.position).orientation() - self_state.orientation))
         if self.feature_config.inverse_distance:
             x = unnormalised_values["distance"] if "distance" in unnormalised_values else self_position.distance(ego_position)
             unnormalised_values["inverse_distance"] = 1 - (x / self.x_max) ** self.n  # thanks to Ram Varadarajan

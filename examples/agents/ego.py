@@ -34,13 +34,13 @@ class QLearningEgoAgent(RandomAgent):
 
         self.feature_bounds = dict()
         if self.feature_config.distance_x:
-            self.feature_bounds["distance_x"] = (0.0, float(width))
+            self.feature_bounds["distance_x"] = (-float(width), float(width))
         if self.feature_config.distance_y:
-            self.feature_bounds["distance_y"] = (0.0, float(height))
+            self.feature_bounds["distance_y"] = (-float(height), float(height))
         if self.feature_config.distance:
             self.feature_bounds["distance"] = (0.0, math.sqrt((width ** 2) + (height ** 2)))
-        if self.feature_config.facing:
-            self.feature_bounds["facing"] = (0.0, math.pi)
+        if self.feature_config.relative_angle:
+            self.feature_bounds["relative_angle"] = (0.0, math.pi)
 
         self.feature_weights = {index: {feature: 0.0 for feature in self.feature_bounds.keys()} for index in self.opponent_indexes}
 
@@ -92,7 +92,6 @@ class QLearningEgoAgent(RandomAgent):
 
         if self.log_file:
             weights = [self.feature_weights[index][feature] for index, features in self.enabled_features.items() for feature in features]
-            print(weights)
             self.log_file.info(f"{','.join(map(str, weights))}")
 
         body_state = make_body_state(state, self.index)
@@ -107,6 +106,8 @@ class QLearningEgoAgent(RandomAgent):
         return q_value
 
     def features(self, state, target_velocity):
+        # print()
+        # sleep(0.05)
         return {index: self.features_opponent(state, target_velocity, index) for index in self.opponent_indexes}
 
     def features_opponent(self, state, target_velocity, opponent_index):
@@ -150,8 +151,11 @@ class QLearningEgoAgent(RandomAgent):
             unnormalised_values["distance_y"] = self_state.position.distance_y(opponent_state.position)
         if self.feature_config.distance:
             unnormalised_values["distance"] = self_state.position.distance(opponent_state.position)
-        if self.feature_config.facing:
-            unnormalised_values["facing"] = abs(geometry.Line(start=self_state.position, end=opponent_state.position).orientation() - self_state.orientation)
+        if self.feature_config.relative_angle:
+            unnormalised_values["relative_angle"] = abs(geometry.normalise_angle(geometry.Line(start=self_state.position, end=opponent_state.position).orientation() - self_state.orientation))
+
+        # print(f"R{opponent_index}={unnormalised_values['distance']}, A{opponent_index}={math.degrees(unnormalised_values['relative_angle'])}", end=", ")
 
         normalised_values = {feature: normalise(feature_value, *self.feature_bounds[feature]) for feature, feature_value in unnormalised_values.items()}
+        # print(f"R{opponent_index}={normalised_values['distance']}, A{opponent_index}={normalised_values['relative_angle']}", end=", ")
         return normalised_values
