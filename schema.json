@@ -201,8 +201,9 @@
                 "distance_x": { "type": "boolean" },
                 "distance_y": { "type": "boolean" },
                 "distance": { "type": "boolean" },
-                "on_road": { "type": "boolean" },
                 "relative_angle": { "type": "boolean" },
+                "heading": { "type": "boolean" },
+                "on_road": { "type": "boolean" },
                 "inverse_distance": { "type": "boolean" }
             },
             "required": [ "distance_x", "distance_y", "distance", "on_road", "relative_angle", "inverse_distance" ],

@@ -41,6 +41,8 @@ class QLearningEgoAgent(RandomAgent):
             self.feature_bounds["distance"] = (0.0, math.sqrt((width ** 2) + (height ** 2)))
         if self.feature_config.relative_angle:
             self.feature_bounds["relative_angle"] = (0.0, math.pi)
+        if self.feature_config.heading:
+            self.feature_bounds["heading"] = (0.0, math.pi)
 
         self.feature_weights = {index: {feature: 0.0 for feature in self.feature_bounds.keys()} for index in self.opponent_indexes}
 
@@ -106,8 +108,6 @@ class QLearningEgoAgent(RandomAgent):
         return q_value
 
     def features(self, state, target_velocity):
-        # print()
-        # sleep(0.05)
         return {index: self.features_opponent(state, target_velocity, index) for index in self.opponent_indexes}
 
     def features_opponent(self, state, target_velocity, opponent_index):
@@ -153,9 +153,8 @@ class QLearningEgoAgent(RandomAgent):
             unnormalised_values["distance"] = self_state.position.distance(opponent_state.position)
         if self.feature_config.relative_angle:
             unnormalised_values["relative_angle"] = abs(geometry.normalise_angle(geometry.Line(start=self_state.position, end=opponent_state.position).orientation() - self_state.orientation))
-
-        # print(f"R{opponent_index}={unnormalised_values['distance']}, A{opponent_index}={math.degrees(unnormalised_values['relative_angle'])}", end=", ")
+        if self.feature_config.heading:
+            unnormalised_values["heading"] = abs(geometry.normalise_angle(geometry.Line(start=opponent_state.position, end=self_state.position).orientation() - opponent_state.orientation))
 
         normalised_values = {feature: normalise(feature_value, *self.feature_bounds[feature]) for feature, feature_value in unnormalised_values.items()}
-        # print(f"R{opponent_index}={normalised_values['distance']}, A{opponent_index}={normalised_values['relative_angle']}", end=", ")
         return normalised_values

@@ -174,8 +174,9 @@ class FeatureConfig:
     distance_x: bool
     distance_y: bool
     distance: bool
-    on_road: bool
     relative_angle: bool
+    heading: bool
+    on_road: bool
     inverse_distance: bool
 
 

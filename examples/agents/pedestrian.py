@@ -140,10 +140,12 @@ class QLearningAgent(TargetAgent, RandomAgent):
             self.feature_bounds["distance_y"] = (0.0, height)
         if self.feature_config.distance:
             self.feature_bounds["distance"] = (0.0, math.sqrt((width ** 2) + (height ** 2)))
-        if self.feature_config.on_road:
-            self.feature_bounds["on_road"] = (0.0, 1.0)
         if self.feature_config.relative_angle:
             self.feature_bounds["relative_angle"] = (0.0, math.pi)
+        if self.feature_config.heading:
+            self.feature_bounds["heading"] = (0.0, math.pi)
+        if self.feature_config.on_road:
+            self.feature_bounds["on_road"] = (0.0, 1.0)
         if self.feature_config.inverse_distance:
             self.feature_bounds["inverse_distance"] = (0.0, 1.0)
             x_mid = M2PX * 16  # 0 < x_mid < self.x_max
@@ -183,9 +185,6 @@ class QLearningAgent(TargetAgent, RandomAgent):
         for i, spawn_body in enumerate(spawn_bodies):
             spawn_body.step(joint_action[i], self.time_resolution)
 
-        ego_position = ego_body.state.position
-        self_position = self_body.state.position
-
         def normalise(value, min_bound, max_bound):
             if value < min_bound:
                 return 0
@@ -196,17 +195,19 @@ class QLearningAgent(TargetAgent, RandomAgent):
 
         unnormalised_values = dict()
         if self.feature_config.distance_x:
-            unnormalised_values["distance_x"] = self_position.distance_x(ego_position)
+            unnormalised_values["distance_x"] = self_body.state.position.distance_x(ego_body.state.position)
         if self.feature_config.distance_y:
-            unnormalised_values["distance_y"] = self_position.distance_y(ego_position)
+            unnormalised_values["distance_y"] = self_body.state.position.distance_y(ego_body.state.position)
         if self.feature_config.distance:
-            unnormalised_values["distance"] = self_position.distance(ego_position)
+            unnormalised_values["distance"] = self_body.state.position.distance(ego_body.state.position)
+        if self.feature_config.relative_angle:
+            unnormalised_values["relative_angle"] = abs(geometry.normalise_angle(geometry.Line(start=self_body.state.position, end=ego_body.state.position).orientation() - self_body.state.orientation))
+        if self.feature_config.heading:
+            unnormalised_values["heading"] = abs(geometry.normalise_angle(geometry.Line(start=ego_body.state.position, end=self_body.state.position).orientation() - ego_body.state.orientation))
         if self.feature_config.on_road:
             unnormalised_values["on_road"] = 1 if self_body.bounding_box().intersects(self.road_polgon) else 0
-        if self.feature_config.relative_angle:
-            unnormalised_values["relative_angle"] = abs(geometry.normalise_angle(geometry.Line(start=self_state.position, end=ego_position.position).orientation() - self_state.orientation))
         if self.feature_config.inverse_distance:
-            x = unnormalised_values["distance"] if "distance" in unnormalised_values else self_position.distance(ego_position)
+            x = unnormalised_values["distance"] if "distance" in unnormalised_values else self_body.state.position.distance(ego_body.state.position)
             unnormalised_values["inverse_distance"] = 1 - (x / self.x_max) ** self.n  # thanks to Ram Varadarajan
 
         normalised_values = {feature: normalise(feature_value, *self.feature_bounds[feature]) for feature, feature_value in unnormalised_values.items()}
