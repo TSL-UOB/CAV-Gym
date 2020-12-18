@@ -253,7 +253,7 @@
             "type": "object",
             "properties": {
                 "option": { "const": "render" },
-                "timestep_condition": {
+                "episode_condition": {
                     "type": "integer",
                     "minimum": 1
                 },
@@ -264,7 +264,7 @@
                     ]
                 }
             },
-            "required": [ "option", "timestep_condition", "video_dir" ],
+            "required": [ "option", "episode_condition", "video_dir" ],
             "additionalProperties": false
         }
     }

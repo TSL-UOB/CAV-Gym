@@ -39,7 +39,7 @@ class Simulation:
             self.run_file = reporting.get_run_file_logger(self.config.run_log)
 
     def should_render(self, episode):
-        return self.config.mode_config.mode is Mode.RENDER and episode % self.config.mode_config.timestep_condition == 0
+        return self.config.mode_config.mode is Mode.RENDER and episode % self.config.mode_config.episode_condition == 0
 
     def run(self):
         episode_data = list()

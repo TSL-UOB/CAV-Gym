@@ -209,14 +209,14 @@ class HeadlessConfig(ModeConfig):
 @enforce_types
 @dataclass(frozen=True)
 class RenderConfig(ModeConfig):
-    timestep_condition: int
+    episode_condition: int
     video_dir: Optional[str]
 
     mode = Mode.RENDER
 
     def __post_init__(self):
-        if self.timestep_condition < 1:
-            raise ValueError("timestep_condition must be >= 1")
+        if self.episode_condition < 1:
+            raise ValueError("episode_condition must be >= 1")
 
 
 class CollisionType(Enum):

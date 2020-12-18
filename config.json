@@ -39,7 +39,7 @@
   },
   "mode_config": {
     "option": "render",
-    "timestep_condition": 5,
+    "episode_condition": 5,
     "video_dir": null
   }
 }
