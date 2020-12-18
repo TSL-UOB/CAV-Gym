@@ -253,6 +253,10 @@
             "type": "object",
             "properties": {
                 "option": { "const": "render" },
+                "timestep_condition": {
+                    "type": "integer",
+                    "minimum": 1
+                },
                 "video_dir": {
                     "oneOf": [
                         { "type": "string" },
@@ -260,7 +264,7 @@
                     ]
                 }
             },
-            "required": [ "option", "video_dir" ],
+            "required": [ "option", "timestep_condition", "video_dir" ],
             "additionalProperties": false
         }
     }
