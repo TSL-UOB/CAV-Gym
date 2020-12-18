@@ -62,7 +62,7 @@ class CAVEnv(MarkovGameEnv):
         self.env_config = env_config
         self.np_random = np_random
 
-        self.frequency = 30 if self.env_config.mode_config.mode is Mode.RENDER and self.env_config.mode_config.video_dir else 60
+        self.frequency = 60
         self.time_resolution = 1.0 / self.frequency
 
         console_logger.info(f"frequency={self.frequency}")

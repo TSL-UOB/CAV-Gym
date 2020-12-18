@@ -1,6 +1,5 @@
+import pathlib
 import timeit
-
-from gym import wrappers
 
 import reporting
 from config import Mode, AgentType
@@ -17,11 +16,6 @@ class Simulation:
 
         if self.keyboard_agent is not None:
             assert self.config.mode_config.mode is Mode.RENDER, "keyboard agents only work in render mode"
-
-        if self.config.mode_config.mode is Mode.RENDER and self.config.mode_config.video_dir is not None:
-            from library import mods  # lazy import of pyglet to allow headless mode on headless machines
-            self.env = wrappers.Monitor(self.env, self.config.mode_config.video_dir, video_callable=lambda episode_id: True, force=True)  # save all episodes instead of default behaviour (episodes 1, 8, 27, 64, ...)
-            self.env.stats_recorder = mods.make_joint_stats_recorder(self.env, len(agents))  # workaround to avoid bugs due to existence of joint rewards
 
         if self.config.tester_config.agent is AgentType.ELECTION:
             self.election = Election(env, agents)
@@ -55,8 +49,14 @@ class Simulation:
             for agent in self.agents:
                 agent.reset()
 
+            video_file = None
             if self.should_render(episode):
-                self.env.render()
+                frame = self.env.render(mode='rgb_array' if self.config.mode_config.video_dir is not None else 'human')
+                if self.config.mode_config.video_dir is not None:
+                    pathlib.Path(self.config.mode_config.video_dir).mkdir(parents=True, exist_ok=True)
+                    import cv2
+                    video_file = cv2.VideoWriter(f"{self.config.mode_config.video_dir}/episode{episode:0{len(str(self.config.episodes))}}.mp4", cv2.VideoWriter_fourcc(*"mp4v"), self.env.frequency, (self.env.constants.viewer_width, self.env.constants.viewer_height), True)
+                    video_file.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR).astype("uint8"))
                 if self.keyboard_agent is not None and self.env.unwrapped.viewer.window.on_key_press is not self.keyboard_agent.key_press:  # must render before key_press can be assigned
                     self.env.unwrapped.viewer.window.on_key_press = self.keyboard_agent.key_press
 
@@ -81,14 +81,17 @@ class Simulation:
                     agent.process_feedback(previous_state, action, state, reward)
 
                 if self.should_render(episode):
-                    self.env.render()
+                    frame = self.env.render(mode='rgb_array' if self.config.mode_config.video_dir is not None else 'human')
+                    if self.config.mode_config.video_dir is not None:
+                        import cv2
+                        video_file.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR).astype("uint8"))
 
                 if done:
                     final_timestep = timestep
                     break
-            else:
-                if self.config.mode_config.mode is Mode.RENDER and self.config.mode_config.video_dir is not None:
-                    self.env.stats_recorder.done = True  # need to manually tell the monitor that the episode is over if it runs to completion (not sure why)
+
+            if video_file is not None:
+                video_file.release()
 
             if self.should_render(episode) and not self.should_render(episode+1):
                 self.env.close()  # closes viewer rather than environment
