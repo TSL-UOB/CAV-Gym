@@ -214,9 +214,20 @@
             "properties": {
                 "option": { "const": "q-learning" },
                 "alpha": {
-                    "type": "number",
-                    "minimum": 0,
-                    "maximum": 1
+                    "start": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                    },
+                    "stop": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                    },
+                    "num_steps": {
+                        "type": "integer",
+                        "minimum": 2
+                    }
                 },
                 "gamma": {
                     "type": "number",

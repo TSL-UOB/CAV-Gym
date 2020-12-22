@@ -118,7 +118,7 @@ class ElectionAgent(ProximityAgent):
 
 class QLearningAgent(TargetAgent, RandomAgent):
     # self.alpha is learning rate (should decrease over time)
-    # self.gamma is discount fbody (should be fixed over time?)
+    # self.gamma is discount factor (should be fixed over time?)
     # self.epsilon is exploration probability (should decrease over time)
     def __init__(self, ego_constants, road_polgon, width, height, q_learning_config, **kwargs):
         super().__init__(epsilon=q_learning_config.epsilon, **kwargs)  # self.epsilon is exploration probability (should decrease over time)
@@ -126,7 +126,7 @@ class QLearningAgent(TargetAgent, RandomAgent):
         self.ego_constants = ego_constants
         self.road_polgon = road_polgon
         self.alpha = q_learning_config.alpha  # learning rate (should decrease over time)
-        self.gamma = q_learning_config.gamma  # discount fbody (should be fixed over time?)
+        self.gamma = q_learning_config.gamma  # discount factor (should be fixed over time?)
         self.feature_config = q_learning_config.features
 
         self.log_file = None

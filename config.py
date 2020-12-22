@@ -182,8 +182,26 @@ class FeatureConfig:
 
 @enforce_types
 @dataclass(frozen=True)
+class LinSpace:
+    start: float
+    stop: float
+    num_steps: int
+
+    def __post_init__(self):
+        if self.start < 0 or self.start > 1:
+            raise ValueError("start must be in [0, 1]")
+        if self.stop < 0 or self.stop > 1:
+            raise ValueError("stop must be in [0, 1]")
+        if self.stop > self.start:
+            raise ValueError("start must be greater than stop")
+        if self.num_steps < 2:
+            raise ValueError("num_steps must be >= 2")
+
+
+@enforce_types
+@dataclass(frozen=True)
 class QLearningConfig(AgentConfig):
-    alpha: float
+    alpha: LinSpace
     gamma: float
     epsilon: float
     features: FeatureConfig
@@ -192,8 +210,6 @@ class QLearningConfig(AgentConfig):
     agent = AgentType.Q_LEARNING
 
     def __post_init__(self):
-        if self.alpha < 0 or self.alpha > 1:
-            raise ValueError("alpha must be in [0, 1]")
         if self.epsilon < 0 or self.epsilon > 1:
             raise ValueError("epsilon must be in [0, 1]")
         if self.gamma < 0 or self.gamma > 1:
@@ -301,7 +317,7 @@ class Config:
                 time_resolution=env.time_resolution,
                 width=env.constants.viewer_width,
                 height=env.constants.viewer_height,
-                num_velocity_targets=5,
+                num_actions=5,
                 num_opponents=len(env.bodies)-1
             )
         # elif self.ego_config.agent is AgentType.FRENET:
@@ -442,9 +458,11 @@ def make_scenario_config(data):  # deserialise data to ScenarioConfig
 
 
 def make_q_learning_config(data):
+    alpha_data = data.pop("alpha")
+    alpha = LinSpace(**alpha_data)
     feature_config_data = data.pop("feature_config")
     feature_config = FeatureConfig(**feature_config_data)
-    return QLearningConfig(**data, features=feature_config)
+    return QLearningConfig(**data, alpha=alpha, features=feature_config)
 
 
 def make_ego_config(data):  # deserialise data to AgentConfig
