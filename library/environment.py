@@ -130,13 +130,17 @@ class CAVEnv(MarkovGameEnv):
 
         joint_reward = [0.0 for _ in self.bodies]
 
+        ego_relative_distance_to_destination = max(0.0, min(1.0, (self.constants.viewer_width - self.ego.state.position.x) / self.constants.viewer_width))
+
         ego_velocity_relative_offset = abs(self.ego.state.velocity - self.ego_maintenance_velocity) / self.ego_max_velocity_offset
         joint_reward[0] -= ego_velocity_relative_offset * self.env_config.cost_step
+        joint_reward[0] += (1.0 - ego_relative_distance_to_destination) * self.env_config.cost_step
 
         for i, polygon in enumerate(body_polygons):
             if i > 0:
                 percentage_intersects = max(polygon.percentage_intersects(road.bounding_box()) for road in self.constants.road_map.roads)
                 joint_reward[i] -= percentage_intersects * self.env_config.cost_step
+                joint_reward[i] += ego_relative_distance_to_destination * self.env_config.cost_step
                 if percentage_intersects > 0.5:  # pedestrian mostly on road
                     self.episode_liveness[i] += 1
                     self.run_liveness[i] += 1
