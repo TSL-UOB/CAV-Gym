@@ -1,3 +1,4 @@
 enforce-typing~=1.0.0.post1
 gym==0.17.2
 Shapely~=1.7.0
+pyglet==1.5.11
