@@ -55,7 +55,13 @@ class Simulation:
                 if self.config.mode_config.video_dir is not None:
                     pathlib.Path(self.config.mode_config.video_dir).mkdir(parents=True, exist_ok=True)
                     import cv2
-                    video_file = cv2.VideoWriter(f"{self.config.mode_config.video_dir}/episode{episode:0{len(str(self.config.episodes))}}.mp4", cv2.VideoWriter_fourcc(*"mp4v"), self.env.frequency, (self.env.constants.viewer_width, self.env.constants.viewer_height), True)
+                    video_file = cv2.VideoWriter(
+                        f"{self.config.mode_config.video_dir}/episode{episode:0{len(str(self.config.episodes))}}.mp4",
+                        cv2.VideoWriter_fourcc(*"mp4v"),
+                        self.env.frequency,
+                        (int(self.env.constants.viewer_width), int(self.env.constants.viewer_height)),
+                        True
+                    )
                     video_file.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR).astype("uint8"))
                 if self.keyboard_agent is not None and self.env.unwrapped.viewer.window.on_key_press is not self.keyboard_agent.key_press:  # must render before key_press can be assigned
                     self.env.unwrapped.viewer.window.on_key_press = self.keyboard_agent.key_press
